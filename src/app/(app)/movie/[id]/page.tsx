@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DetailHero } from "@/features/media/components/detail-hero";
+import { StreamButton } from "@/features/streaming/components/stream-button";
 import { MediaMeta } from "@/features/media/components/media-meta";
 import { CastRow } from "@/features/media/components/cast-row";
 import { MediaRow } from "@/features/media/components/media-row";
@@ -128,22 +129,31 @@ export default async function MovieDetailPage({ params }: PageProps) {
         videos={movie.videos}
         streaming={movie.streaming}
       >
-        {directors.length ? (
-          <p className="text-sm text-muted-foreground">
-            Directed by{" "}
-            {directors.map((d, i) => (
-              <span key={d.creditId ?? d.id}>
-                {i > 0 ? ", " : null}
-                <Link
-                  href={mediaHref("person", d.id)}
-                  className="font-medium text-foreground underline-offset-4 hover:underline"
-                >
-                  {d.name}
-                </Link>
-              </span>
-            ))}
-          </p>
-        ) : null}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-2">
+          <StreamButton
+            title={movie.title}
+            tmdbId={movie.id}
+            mediaType="movie"
+            identity={identity}
+            variant="hero"
+          />
+          {directors.length ? (
+            <p className="text-sm text-muted-foreground">
+              Directed by{" "}
+              {directors.map((d, i) => (
+                <span key={d.creditId ?? d.id}>
+                  {i > 0 ? ", " : null}
+                  <Link
+                    href={mediaHref("person", d.id)}
+                    className="font-medium text-foreground underline-offset-4 hover:underline"
+                  >
+                    {d.name}
+                  </Link>
+                </span>
+              ))}
+            </p>
+          ) : null}
+        </div>
       </DetailHero>
 
       <div className="grid w-full min-w-0 max-w-full gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(16.5rem,20rem)] lg:items-start lg:gap-6">

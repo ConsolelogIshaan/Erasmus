@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { WatchedToggle } from "@/components/ui/watched-toggle";
+import { StreamButton } from "@/features/streaming/components/stream-button";
 import { stillUrl } from "@/lib/media/image";
 import { formatDate, formatRuntime, formatVote } from "@/lib/media/format";
 import {
@@ -389,6 +390,8 @@ function SeasonRow({
               {episodes.map((ep) => (
                 <EpisodeRow
                   key={ep.id}
+                  showId={showId}
+                  seasonNumber={season.seasonNumber}
                   name={ep.name}
                   episodeNumber={ep.episodeNumber}
                   overview={ep.overview}
@@ -414,6 +417,8 @@ function SeasonRow({
 }
 
 interface EpisodeRowProps {
+  showId: string;
+  seasonNumber: number;
   name: string;
   episodeNumber: number;
   overview?: string | null;
@@ -439,6 +444,8 @@ interface EpisodeRowProps {
  * the unwatched episodes are the ones the user is looking for.
  */
 function EpisodeRow({
+  showId,
+  seasonNumber,
   name,
   episodeNumber,
   overview,
@@ -497,15 +504,25 @@ function EpisodeRow({
             <span className="text-primary">★ {formatVote(voteAverage)}</span>
           ) : null}
         </div>
-        {canTrack ? (
-          <WatchedToggle
-            state={watched}
-            onClick={onToggle}
-            disabled={pending}
-            label={`${seasonName} episode ${episodeNumber}`}
-            size="sm"
+        <div className="flex items-center gap-1.5">
+          <StreamButton
+            title={name}
+            tmdbId={showId}
+            mediaType="tv"
+            season={seasonNumber}
+            episode={episodeNumber}
+            variant="icon"
           />
-        ) : null}
+          {canTrack ? (
+            <WatchedToggle
+              state={watched}
+              onClick={onToggle}
+              disabled={pending}
+              label={`${seasonName} episode ${episodeNumber}`}
+              size="sm"
+            />
+          ) : null}
+        </div>
       </div>
     </li>
   );

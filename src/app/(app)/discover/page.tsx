@@ -34,7 +34,7 @@ export default async function DiscoverPage() {
     <div className="space-y-10">
       <PageHeaderMotion
         title="Discover"
-        description="A cinematic catalog of movies and television — search with ⌘K anytime."
+        description="Films and television worth your time. Press ⌘K to search anything."
       />
 
       {!data.configured ? <CatalogConfigBanner /> : null}
