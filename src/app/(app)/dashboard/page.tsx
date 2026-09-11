@@ -36,7 +36,7 @@ import { formatRelativeDate } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Home",
-  description: "Your habits, your taste, and what to watch next",
+  description: "Your watch history, habits, and what to watch next",
 };
 
 /**
@@ -61,7 +61,7 @@ export default async function DashboardPage() {
       <PageHeaderMotion
         eyebrow="Welcome back"
         title={name}
-        description="Your habits, your taste, and what to watch next."
+        description="Where you left off, what you have finished, and what to watch next."
         actions={
           <>
             <Button asChild size="sm">
@@ -127,7 +127,7 @@ export default async function DashboardPage() {
         <DashboardSection
           title="Insights"
           href={ROUTES.insights}
-          description="Deterministic observations from your journal"
+          description="What your watch history says about you"
         >
           <InsightCards insights={insights.slice(0, 3)} />
         </DashboardSection>
@@ -251,7 +251,7 @@ export default async function DashboardPage() {
       {dash.recommendations.length > 0 ? (
         <DashboardSection
           title="Recommended for you"
-          description="Based on your genres, ratings and history"
+          description="Based on genres, ratings, and history — not AI"
         >
           <div className="scrollbar-thin flex gap-3 overflow-x-auto pb-2">
             {dash.recommendations.map((item) => (

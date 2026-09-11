@@ -88,7 +88,10 @@ function anchorVerb(profile: TasteProfile, title: string): string {
   if (!anchor) return "watched";
   switch (anchor.basis) {
     case "rated_high":
-      return "rated highly";
+      // Reads as "Because you loved X". "rated highly" produced the ungrammatical
+      // "Because you rated highly X", and a high rating is fairly described as
+      // loving it.
+      return "loved";
     case "rewatched":
       return "rewatched";
     case "favorite":
@@ -98,30 +101,6 @@ function anchorVerb(profile: TasteProfile, title: string): string {
     case "completed":
     default:
       return "watched";
-  }
-}
-
-/**
- * The single-anchor sentence, written out per relationship rather than by
- * dropping `anchorVerb` into one template: "you rated highly Blade Runner 2049"
- * is not a sentence anybody would say out loud.
- */
-function anchorClause(profile: TasteProfile, title: string): string {
-  const anchor = profile.anchors.find(
-    (a) => a.title.toLowerCase() === title.toLowerCase(),
-  );
-  switch (anchor?.basis) {
-    case "rated_high":
-      return `Because you rated ${title} highly`;
-    case "rewatched":
-      return `Because you rewatched ${title}`;
-    case "favorite":
-      return `Because ${title} is a favorite of yours`;
-    case "deeply_engaged":
-      return `Because you wrote about ${title}`;
-    case "completed":
-    default:
-      return `Because you watched ${title}`;
   }
 }
 
@@ -141,9 +120,10 @@ function sentenceFor(factor: ScoreFactor, profile: TasteProfile): string | null 
 
     case "anchor_similarity": {
       if (!evidence[0]) return null;
+      const verb = anchorVerb(profile, evidence[0]);
       return evidence.length > 1
-        ? `Close to ${list(evidence, 2)}, which you ${anchorVerb(profile, evidence[0])}`
-        : anchorClause(profile, evidence[0]);
+        ? `Close to ${list(evidence, 2)}, which you ${verb}`
+        : `Because you ${verb} ${evidence[0]}`;
     }
 
     case "people_affinity": {
@@ -182,7 +162,7 @@ function sentenceFor(factor: ScoreFactor, profile: TasteProfile): string | null 
     }
 
     case "quality":
-      return evidence[0] ? `Strong audience score: ${evidence[0]}` : null;
+      return evidence[0] ? `Strong audience score (${evidence[0]})` : null;
 
     case "freshness":
       return evidence[0] ? `Released ${evidence[0]}` : null;
@@ -191,7 +171,7 @@ function sentenceFor(factor: ScoreFactor, profile: TasteProfile): string | null 
       return evidence[0] === "Low popularity"
         ? "A quieter title than your usual picks"
         : evidence[0]
-          ? `A change of pace: ${evidence[0]} sits outside your usual genres`
+          ? `${evidence[0]} is outside your usual genres`
           : null;
 
     case "media_type_fit":
