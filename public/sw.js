@@ -1,5 +1,5 @@
 /* Argus service worker — offline fallback only; never pin stale app HTML/CSS */
-const CACHE = "argus-shell-v4";
+const CACHE = "argus-shell-v5";
 const OFFLINE = "/offline";
 
 /**
