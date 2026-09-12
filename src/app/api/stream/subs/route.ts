@@ -1,20 +1,9 @@
 import { NextResponse } from "next/server";
+import { loadWyzieList, publicTracks } from "@/lib/streaming/wyzie";
 
 export const runtime = "nodejs";
-
-interface WyzieTrack {
-  display: string;
-  language: string;
-  url: string;
-  encoding?: string;
-}
-
-function rankLanguage(language: string, label: string) {
-  const hay = `${language} ${label}`.toLowerCase();
-  if (hay.includes("english") || hay === "en" || hay.startsWith("en ")) return 0;
-  if (hay.startsWith("en")) return 1;
-  return 10;
-}
+export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -25,34 +14,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ tracks: [] }, { status: 400 });
   }
 
-  const wyzie = new URL("https://vidfast.vc/wyzie");
-  wyzie.searchParams.set("id", tmdbId);
-  if (season) wyzie.searchParams.set("season", season);
-  if (episode) wyzie.searchParams.set("episode", episode);
-
   try {
-    const upstream = await fetch(wyzie, {
-      headers: {
-        Referer: "https://vidfast.vc/",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      },
+    const { tracks } = await loadWyzieList({
+      id: tmdbId,
+      season,
+      episode,
     });
-    if (!upstream.ok) {
-      return NextResponse.json({ tracks: [] });
-    }
-    const data = (await upstream.json()) as WyzieTrack[];
-    const tracks = (Array.isArray(data) ? data : [])
-      .map((track) => ({
-        label: track.display,
-        language: track.language,
-        url: `/api/stream/hls?url=${encodeURIComponent(track.url)}&referer=${encodeURIComponent("https://vidfast.vc/")}`,
-      }))
-      .sort(
-        (a, b) =>
-          rankLanguage(a.language, a.label) - rankLanguage(b.language, b.label),
-      );
-    return NextResponse.json({ tracks });
+    return NextResponse.json({
+      tracks: publicTracks({ id: tmdbId, season, episode }, tracks),
+    });
   } catch {
     return NextResponse.json({ tracks: [] });
   }

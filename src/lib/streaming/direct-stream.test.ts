@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { STREAMING_SERVERS } from "./stream-resolver";
 import { buildSheguQuery, sheguServerName } from "./cinejoy-stream";
 import { cuesAtTime, isSrtText, parseSubtitleCues, srtToVtt } from "./subtitles";
+import { publicTracks } from "./wyzie";
 
 describe("direct stream proxy path", () => {
   it("encodes an https playlist into the HLS relay", () => {
@@ -43,5 +44,15 @@ My dad was a farmer.
     expect(cues[0]?.text).toBe("My dad was a farmer.");
     expect(cuesAtTime(cues, 8)).toBe("My dad was a farmer.");
     expect(cuesAtTime(cues, 1)).toBe("");
+  });
+
+  it("exposes subtitle files through the dedicated subs route", () => {
+    const tracks = publicTracks({ id: "1399", season: "1", episode: "1" }, [
+      { display: "English", language: "en", url: "https://vidfast.vc/wyzie/abc" },
+    ]);
+    expect(tracks[0]!.url).toContain("/api/stream/subs/file?");
+    expect(tracks[0]!.url).toContain("id=1399");
+    expect(tracks[0]!.url).toContain("index=0");
+    expect(tracks[0]!.url).not.toContain("/api/stream/hls");
   });
 });
