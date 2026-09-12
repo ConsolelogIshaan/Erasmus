@@ -3,6 +3,8 @@
 import * as React from "react";
 import Hls from "hls.js";
 import {
+  Check,
+  ChevronLeft,
   Maximize2,
   Pause,
   PictureInPicture2,
@@ -15,7 +17,6 @@ import {
   VolumeX,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { formatTimecode } from "@/lib/streaming/playback-progress";
 import {
   cuesAtTime,
@@ -40,7 +41,9 @@ interface NativePlayerProps {
   onProgress?: (seconds: number, duration: number) => void;
 }
 
-type Panel = "none" | "settings" | "subs" | "audio" | "quality";
+type Panel = "none" | "settings" | "subs" | "audio" | "quality" | "speed";
+
+const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 
 export function NativePlayer({
   src,
@@ -340,108 +343,91 @@ export function NativePlayer({
       </div>
       {cueText ? (
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-28 z-[80] flex justify-center px-6"
-          style={{ zIndex: 80 }}
+          className="pointer-events-none absolute inset-x-0 z-[80] flex justify-center px-8"
+          style={{
+            zIndex: 80,
+            bottom: showBar || panel !== "none" ? "6.5rem" : "2.5rem",
+          }}
         >
-          <p className="max-w-4xl whitespace-pre-line rounded-md bg-black/80 px-4 py-1.5 text-center text-lg font-semibold leading-snug text-white sm:text-2xl">
+          <p className="max-w-3xl whitespace-pre-line text-center text-[1.05rem] font-medium leading-snug tracking-wide text-white sm:text-xl"
+            style={{ textShadow: "0 1px 2px rgba(0,0,0,0.9), 0 0 12px rgba(0,0,0,0.7)" }}
+          >
             {cueText}
           </p>
         </div>
       ) : null}
       {buffering ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-primary" />
+          <div className="h-9 w-9 animate-spin rounded-full border-[2px] border-white/15 border-t-white" />
         </div>
       ) : null}
       <div
         className={cn(
-          "absolute inset-x-0 bottom-0 z-[100] bg-gradient-to-t from-black via-black/85 to-transparent px-4 pb-5 pt-14 text-white transition-transform duration-200",
+          "absolute inset-x-0 bottom-0 z-[100] bg-gradient-to-t from-black/90 via-black/50 to-transparent px-5 pb-5 pt-16 text-white",
+          "transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]",
           showBar || panel !== "none"
-            ? "translate-y-0"
-            : "translate-y-full pointer-events-none",
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-2 opacity-0",
         )}
-        style={{ zIndex: 100, color: "#fff" }}
+        style={{ zIndex: 100 }}
         onClick={(event) => event.stopPropagation()}
       >
-        <input
-          type="range"
-          min={0}
-          max={Math.max(1, duration)}
-          value={Math.min(current, duration || 0)}
-          onChange={(event) => seekTo(Number(event.target.value))}
-          className="mb-3 h-1 w-full cursor-pointer appearance-none rounded-full bg-white/20 accent-primary"
-          aria-label="Seek"
-        />
-        <div className="flex items-center gap-1.5 text-white [&_svg]:text-white">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-9 w-9 p-0 text-white hover:bg-white/15 active:scale-[0.97]"
+        <SeekBar current={current} duration={duration} onSeek={seekTo} />
+        <div className="mt-1 flex items-center gap-0.5">
+          <IconButton
+            title={paused ? "Play" : "Pause"}
             onClick={() => {
               const video = videoRef.current;
               if (!video) return;
               if (video.paused) video.play().catch(() => {});
               else video.pause();
             }}
-            title={paused ? "Play" : "Pause"}
           >
-            {paused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="relative h-9 w-9 p-0 text-white hover:bg-white/15"
-            onClick={() => seekTo(current - 10)}
-            title="Back 10 seconds"
-          >
-            <RotateCcw className="h-5 w-5" />
-            <span className="pointer-events-none absolute inset-0 flex items-center justify-center pt-0.5 text-[8px] font-bold">
-              10
+            {paused ? (
+              <Play className="h-[18px] w-[18px] fill-current" />
+            ) : (
+              <Pause className="h-[18px] w-[18px] fill-current" />
+            )}
+          </IconButton>
+          <IconButton title="Back 10 seconds" onClick={() => seekTo(current - 10)}>
+            <span className="relative inline-flex h-[18px] w-[18px] items-center justify-center">
+              <RotateCcw className="h-[18px] w-[18px]" />
+              <span className="absolute inset-0 flex items-center justify-center pt-px text-[7px] font-semibold leading-none">
+                10
+              </span>
             </span>
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="relative h-9 w-9 p-0 text-white hover:bg-white/15"
-            onClick={() => seekTo(current + 10)}
-            title="Forward 10 seconds"
-          >
-            <RotateCw className="h-5 w-5" />
-            <span className="pointer-events-none absolute inset-0 flex items-center justify-center pt-0.5 text-[8px] font-bold">
-              10
+          </IconButton>
+          <IconButton title="Forward 10 seconds" onClick={() => seekTo(current + 10)}>
+            <span className="relative inline-flex h-[18px] w-[18px] items-center justify-center">
+              <RotateCw className="h-[18px] w-[18px]" />
+              <span className="absolute inset-0 flex items-center justify-center pt-px text-[7px] font-semibold leading-none">
+                10
+              </span>
             </span>
-          </Button>
-          <span className="px-2 font-mono text-xs text-white/80">
-            {formatTimecode(current)} / {formatTimecode(duration)}
+          </IconButton>
+          <span className="ml-1.5 min-w-[7.5rem] font-mono text-[11px] tabular-nums tracking-wide text-white/70">
+            {formatTimecode(current)}
+            <span className="text-white/30"> / </span>
+            {formatTimecode(duration)}
           </span>
-          <button
-            type="button"
-            className="ml-1 flex items-center gap-1"
+          <IconButton
+            title={muted ? "Unmute" : "Mute"}
             onClick={() => {
               const video = videoRef.current;
               if (!video) return;
               video.muted = !video.muted;
               setMuted(video.muted);
             }}
-            title={muted ? "Unmute" : "Mute"}
           >
             {muted || volume === 0 ? (
-              <VolumeX className="h-4 w-4 text-white/80" />
+              <VolumeX className="h-4 w-4" />
             ) : (
-              <Volume2 className="h-4 w-4 text-white/80" />
+              <Volume2 className="h-4 w-4" />
             )}
-          </button>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
+          </IconButton>
+          <VolumeBar
             value={muted ? 0 : volume}
-            onChange={(event) => {
-              const next = Number(event.target.value);
+            onChange={(next) => {
               const video = videoRef.current;
               setVolume(next);
               setMuted(next === 0);
@@ -450,41 +436,24 @@ export function NativePlayer({
                 video.muted = next === 0;
               }
             }}
-            className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-white/20 accent-primary"
-            aria-label="Volume"
           />
           <span className="flex-1" />
-          <span className="hidden rounded-md border border-white/10 bg-white/5 px-2 py-1 font-mono text-[10px] text-white/70 sm:inline">
-            {qualityLabel}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "h-9 w-9 p-0 hover:bg-white/15",
-              subId !== "off" ? "text-primary" : "text-white",
-            )}
-            onClick={() => setPanel(panel === "subs" ? "none" : "subs")}
+          <IconButton
             title="Subtitles"
+            active={subId !== "off"}
+            onClick={() => setPanel(panel === "subs" ? "none" : "subs")}
           >
             <Subtitles className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-9 w-9 p-0 text-white hover:bg-white/15"
-            onClick={() => setPanel(panel === "settings" ? "none" : "settings")}
+          </IconButton>
+          <IconButton
             title="Settings"
+            active={panel === "settings" || panel === "quality" || panel === "speed" || panel === "audio"}
+            onClick={() => setPanel(panel === "settings" ? "none" : "settings")}
           >
             <Settings2 className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-9 w-9 p-0 text-white hover:bg-white/15"
+          </IconButton>
+          <IconButton
+            title="Picture in picture"
             onClick={() => {
               const video = videoRef.current;
               if (!video) return;
@@ -494,31 +463,23 @@ export function NativePlayer({
                 video.requestPictureInPicture?.().catch(() => {});
               }
             }}
-            title="Picture in picture"
           >
             <PictureInPicture2 className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-9 w-9 p-0 text-white hover:bg-white/15"
-            onClick={() => onToggleFullscreen?.()}
-            title="Fullscreen"
-          >
+          </IconButton>
+          <IconButton title="Fullscreen" onClick={() => onToggleFullscreen?.()}>
             <Maximize2 className="h-4 w-4" />
-          </Button>
+          </IconButton>
         </div>
       </div>
 
       {panel !== "none" ? (
         <div
-          className="absolute bottom-24 right-4 z-[110] max-h-[50vh] w-64 overflow-y-auto rounded-xl border border-white/20 bg-black py-1 text-white shadow-2xl"
-          style={{ zIndex: 110, background: "#111", color: "#fff" }}
+          className="absolute bottom-[5.25rem] right-5 z-[110] w-60 origin-bottom-right overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0c]/95 text-white shadow-[0_16px_50px_rgba(0,0,0,0.55)] backdrop-blur-md"
+          style={{ zIndex: 110 }}
           onClick={(event) => event.stopPropagation()}
         >
           {panel === "settings" ? (
-            <>
+            <div className="py-1">
               <MenuRow
                 label="Quality"
                 value={qualityLabel}
@@ -527,11 +488,7 @@ export function NativePlayer({
               <MenuRow
                 label="Speed"
                 value={`${speed}x`}
-                onClick={() => {
-                  const next = speed === 1 ? 1.25 : speed === 1.25 ? 1.5 : speed === 1.5 ? 2 : 1;
-                  setSpeed(next);
-                  if (videoRef.current) videoRef.current.playbackRate = next;
-                }}
+                onClick={() => setPanel("speed")}
               />
               {audioTracks.length > 1 ? (
                 <MenuRow
@@ -545,88 +502,115 @@ export function NativePlayer({
                 value={activeSub}
                 onClick={() => setPanel("subs")}
               />
-            </>
+            </div>
+          ) : null}
+          {panel === "speed" ? (
+            <ChoiceList
+              title="Speed"
+              onBack={() => setPanel("settings")}
+              items={PLAYBACK_SPEEDS.map((rate) => ({
+                key: String(rate),
+                label: `${rate}x`,
+                active: speed === rate,
+                onSelect: () => {
+                  setSpeed(rate);
+                  if (videoRef.current) videoRef.current.playbackRate = rate;
+                  setPanel("none");
+                },
+              }))}
+            />
           ) : null}
           {panel === "quality" ? (
-            <>
-              <button
-                type="button"
-                className={cn(
-                  "block w-full px-3 py-2 text-left text-xs hover:bg-white/10",
-                  level < 0 ? "text-primary" : "text-white/80",
-                )}
-                onClick={() => applyLevel(-1)}
-              >
-                Auto
-              </button>
-              {[...levels]
-                .sort((a, b) => b.height - a.height)
-                .map((item) => (
-                  <button
-                    key={item.index}
-                    type="button"
-                    className={cn(
-                      "block w-full px-3 py-2 text-left text-xs hover:bg-white/10",
-                      level === item.index ? "text-primary" : "text-white/80",
-                    )}
-                    onClick={() => applyLevel(item.index)}
-                  >
-                    {item.height}p
-                  </button>
-                ))}
-            </>
+            <ChoiceList
+              title="Quality"
+              onBack={() => setPanel("settings")}
+              items={[
+                {
+                  key: "auto",
+                  label: "Auto",
+                  active: level < 0,
+                  onSelect: () => applyLevel(-1),
+                },
+                ...[...levels]
+                  .sort((a, b) => b.height - a.height)
+                  .map((item) => ({
+                    key: String(item.index),
+                    label: `${item.height}p`,
+                    active: level === item.index,
+                    onSelect: () => applyLevel(item.index),
+                  })),
+              ]}
+            />
           ) : null}
           {panel === "audio" ? (
-            audioTracks.map((track) => (
-              <button
-                key={track.index}
-                type="button"
-                className={cn(
-                  "block w-full px-3 py-2 text-left text-xs hover:bg-white/10",
-                  audio === track.index ? "text-primary" : "text-white/80",
-                )}
-                onClick={() => applyAudio(track.index)}
-              >
-                {track.name}
-              </button>
-            ))
+            <ChoiceList
+              title="Audio"
+              onBack={() => setPanel("settings")}
+              items={audioTracks.map((track) => ({
+                key: String(track.index),
+                label: track.name,
+                active: audio === track.index,
+                onSelect: () => applyAudio(track.index),
+              }))}
+            />
           ) : null}
           {panel === "subs" ? (
-            <>
-              <button
-                type="button"
-                className={cn(
-                  "block w-full px-3 py-2 text-left text-xs hover:bg-white/10",
-                  subId === "off" ? "text-primary" : "text-white/80",
-                )}
-                onClick={() => {
-                  setSubId("off");
-                  setPanel("none");
-                }}
-              >
-                Off
-              </button>
-              {externalSubtitles.map((sub, index) => (
-                <button
-                  key={`${sub.language}-${index}`}
-                  type="button"
-                  className={cn(
-                    "block w-full px-3 py-2 text-left text-xs hover:bg-white/10",
-                    subId === `ext-${index}` ? "text-primary" : "text-white/80",
-                  )}
-                  onClick={() => {
+            <ChoiceList
+              title="Subtitles"
+              onBack={() => setPanel("settings")}
+              items={[
+                {
+                  key: "off",
+                  label: "Off",
+                  active: subId === "off",
+                  onSelect: () => {
+                    setSubId("off");
+                    setPanel("none");
+                  },
+                },
+                ...externalSubtitles.map((sub, index) => ({
+                  key: `${sub.language}-${index}`,
+                  label: sub.label,
+                  active: subId === `ext-${index}`,
+                  onSelect: () => {
                     setSubId(`ext-${index}`);
                     setPanel("none");
-                  }}
-                >
-                  {sub.label}
-                </button>
-              ))}
-            </>
+                  },
+                })),
+              ]}
+            />
           ) : null}
         </div>
       ) : null}
     </div>
+  );
+}
+
+function IconButton({
+  title,
+  onClick,
+  active,
+  children,
+}: {
+  title: string;
+  onClick: () => void;
+  active?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition-[background-color,transform,color] duration-150 ease-out",
+        "hover:bg-white/10 active:scale-[0.97]",
+        active && "text-primary",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -642,11 +626,166 @@ function MenuRow({
   return (
     <button
       type="button"
-      className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-white/90 hover:bg-white/10"
+      className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-[13px] text-white/90 transition-colors duration-150 hover:bg-white/[0.06]"
       onClick={onClick}
     >
       <span>{label}</span>
-      <span className="text-white/50">{value}</span>
+      <span className="text-[12px] text-white/40">{value}</span>
     </button>
+  );
+}
+
+function ChoiceList({
+  title,
+  onBack,
+  items,
+}: {
+  title: string;
+  onBack?: () => void;
+  items: { key: string; label: string; active: boolean; onSelect: () => void }[];
+}) {
+  return (
+    <div className="flex max-h-[50vh] flex-col">
+      <div className="flex items-center gap-1 border-b border-white/10 px-1.5 py-1.5">
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Back"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        ) : (
+          <span className="w-2" />
+        )}
+        <p className="text-[12px] font-medium tracking-wide text-white/80">{title}</p>
+      </div>
+      <div className="overflow-y-auto py-1">
+        {items.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={cn(
+              "flex w-full items-center justify-between px-3.5 py-2 text-left text-[13px] transition-colors duration-150 hover:bg-white/[0.06]",
+              item.active ? "text-white" : "text-white/70",
+            )}
+            onClick={item.onSelect}
+          >
+            <span>{item.label}</span>
+            {item.active ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VolumeBar({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (next: number) => void;
+}) {
+  const trackRef = React.useRef<HTMLDivElement>(null);
+  const draggingRef = React.useRef(false);
+  const pct = Math.min(100, Math.max(0, value * 100));
+
+  const fromPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    onChange(ratio);
+  };
+
+  return (
+    <div
+      ref={trackRef}
+      className="group/vol relative mx-1 hidden h-5 w-[4.5rem] cursor-pointer items-center sm:flex"
+      onPointerDown={(event) => {
+        draggingRef.current = true;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        fromPointer(event);
+      }}
+      onPointerMove={(event) => {
+        if (draggingRef.current) fromPointer(event);
+      }}
+      onPointerUp={() => {
+        draggingRef.current = false;
+      }}
+      role="slider"
+      aria-label="Volume"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(pct)}
+    >
+      <div className="relative h-[3px] w-full rounded-full bg-white/20">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-white"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SeekBar({
+  current,
+  duration,
+  onSeek,
+}: {
+  current: number;
+  duration: number;
+  onSeek: (seconds: number) => void;
+}) {
+  const trackRef = React.useRef<HTMLDivElement>(null);
+  const draggingRef = React.useRef(false);
+  const pct = duration > 0 ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
+
+  const seekFromPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+    const track = trackRef.current;
+    if (!track || duration <= 0) return;
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    onSeek(ratio * duration);
+  };
+
+  return (
+    <div
+      ref={trackRef}
+      className="group relative mb-3 flex h-5 w-full cursor-pointer items-center"
+      onPointerDown={(event) => {
+        draggingRef.current = true;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        seekFromPointer(event);
+      }}
+      onPointerMove={(event) => {
+        if (draggingRef.current) seekFromPointer(event);
+      }}
+      onPointerUp={() => {
+        draggingRef.current = false;
+      }}
+      onPointerCancel={() => {
+        draggingRef.current = false;
+      }}
+      role="slider"
+      aria-label="Seek"
+      aria-valuemin={0}
+      aria-valuemax={Math.round(duration)}
+      aria-valuenow={Math.round(current)}
+    >
+      <div className="relative h-[3px] w-full rounded-full bg-white/20 transition-[height] duration-150 group-hover:h-1.5">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-primary"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div
+        className="pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary opacity-0 shadow-[0_0_8px_rgba(29,144,245,0.65)] transition-opacity duration-150 group-hover:opacity-100 group-active:opacity-100"
+        style={{ left: `${pct}%` }}
+      />
+    </div>
   );
 }
