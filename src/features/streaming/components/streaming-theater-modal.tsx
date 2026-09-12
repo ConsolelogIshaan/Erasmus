@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Layers,
   Maximize2,
   Minimize2,
   Play,
@@ -21,7 +22,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { getPlaybackQueue } from "@/lib/streaming/stream-resolver";
+import { STREAMING_SERVERS } from "@/lib/streaming/stream-resolver";
+
+import {
+  NativePlayer,
+  type ExternalSubtitle,
+} from "@/features/streaming/components/native-player";
+import {
+  ServersModal,
+  readPreferredServer,
+} from "@/features/streaming/components/servers-modal";
 import {
   formatTimecode,
   getPlaybackProgress,
@@ -36,17 +46,10 @@ import {
 } from "@/features/library/actions/library-actions";
 import { cn } from "@/lib/utils";
 
-function isPlayerFailureMessage(data: unknown): boolean {
-  if (data == null) return false;
-  if (typeof data === "string") {
-    return /playererror|sourceerror|playbackerror|no.?sourc/i.test(data);
-  }
-  if (typeof data !== "object") return false;
-  const record = data as Record<string, unknown>;
-  const kind = String(record.type ?? record.event ?? record.action ?? "");
-  return /^(error|playererror|player_error|sourceerror|playbackerror)$/i.test(
-    kind,
-  );
+function relayUrl(url: string, referer?: string) {
+  const query = new URLSearchParams({ url });
+  if (referer) query.set("referer", referer);
+  return `/api/stream/hls?${query.toString()}`;
 }
 
 interface StreamingTheaterModalProps {
@@ -76,10 +79,18 @@ export function StreamingTheaterModal({
 }: StreamingTheaterModalProps) {
   const [activeSeason, setActiveSeason] = React.useState(currentSeason);
   const [activeEpisode, setActiveEpisode] = React.useState(currentEpisode);
-  const [attempt, setAttempt] = React.useState(0);
   const [key, setKey] = React.useState(0);
+  const [extractNonce, setExtractNonce] = React.useState(0);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
-  const [iframeLoaded, setIframeLoaded] = React.useState(false);
+  const [directSrc, setDirectSrc] = React.useState<string | null>(null);
+  const [directKind, setDirectKind] = React.useState<"hls" | "file">("hls");
+  const [directTried, setDirectTried] = React.useState(false);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [selectedServerId, setSelectedServerId] = React.useState("lisbon");
+  const [serversOpen, setServersOpen] = React.useState(false);
+  const [externalSubtitles, setExternalSubtitles] = React.useState<
+    ExternalSubtitle[]
+  >([]);
   const [showControls, setShowControls] = React.useState(true);
   const [startAt, setStartAt] = React.useState(() =>
     resumeSeconds(
@@ -93,7 +104,6 @@ export function StreamingTheaterModal({
   );
   const containerRef = React.useRef<HTMLDivElement>(null);
   const hideTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-  const attemptRef = React.useRef(0);
   const lastKnownRef = React.useRef({
     seconds: startAt,
     duration: null as number | null,
@@ -103,16 +113,18 @@ export function StreamingTheaterModal({
   const didResumeToastRef = React.useRef(false);
   const lastLibrarySyncRef = React.useRef(0);
 
-  // Every time the theater opens, lock to the episode the user clicked
-  // and restart the hidden queue at Lisbon.
+  const selectedServer =
+    STREAMING_SERVERS.find((server) => server.id === selectedServerId) ??
+    STREAMING_SERVERS[0]!;
+
   React.useEffect(() => {
     if (!open) return;
     const season = Math.max(1, currentSeason || 1);
     const episode = Math.max(1, currentEpisode || 1);
     setActiveSeason(season);
     setActiveEpisode(episode);
-    setAttempt(0);
-    attemptRef.current = 0;
+    setSelectedServerId(readPreferredServer());
+    setServersOpen(false);
     const resume = resumeSeconds(
       getPlaybackProgress({
         mediaType,
@@ -125,7 +137,9 @@ export function StreamingTheaterModal({
     lastKnownRef.current = { seconds: resume, duration: null };
     hasPlayerTimeRef.current = false;
     wallStartRef.current = null;
-    setIframeLoaded(false);
+    setDirectSrc(null);
+    setDirectTried(false);
+    setLoadError(null);
     setKey((prev) => prev + 1);
     if (resume > 0 && !didResumeToastRef.current) {
       didResumeToastRef.current = true;
@@ -143,6 +157,89 @@ export function StreamingTheaterModal({
     }),
     [mediaType, tmdbId, activeSeason, activeEpisode],
   );
+
+  React.useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setDirectTried(false);
+    setDirectSrc(null);
+    setLoadError(null);
+    const query = new URLSearchParams({
+      type: mediaType,
+      id: tmdbId,
+      title,
+      season: String(activeSeason),
+      episode: String(activeEpisode),
+      server: selectedServerId,
+    });
+    fetch(`/api/stream/direct?${query}`)
+      .then((response) => response.json())
+      .then(
+        (data: {
+          ok?: boolean;
+          referer?: string;
+          captions?: ExternalSubtitle[];
+          servers?: { url: string; kind?: "hls" | "file" }[];
+        }) => {
+          if (cancelled) return;
+          const hit = data.servers?.[0];
+          if (data.ok && hit?.url) {
+            setDirectKind(hit.kind === "file" ? "file" : "hls");
+            setDirectSrc(relayUrl(hit.url, data.referer));
+            if (data.captions?.length) {
+              setExternalSubtitles((current) =>
+                current.length ? current : data.captions!,
+              );
+            }
+            wallStartRef.current = Date.now();
+          } else {
+            setLoadError("This server has no file. Pick another.");
+          }
+          setDirectTried(true);
+        },
+      )
+      .catch(() => {
+        if (!cancelled) {
+          setDirectTried(true);
+          setLoadError("This server has no file. Pick another.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    open,
+    mediaType,
+    tmdbId,
+    activeSeason,
+    activeEpisode,
+    selectedServerId,
+    extractNonce,
+    title,
+  ]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const query = new URLSearchParams({ id: tmdbId });
+    if (mediaType === "tv") {
+      query.set("season", String(activeSeason));
+      query.set("episode", String(activeEpisode));
+    }
+    fetch(`/api/stream/subs?${query}`)
+      .then((response) => response.json())
+      .then((data: { tracks?: ExternalSubtitle[] }) => {
+        if (cancelled) return;
+        const tracks = data.tracks ?? [];
+        if (tracks.length) setExternalSubtitles(tracks);
+      })
+      .catch(() => {
+        /* keep any captions already loaded */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mediaType, tmdbId, activeSeason, activeEpisode]);
 
   const persistProgress = React.useCallback(
     (seconds: number, duration: number | null) => {
@@ -163,40 +260,12 @@ export function StreamingTheaterModal({
     [identity, mediaType, progressInput],
   );
 
-  const queue = React.useMemo(
-    () =>
-      getPlaybackQueue({
-        type: mediaType,
-        tmdbId,
-        season: activeSeason,
-        episode: activeEpisode,
-        isAnime,
-        startAtSeconds: startAt,
-      }),
-    [mediaType, tmdbId, activeSeason, activeEpisode, isAnime, startAt],
-  );
-
-  const activeUrl = queue[Math.min(attempt, queue.length - 1)]?.url ?? "";
-
-  const advanceFallback = React.useCallback(() => {
-    setAttempt((current) => {
-      const next = current + 1;
-      if (next >= queue.length) return current;
-      attemptRef.current = next;
-      setIframeLoaded(false);
-      setKey((prev) => prev + 1);
-      return next;
-    });
-  }, [queue.length]);
-
-  // Auto-record watching status in library
   React.useEffect(() => {
     if (open && identity) {
       actionUpsertAndSetStatus(identity, "watching").catch(() => {});
     }
   }, [open, identity]);
 
-  // Handle browser history (popstate) & keyboard Escape for flawless Back navigation
   React.useEffect(() => {
     if (!open) return;
 
@@ -231,10 +300,6 @@ export function StreamingTheaterModal({
   React.useEffect(() => {
     if (!open) return;
     const onMessage = (event: MessageEvent) => {
-      if (isPlayerFailureMessage(event.data)) {
-        advanceFallback();
-        return;
-      }
       const time = parsePlaybackTime(event.data);
       if (!time) return;
       hasPlayerTimeRef.current = true;
@@ -243,7 +308,7 @@ export function StreamingTheaterModal({
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [open, advanceFallback, persistProgress]);
+  }, [open, persistProgress]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -287,7 +352,6 @@ export function StreamingTheaterModal({
     };
   }, [open, persistProgress, identity, mediaType]);
 
-  // Auto-hiding HUD controls on mouse idle
   const handleMouseMove = React.useCallback(() => {
     setShowControls(true);
     if (hideTimerRef.current) {
@@ -299,23 +363,39 @@ export function StreamingTheaterModal({
   }, []);
 
   React.useEffect(() => {
+    if (!open) return;
+    const onMove = () => handleMouseMove();
+    document.addEventListener("mousemove", onMove);
+    return () => document.removeEventListener("mousemove", onMove);
+  }, [open, handleMouseMove]);
+
+  React.useEffect(() => {
     return () => {
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     };
   }, []);
 
   const handleReload = () => {
-    setIframeLoaded(false);
+    setDirectSrc(null);
+    setDirectTried(false);
+    setLoadError(null);
+    setExtractNonce((prev) => prev + 1);
     setKey((prev) => prev + 1);
     toast.success("Reloading stream...");
+  };
+
+  const handleSelectServer = (serverId: string) => {
+    setSelectedServerId(serverId);
+    setDirectSrc(null);
+    setDirectTried(false);
+    setLoadError(null);
+    setKey((prev) => prev + 1);
   };
 
   const handleEpisodeNavigate = (direction: "prev" | "next") => {
     const nextEp =
       direction === "next" ? activeEpisode + 1 : Math.max(1, activeEpisode - 1);
     setActiveEpisode(nextEp);
-    setAttempt(0);
-    attemptRef.current = 0;
     const resume = resumeSeconds(
       getPlaybackProgress({
         mediaType,
@@ -328,7 +408,9 @@ export function StreamingTheaterModal({
     lastKnownRef.current = { seconds: resume, duration: null };
     hasPlayerTimeRef.current = false;
     wallStartRef.current = Date.now();
-    setIframeLoaded(false);
+    setDirectSrc(null);
+    setDirectTried(false);
+    setLoadError(null);
     setKey((prev) => prev + 1);
     if (onEpisodeChange) {
       onEpisodeChange(activeSeason, nextEp);
@@ -336,14 +418,12 @@ export function StreamingTheaterModal({
   };
 
   const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen?.().catch(() => {});
-      setIsFullscreen(true);
-    } else {
+    if (document.fullscreenElement) {
       document.exitFullscreen?.().catch(() => {});
       setIsFullscreen(false);
+      return;
     }
+    setIsFullscreen(true);
   };
 
   React.useEffect(() => {
@@ -354,7 +434,15 @@ export function StreamingTheaterModal({
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
 
-  const iframeKey = `${mediaType}-${tmdbId}-s${activeSeason}-e${activeEpisode}-a${attempt}-t${startAt}-${key}`;
+  React.useEffect(() => {
+    if (!isFullscreen || document.fullscreenElement) return;
+    const frame = window.requestAnimationFrame(() => {
+      containerRef.current?.requestFullscreen?.().catch(() => {});
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isFullscreen]);
+
+  const playerKey = `${mediaType}-${tmdbId}-s${activeSeason}-e${activeEpisode}`;
 
   return (
     <>
@@ -365,22 +453,32 @@ export function StreamingTheaterModal({
             "w-[98vw] max-w-[98rem] h-[95vh] max-h-[64rem] sm:rounded-2xl overflow-hidden",
             isFullscreen && "w-screen h-screen max-w-none max-h-none rounded-none border-0",
           )}
+          style={
+            isFullscreen
+              ? {
+                  transform: "none",
+                  left: 0,
+                  top: 0,
+                  width: "100vw",
+                  height: "100vh",
+                  maxWidth: "none",
+                }
+              : undefined
+          }
         >
           <div
             ref={containerRef}
             onMouseMove={handleMouseMove}
-            className="relative flex flex-col h-full w-full bg-black select-none overflow-hidden"
+            className="relative flex h-full w-full flex-col overflow-hidden bg-black select-none"
           >
-            {/* Cinema Floating Top HUD: Accessible in windowed AND fullscreen */}
             <div
               className={cn(
-                "absolute top-0 inset-x-0 z-50 flex items-center justify-between gap-3 px-4 py-3 sm:px-6",
+                "absolute top-0 inset-x-0 z-[200] flex items-center justify-between gap-3 px-4 py-3 sm:px-6",
                 "bg-gradient-to-b from-black/95 via-black/80 to-transparent",
-                "transition-opacity duration-300 backdrop-blur-sm",
-                showControls ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
+                "transition-transform duration-200",
+                showControls ? "translate-y-0" : "-translate-y-full pointer-events-none",
               )}
             >
-              {/* Left: Back/Exit Button & Title */}
               <div className="flex items-center gap-3 min-w-0">
                 <Button
                   type="button"
@@ -416,14 +514,20 @@ export function StreamingTheaterModal({
                     )}
                     <span className="inline-flex items-center gap-1 text-primary">
                       <Subtitles className="h-3 w-3" />
-                      <span>Subtitles & Audio Available</span>
+                      <span>
+                        {externalSubtitles.length > 0
+                          ? `${externalSubtitles.length} subtitle tracks`
+                          : "Subtitles & Audio"}
+                      </span>
+                    </span>
+                    <span className="text-white/50">
+                      {selectedServer.flag} {selectedServer.name}
                     </span>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                {/* TV Episode Stepper */}
                 {mediaType === "tv" && (
                   <div className="flex items-center rounded-xl border border-white/15 bg-black/40 backdrop-blur-md p-0.5 mr-1 shadow-md">
                     <Button
@@ -453,7 +557,20 @@ export function StreamingTheaterModal({
                   </div>
                 )}
 
-                {/* Reload Stream Button */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-1.5 rounded-xl px-2 text-white/80 hover:text-white hover:bg-white/15"
+                  onClick={() => setServersOpen(true)}
+                  title="Choose server"
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  <span className="hidden text-xs font-medium sm:inline">
+                    {selectedServer.name}
+                  </span>
+                </Button>
+
                 <Button
                   type="button"
                   variant="ghost"
@@ -465,7 +582,6 @@ export function StreamingTheaterModal({
                   <RotateCw className="h-3.5 w-3.5" />
                 </Button>
 
-                {/* Fullscreen Toggle */}
                 <Button
                   type="button"
                   variant="ghost"
@@ -481,7 +597,6 @@ export function StreamingTheaterModal({
                   )}
                 </Button>
 
-                {/* Close Button */}
                 <Button
                   type="button"
                   variant="ghost"
@@ -500,9 +615,8 @@ export function StreamingTheaterModal({
               </div>
             </div>
 
-            {/* Video Player Frame Area */}
             <div className="relative flex-1 w-full h-full bg-black overflow-hidden flex items-center justify-center">
-              {!iframeLoaded && (
+              {!directSrc && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black z-[2]">
                   <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 border border-primary/40 shadow-[0_0_30px_rgba(29,144,245,0.4)]">
                     <Play className="h-7 w-7 text-primary ml-0.5 animate-pulse" />
@@ -510,30 +624,36 @@ export function StreamingTheaterModal({
                   <div className="text-center space-y-1">
                     <p className="text-xs font-mono uppercase tracking-widest text-primary font-semibold flex items-center justify-center gap-1.5">
                       <Sparkles className="h-3.5 w-3.5" />
-                      <span>Starting playback</span>
+                      <span>{loadError ? selectedServer.name : "Starting playback"}</span>
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      Loading the highest quality stream...
+                      {loadError || `${selectedServer.name} · ${selectedServer.badge}`}
                     </p>
                   </div>
                 </div>
               )}
 
-              {open && activeUrl ? (
-                <iframe
-                  key={iframeKey}
-                  src={activeUrl}
-                  className="w-full h-full border-0 absolute inset-0 z-[1]"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                  allowFullScreen
-                  referrerPolicy="origin"
-                  onLoad={() => {
-                    setIframeLoaded(true);
-                    wallStartRef.current = Date.now();
+              {open && directSrc ? (
+                <NativePlayer
+                  key={playerKey}
+                  src={directSrc}
+                  kind={directKind}
+                  startAt={startAt}
+                  serverId={selectedServerId}
+                  externalSubtitles={externalSubtitles}
+                  onToggleFullscreen={toggleFullscreen}
+                  onProgress={(seconds, duration) => {
+                    persistProgress(seconds, duration);
                   }}
-                  onError={() => advanceFallback()}
                 />
               ) : null}
+
+              <ServersModal
+                open={serversOpen}
+                onOpenChange={setServersOpen}
+                activeServerId={selectedServerId}
+                onSelectServer={handleSelectServer}
+              />
             </div>
           </div>
         </DialogContent>

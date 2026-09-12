@@ -66,3 +66,6 @@ next-env.d.ts
 
 # Local agent tooling state
 .codex/
+
+# Extractor runtime
+vendor/
