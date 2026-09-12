@@ -88,11 +88,14 @@ function anchorVerb(profile: TasteProfile, title: string): string {
   if (!anchor) return "watched";
   switch (anchor.basis) {
     case "rated_high":
-      return "rated highly";
+      // Reads as "Because you loved X". "rated highly" produced the ungrammatical
+      // "Because you rated highly X", and a high rating is fairly described as
+      // loving it.
+      return "loved";
     case "rewatched":
       return "rewatched";
     case "favorite":
-      return "favourited";
+      return "favorited";
     case "deeply_engaged":
       return "wrote about";
     case "completed":
@@ -145,7 +148,7 @@ function sentenceFor(factor: ScoreFactor, profile: TasteProfile): string | null 
 
     case "theme_overlap":
       return evidence.length > 0
-        ? `Covers ${list(evidence, 2)} — themes that run through your library`
+        ? `Covers ${list(evidence, 2)}, themes that run through your library`
         : null;
 
     case "era_fit":
@@ -159,7 +162,7 @@ function sentenceFor(factor: ScoreFactor, profile: TasteProfile): string | null 
     }
 
     case "quality":
-      return evidence[0] ? `Strong audience score — ${evidence[0]}` : null;
+      return evidence[0] ? `Strong audience score (${evidence[0]})` : null;
 
     case "freshness":
       return evidence[0] ? `Released ${evidence[0]}` : null;
@@ -168,7 +171,7 @@ function sentenceFor(factor: ScoreFactor, profile: TasteProfile): string | null 
       return evidence[0] === "Low popularity"
         ? "A quieter title than your usual picks"
         : evidence[0]
-          ? `A change of pace — ${evidence[0]} sits outside your usual genres`
+          ? `${evidence[0]} is outside your usual genres`
           : null;
 
     case "media_type_fit":

@@ -255,7 +255,7 @@ function anchorFactor(candidate: Candidate): ScoreFactor | null {
 
   return factor(
     "anchor_similarity",
-    "Similar to your favourites",
+    "Similar to your favorites",
     clamp01(value),
     evidence,
   );

@@ -110,8 +110,8 @@ function topPicksReason(profile: TasteProfile): string {
   if (profile.completion.droppedCount > 0) {
     parts.push(`what you have dropped`);
   }
-  if (parts.length === 0) return "Ranked from your library.";
-  return `Ranked from ${joinList(parts)}.`;
+  if (parts.length === 0) return "Drawn from your library.";
+  return `Drawn from ${joinList(parts)}.`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -167,11 +167,11 @@ export function assembleSections(
 
     const verb =
       anchor.basis === "rated_high"
-        ? "you rated"
+        ? "you loved"
         : anchor.basis === "rewatched"
           ? "you rewatched"
           : anchor.basis === "favorite"
-            ? "you favourited"
+            ? "you favorited"
             : "you watched";
 
     const section = buildSection(context, {
