@@ -78,6 +78,8 @@ export interface CommandMenuProps {
   triggerProps?: CommandMenuTriggerProps;
   /** Extra className on the root CommandDialog */
   className?: string;
+  /** Widen dialog for discovery views */
+  wide?: boolean;
 }
 
 function CommandMenuTrigger({
@@ -143,6 +145,7 @@ function CommandMenu({
   hideTrigger = false,
   triggerProps,
   className,
+  wide = false,
 }: CommandMenuProps) {
   const router = useRouter();
 
@@ -254,14 +257,16 @@ function CommandMenu({
         onOpenChange={(next) => setOpen(next)}
         className={cn("sm:rounded-2xl", className)}
         shouldFilter={shouldFilter}
+        wide={wide}
       >
         <CommandInput
           placeholder={placeholder}
           value={inputValue}
           onValueChange={onInputValueChange}
+          className={wide ? "sm:h-16 sm:text-lg" : undefined}
         />
 
-        <CommandList className="max-h-[min(60vh,420px)]">
+        <CommandList className={cn(wide ? "max-h-[min(82vh,640px)]" : "max-h-[min(60vh,420px)]")}>
           {children ?? defaultList}
         </CommandList>
       </CommandDialog>

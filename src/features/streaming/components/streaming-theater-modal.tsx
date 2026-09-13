@@ -31,6 +31,7 @@ import {
 import {
   formatTimecode,
   getPlaybackProgress,
+  getTvShowResume,
   parsePlaybackTime,
   resumeSeconds,
   savePlaybackProgress,
@@ -39,6 +40,7 @@ import type { MediaIdentity } from "@/types/library";
 import type { TvEpisode, TvSeason } from "@/types/media";
 import {
   actionSetMovieProgress,
+  actionSetTvProgress,
   actionUpsertAndSetStatus,
 } from "@/features/library/actions/library-actions";
 import { cn } from "@/lib/utils";
@@ -119,14 +121,21 @@ export function StreamingTheaterModal({
 
   React.useEffect(() => {
     if (!open) return;
-    const season = Math.max(1, currentSeason || 1);
-    const episode = Math.max(1, currentEpisode || 1);
+    let season = Math.max(1, currentSeason || 1);
+    let episode = Math.max(1, currentEpisode || 1);
+    if (mediaType === "tv" && currentSeason === 1 && currentEpisode === 1) {
+      const tvResume = getTvShowResume(tmdbId);
+      if (tvResume) {
+        season = tvResume.season;
+        episode = tvResume.episode;
+      }
+    }
     setActiveSeason(season);
     setActiveEpisode(episode);
     setSelectedServerId(readPreferredServer());
     setServersOpen(false);
     setEpisodesOpen(false);
-    setPickerSeason(Math.max(1, currentSeason || 1));
+    setPickerSeason(season);
     const resume = resumeSeconds(
       getPlaybackProgress({
         mediaType,
@@ -145,10 +154,24 @@ export function StreamingTheaterModal({
     setKey((prev) => prev + 1);
     if (resume > 0 && !didResumeToastRef.current) {
       didResumeToastRef.current = true;
-      toast.info(`Resuming from ${formatTimecode(resume)}`);
+      const label =
+        mediaType === "tv"
+          ? `S${season}:E${episode} from ${formatTimecode(resume)}`
+          : `from ${formatTimecode(resume)}`;
+      toast.info(`Resuming ${label}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot episode at open only
   }, [open]);
+
+  const effectiveIdentity: MediaIdentity = React.useMemo(() => {
+    if (identity) return identity;
+    return {
+      provider: "tmdb",
+      mediaType,
+      externalId: String(tmdbId),
+      title,
+    };
+  }, [identity, mediaType, tmdbId, title]);
 
   const progressInput = React.useMemo(
     () => ({
@@ -156,8 +179,11 @@ export function StreamingTheaterModal({
       tmdbId,
       season: activeSeason,
       episode: activeEpisode,
+      title,
+      posterPath: effectiveIdentity.posterPath ?? null,
+      backdropPath: effectiveIdentity.backdropPath ?? null,
     }),
-    [mediaType, tmdbId, activeSeason, activeEpisode],
+    [mediaType, tmdbId, activeSeason, activeEpisode, title, effectiveIdentity],
   );
 
   React.useEffect(() => {
@@ -249,24 +275,41 @@ export function StreamingTheaterModal({
       lastKnownRef.current = { seconds, duration };
       savePlaybackProgress(progressInput, seconds, duration);
       if (
-        identity &&
-        mediaType === "movie" &&
+        effectiveIdentity &&
         Date.now() - lastLibrarySyncRef.current > 60_000
       ) {
         lastLibrarySyncRef.current = Date.now();
-        actionSetMovieProgress(identity, Math.max(1, Math.round(seconds / 60))).catch(
-          () => {},
-        );
+        if (mediaType === "movie") {
+          actionSetMovieProgress(
+            effectiveIdentity,
+            Math.max(1, Math.round(seconds / 60)),
+          ).catch(() => {});
+        } else if (mediaType === "tv") {
+          actionSetTvProgress(
+            effectiveIdentity,
+            activeSeason,
+            activeEpisode,
+            [],
+          ).catch(() => {});
+        }
       }
     },
-    [identity, mediaType, progressInput],
+    [effectiveIdentity, mediaType, progressInput, activeSeason, activeEpisode],
   );
 
   React.useEffect(() => {
-    if (open && identity) {
-      actionUpsertAndSetStatus(identity, "watching").catch(() => {});
+    if (open && effectiveIdentity) {
+      actionUpsertAndSetStatus(effectiveIdentity, "watching").catch(() => {});
+      if (mediaType === "tv") {
+        actionSetTvProgress(
+          effectiveIdentity,
+          activeSeason,
+          activeEpisode,
+          [],
+        ).catch(() => {});
+      }
     }
-  }, [open, identity]);
+  }, [open, effectiveIdentity, mediaType, activeSeason, activeEpisode]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -345,14 +388,23 @@ export function StreamingTheaterModal({
       window.clearInterval(interval);
       window.removeEventListener("pagehide", flushWallClock);
       document.removeEventListener("visibilitychange", onHide);
-      if (identity && mediaType === "movie" && lastKnownRef.current.seconds >= 15) {
-        actionSetMovieProgress(
-          identity,
-          Math.max(1, Math.round(lastKnownRef.current.seconds / 60)),
-        ).catch(() => {});
+      if (effectiveIdentity && lastKnownRef.current.seconds >= 15) {
+        if (mediaType === "movie") {
+          actionSetMovieProgress(
+            effectiveIdentity,
+            Math.max(1, Math.round(lastKnownRef.current.seconds / 60)),
+          ).catch(() => {});
+        } else if (mediaType === "tv") {
+          actionSetTvProgress(
+            effectiveIdentity,
+            activeSeason,
+            activeEpisode,
+            [],
+          ).catch(() => {});
+        }
       }
     };
-  }, [open, persistProgress, identity, mediaType]);
+  }, [open, persistProgress, effectiveIdentity, mediaType, activeSeason, activeEpisode]);
 
   const handleMouseMove = React.useCallback(() => {
     setShowControls(true);

@@ -314,6 +314,7 @@ export interface SearchResultItem {
   mediaType?: "movie" | "tv";
   popularity?: number | null;
   href: string;
+  voteAverage?: number | null;
 }
 
 export interface SearchResponse {

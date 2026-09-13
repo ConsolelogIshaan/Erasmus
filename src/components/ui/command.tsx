@@ -30,12 +30,14 @@ Command.displayName = CommandPrimitive.displayName;
 type CommandDialogProps = DialogProps & {
   shouldFilter?: boolean;
   className?: string;
+  wide?: boolean;
 };
 
 function CommandDialog({
   children,
   className,
   shouldFilter = false,
+  wide = false,
   ...props
 }: CommandDialogProps) {
   return (
@@ -48,7 +50,8 @@ function CommandDialog({
           transform: "translate(-50%, -50%)",
         }}
         className={cn(
-          "overflow-hidden border-0 p-0 sm:max-w-xl sm:rounded-2xl",
+          "overflow-hidden border-0 p-0 sm:rounded-2xl",
+          wide ? "w-[min(100%-2rem,56rem)] max-w-4xl" : "w-[min(100%-2rem,36rem)] sm:max-w-xl",
           /* Frosted panel — matches translucent top bar */
           "bg-background/70 shadow-xl backdrop-blur-xl supports-[backdrop-filter]:bg-background/55",
           "dark:bg-black/55 dark:supports-[backdrop-filter]:bg-black/45",

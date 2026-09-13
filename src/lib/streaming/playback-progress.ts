@@ -9,9 +9,36 @@ export interface ProgressKeyInput {
   tmdbId: string;
   season?: number;
   episode?: number;
+  title?: string;
+  posterPath?: string | null;
+  backdropPath?: string | null;
+}
+
+export interface RecentPlaybackItem {
+  tmdbId: string;
+  mediaType: "movie" | "tv";
+  title: string;
+  posterPath?: string | null;
+  backdropPath?: string | null;
+  season?: number;
+  episode?: number;
+  seconds: number;
+  duration: number | null;
+  updatedAt: number;
+}
+
+export interface TvShowResumeState {
+  season: number;
+  episode: number;
+  seconds: number;
+  duration: number | null;
+  updatedAt: number;
 }
 
 const PREFIX = "argus:playback:";
+const TV_LAST_PREFIX = "argus:playback:tv-last:";
+const RECENT_KEY = "argus:playback:recent";
+const MAX_RECENT_ITEMS = 24;
 const MIN_RESUME_SECONDS = 15;
 const COMPLETE_RATIO = 0.9;
 const COMPLETE_REMAINING_SECONDS = 30;
@@ -23,6 +50,10 @@ export function progressKey(input: ProgressKeyInput): string {
     return `${PREFIX}tv:${input.tmdbId}:s${season}:e${episode}`;
   }
   return `${PREFIX}movie:${input.tmdbId}`;
+}
+
+export function tvLastKey(tmdbId: string): string {
+  return `${TV_LAST_PREFIX}${tmdbId}`;
 }
 
 export function shouldResume(progress: PlaybackProgress | null | undefined): boolean {
@@ -105,6 +136,111 @@ export function getPlaybackProgress(input: ProgressKeyInput): PlaybackProgress |
   }
 }
 
+export function saveTvShowResume(tmdbId: string, state: TvShowResumeState): void {
+  try {
+    localStorage.setItem(tvLastKey(tmdbId), JSON.stringify(state));
+  } catch {
+    /* ignore storage quota */
+  }
+}
+
+export function getTvShowResume(tmdbId: string): TvShowResumeState | null {
+  try {
+    const raw = localStorage.getItem(tvLastKey(tmdbId));
+    if (raw) {
+      const parsed = JSON.parse(raw) as TvShowResumeState;
+      if (parsed && typeof parsed.season === "number" && typeof parsed.episode === "number") {
+        return parsed;
+      }
+    }
+    // Backward-compatible fallback: scan localStorage for any argus:playback:tv:<tmdbId>:s*:e*
+    const targetPrefix = `${PREFIX}tv:${tmdbId}:s`;
+    let latest: TvShowResumeState | null = null;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(targetPrefix)) {
+        const parts = k.slice(targetPrefix.length).split(":e");
+        const sStr = parts[0];
+        const eStr = parts[1];
+        if (parts.length === 2 && sStr !== undefined && eStr !== undefined) {
+          const s = parseInt(sStr, 10);
+          const e = parseInt(eStr, 10);
+          const itemRaw = localStorage.getItem(k);
+          if (itemRaw) {
+            const prog = JSON.parse(itemRaw) as PlaybackProgress;
+            if (prog && (!latest || prog.updatedAt > latest.updatedAt)) {
+              latest = {
+                season: s,
+                episode: e,
+                seconds: prog.seconds,
+                duration: prog.duration,
+                updatedAt: prog.updatedAt,
+              };
+            }
+          }
+        }
+      }
+    }
+    return latest;
+  } catch {
+    return null;
+  }
+}
+
+
+export function getRecentPlayback(): RecentPlaybackItem[] {
+  if (typeof localStorage === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    if (!raw) return [];
+    const list = JSON.parse(raw) as RecentPlaybackItem[];
+    if (Array.isArray(list)) {
+      return list.sort((a, b) => b.updatedAt - a.updatedAt);
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveRecentPlaybackItem(item: RecentPlaybackItem): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const current = getRecentPlayback();
+    const filtered = current.filter(
+      (x) => !(x.tmdbId === item.tmdbId && x.mediaType === item.mediaType)
+    );
+    filtered.unshift(item);
+    if (filtered.length > MAX_RECENT_ITEMS) {
+      filtered.length = MAX_RECENT_ITEMS;
+    }
+    localStorage.setItem(RECENT_KEY, JSON.stringify(filtered));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearRecentPlaybackItem(tmdbId: string, mediaType: "movie" | "tv"): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const current = getRecentPlayback();
+    const filtered = current.filter(
+      (x) => !(x.tmdbId === tmdbId && x.mediaType === mediaType)
+    );
+    localStorage.setItem(RECENT_KEY, JSON.stringify(filtered));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearTvShowResume(tmdbId: string): void {
+  try {
+    localStorage.removeItem(tvLastKey(tmdbId));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function savePlaybackProgress(
   input: ProgressKeyInput,
   seconds: number,
@@ -116,13 +252,84 @@ export function savePlaybackProgress(
     updatedAt: Date.now(),
   };
 
-  if (next.duration && next.seconds / next.duration >= COMPLETE_RATIO) {
+  const isCompleted = Boolean(
+    next.duration &&
+      (next.seconds / next.duration >= COMPLETE_RATIO ||
+        next.duration - next.seconds < COMPLETE_REMAINING_SECONDS),
+  );
+
+  if (isCompleted) {
     clearPlaybackProgress(input);
+    if (input.mediaType === "tv" && input.tmdbId) {
+      const season = Math.max(1, input.season ?? 1);
+      const episode = Math.max(1, input.episode ?? 1);
+      const now = Date.now();
+      // Advance show pointer to the next episode
+      saveTvShowResume(input.tmdbId, {
+        season,
+        episode: episode + 1,
+        seconds: 0,
+        duration: null,
+        updatedAt: now,
+      });
+      if (input.title) {
+        saveRecentPlaybackItem({
+          tmdbId: input.tmdbId,
+          mediaType: "tv",
+          title: input.title,
+          posterPath: input.posterPath,
+          backdropPath: input.backdropPath,
+          season,
+          episode: episode + 1,
+          seconds: 0,
+          duration: null,
+          updatedAt: now,
+        });
+      }
+    } else if (input.mediaType === "movie" && input.tmdbId) {
+      clearRecentPlaybackItem(input.tmdbId, "movie");
+    }
     return null;
   }
 
   try {
     localStorage.setItem(progressKey(input), JSON.stringify(next));
+    if (input.mediaType === "tv" && input.tmdbId) {
+      const season = Math.max(1, input.season ?? 1);
+      const episode = Math.max(1, input.episode ?? 1);
+      saveTvShowResume(input.tmdbId, {
+        season,
+        episode,
+        seconds: next.seconds,
+        duration: next.duration,
+        updatedAt: next.updatedAt,
+      });
+      if (input.title) {
+        saveRecentPlaybackItem({
+          tmdbId: input.tmdbId,
+          mediaType: "tv",
+          title: input.title,
+          posterPath: input.posterPath,
+          backdropPath: input.backdropPath,
+          season,
+          episode,
+          seconds: next.seconds,
+          duration: next.duration,
+          updatedAt: next.updatedAt,
+        });
+      }
+    } else if (input.mediaType === "movie" && input.tmdbId && input.title) {
+      saveRecentPlaybackItem({
+        tmdbId: input.tmdbId,
+        mediaType: "movie",
+        title: input.title,
+        posterPath: input.posterPath,
+        backdropPath: input.backdropPath,
+        seconds: next.seconds,
+        duration: next.duration,
+        updatedAt: next.updatedAt,
+      });
+    }
   } catch {
     return next;
   }

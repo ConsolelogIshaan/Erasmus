@@ -33,14 +33,17 @@ export async function GET() {
     const data = await getMediaProvider().getTrending("all", "day");
     return NextResponse.json(
       {
-        results: data.results.slice(0, 8).map((item) => ({
+        results: data.results.slice(0, 20).map((item) => ({
           id: item.id,
           kind: item.mediaType,
           title: item.title,
           subtitle: item.mediaType === "tv" ? "TV" : "Movie",
           imagePath: item.posterPath,
+          year: item.releaseDate ? item.releaseDate.slice(0, 4) : null,
+          mediaType: item.mediaType,
           href: item.mediaType === "tv" ? `/tv/${item.id}` : `/movie/${item.id}`,
           popularity: item.popularity,
+          voteAverage: typeof item.voteAverage === "number" ? item.voteAverage : null,
         })),
       },
       {

@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/feedback/empty-state";
 import { PageHeaderMotion } from "@/components/motion/page-header-motion";
 import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { LibraryPosterCard } from "@/features/library/components/library-poster-card";
+import { ContinueWatchingRail } from "@/features/library/components/continue-watching-rail";
 import { MediaRow } from "@/features/media/components/media-row";
 import { PosterCard } from "@/features/media/components/poster-card";
 import { StatCounter } from "@/features/intelligence/components/stat-counter";
@@ -137,20 +138,7 @@ export default async function DashboardPage() {
       <div className="grid gap-8 xl:grid-cols-5">
         <div className="space-y-8 xl:col-span-3">
           <DashboardSection title="Continue watching" href={ROUTES.library}>
-            {dash.continueWatching.length === 0 ? (
-              <EmptyState
-                icon={Library}
-                title="Nothing in progress"
-                description="Mark a title as Watching to see it here."
-                className="py-10"
-              />
-            ) : (
-              <div className="grid grid-cols-3 gap-3 pt-4 sm:grid-cols-4">
-                {dash.continueWatching.slice(0, 8).map((e) => (
-                  <LibraryPosterCard key={e.id} entry={e} />
-                ))}
-              </div>
-            )}
+            <ContinueWatchingRail initialEntries={dash.continueWatching} />
           </DashboardSection>
 
           <DashboardSection title="Recently completed" href={ROUTES.history}>

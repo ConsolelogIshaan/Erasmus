@@ -8,6 +8,7 @@ import { StreamingTheaterModal } from "./streaming-theater-modal";
 import {
   formatTimecode,
   getPlaybackProgress,
+  getTvShowResume,
   shouldResume,
 } from "@/lib/streaming/playback-progress";
 import type { MediaIdentity } from "@/types/library";
@@ -37,28 +38,72 @@ export function StreamButton({
   const [theaterOpen, setTheaterOpen] = React.useState(false);
   const [openToken, setOpenToken] = React.useState(0);
   const [resumeAt, setResumeAt] = React.useState<number | null>(null);
-
-  const playSeason = Math.max(1, season || 1);
-  const playEpisode = Math.max(1, episode || 1);
+  const [playSeason, setPlaySeason] = React.useState(() => Math.max(1, season || 1));
+  const [playEpisode, setPlayEpisode] = React.useState(() => Math.max(1, episode || 1));
+  const [resumeDetail, setResumeDetail] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (theaterOpen) return;
+
+    if (mediaType === "tv" && variant === "hero") {
+      const tvResume = getTvShowResume(tmdbId);
+      if (tvResume) {
+        const s = tvResume.season;
+        const e = tvResume.episode;
+        setPlaySeason(s);
+        setPlayEpisode(e);
+        const saved = getPlaybackProgress({
+          mediaType: "tv",
+          tmdbId,
+          season: s,
+          episode: e,
+        });
+        const isResumable = shouldResume(saved);
+        if (isResumable && saved && saved.seconds > 0) {
+          setResumeAt(saved.seconds);
+          setResumeDetail(`S${s}:E${e} · ${formatTimecode(saved.seconds)}`);
+        } else if (saved && saved.seconds === 0) {
+          setResumeAt(null);
+          setResumeDetail(`S${s}:E${e}`);
+        } else {
+          setResumeAt(null);
+          setResumeDetail(`S${s}:E${e}`);
+        }
+        return;
+      }
+    }
+
+    const s = Math.max(1, season || 1);
+    const e = Math.max(1, episode || 1);
+    setPlaySeason(s);
+    setPlayEpisode(e);
     const saved = getPlaybackProgress({
       mediaType,
       tmdbId,
-      season: playSeason,
-      episode: playEpisode,
+      season: s,
+      episode: e,
     });
     setResumeAt(shouldResume(saved) && saved ? saved.seconds : null);
-  }, [theaterOpen, mediaType, tmdbId, playSeason, playEpisode]);
+    setResumeDetail(null);
+  }, [theaterOpen, mediaType, tmdbId, season, episode, variant]);
 
   const openTheater = () => {
     setOpenToken((n) => n + 1);
     setTheaterOpen(true);
   };
 
-  const heroLabel =
-    resumeAt != null ? `Resume · ${formatTimecode(resumeAt)}` : "Play";
+  const heroLabel = React.useMemo(() => {
+    if (mediaType === "tv") {
+      if (resumeAt != null && resumeDetail) {
+        return `Resume · ${resumeDetail}`;
+      }
+      if (resumeDetail) {
+        return `Play · ${resumeDetail}`;
+      }
+      return "Play";
+    }
+    return resumeAt != null ? `Resume · ${formatTimecode(resumeAt)}` : "Play";
+  }, [mediaType, resumeAt, resumeDetail]);
 
   return (
     <>
