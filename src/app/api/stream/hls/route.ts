@@ -47,7 +47,7 @@ function enrichAudioTracks(text: string): string {
   let englishLineIdx = -1;
 
   audioIndices.forEach((idx) => {
-    const l = lines[idx];
+    const l = lines[idx] ?? '';
     if (
       /LANGUAGE="?(en|eng|english)"?/i.test(l) ||
       /NAME="?[^"]*(english|\beng\b)[^"]*"?/i.test(l)
@@ -60,7 +60,7 @@ function enrichAudioTracks(text: string): string {
   const targetEnglishIdx = hasExplicitEnglish ? englishLineIdx : audioIndices[1];
 
   audioIndices.forEach((idx) => {
-    let l = lines[idx];
+    let l = lines[idx] ?? '';
     if (idx === targetEnglishIdx) {
       l = l.replace(/DEFAULT=(YES|NO)/i, "DEFAULT=YES");
       l = l.replace(/AUTOSELECT=(YES|NO)/i, "AUTOSELECT=YES");
