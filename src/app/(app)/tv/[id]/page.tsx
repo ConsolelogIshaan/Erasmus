@@ -128,6 +128,8 @@ export default async function TvDetailPage({ params }: PageProps) {
             tmdbId={show.id}
             mediaType="tv"
             identity={identity}
+            logoPath={show.logoPath}
+            tagline={show.tagline}
             season={
               show.seasons.find((s) => s.seasonNumber > 0)?.seasonNumber ?? 1
             }

@@ -21,6 +21,8 @@ interface StreamButtonProps {
   identity?: MediaIdentity;
   season?: number;
   episode?: number;
+  logoPath?: string | null;
+  tagline?: string | null;
   variant?: "hero" | "compact" | "icon" | "panel";
   className?: string;
 }
@@ -32,6 +34,8 @@ export function StreamButton({
   identity,
   season = 1,
   episode = 1,
+  logoPath,
+  tagline,
   variant = "hero",
   className,
 }: StreamButtonProps) {
@@ -189,6 +193,8 @@ export function StreamButton({
           identity={identity}
           currentSeason={playSeason}
           currentEpisode={playEpisode}
+          logoPath={logoPath}
+          tagline={tagline}
         />
       ) : null}
     </>

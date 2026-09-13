@@ -3,6 +3,7 @@
 import * as React from "react";
 import Hls from "hls.js";
 import {
+  ArrowLeft,
   Check,
   ChevronLeft,
   Maximize2,
@@ -17,6 +18,7 @@ import {
   VolumeX,
 } from "lucide-react";
 
+import { logoUrl } from "@/lib/media/image";
 import { formatTimecode } from "@/lib/streaming/playback-progress";
 import {
   cuesAtTime,
@@ -31,14 +33,27 @@ export interface ExternalSubtitle {
   url: string;
 }
 
-interface NativePlayerProps {
+export interface NativePlayerProps {
   src: string;
   startAt?: number;
   kind?: "hls" | "file";
   serverId?: string;
+  serverName?: string;
   externalSubtitles?: ExternalSubtitle[];
   onToggleFullscreen?: () => void;
   onProgress?: (seconds: number, duration: number) => void;
+  // Cinematic metadata & contextual overlay
+  title: string;
+  mediaType?: "movie" | "tv";
+  season?: number;
+  episode?: number;
+  episodeTitle?: string;
+  overview?: string | null;
+  logoPath?: string | null;
+  tagline?: string | null;
+  onBack?: () => void;
+  topRightControls?: React.ReactNode;
+  isExternalMenuOpen?: boolean;
 }
 
 type Panel = "none" | "settings" | "subs" | "audio" | "quality" | "speed";
@@ -50,9 +65,21 @@ export function NativePlayer({
   startAt = 0,
   kind = "hls",
   serverId,
+  serverName,
   externalSubtitles = [],
   onToggleFullscreen,
   onProgress,
+  title,
+  mediaType = "movie",
+  season = 1,
+  episode = 1,
+  episodeTitle,
+  overview,
+  logoPath,
+  tagline,
+  onBack,
+  topRightControls,
+  isExternalMenuOpen = false,
 }: NativePlayerProps) {
   const rootRef = React.useRef<HTMLDivElement>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
@@ -74,16 +101,53 @@ export function NativePlayer({
   const [subId, setSubId] = React.useState<string>("off");
   const [cueText, setCueText] = React.useState("");
   const [buffering, setBuffering] = React.useState(false);
-  const [showBar, setShowBar] = React.useState(true);
+  const [showControls, setShowControls] = React.useState(true);
+  const [showPauseOverlay, setShowPauseOverlay] = React.useState(false);
+  const [logoFailed, setLogoFailed] = React.useState(false);
+  const pauseTimerRef = React.useRef<number | null>(null);
   const didAutoSub = React.useRef(false);
 
-  const revealBar = React.useCallback(() => {
-    setShowBar(true);
+  React.useEffect(() => {
+    setLogoFailed(false);
+  }, [logoPath]);
+
+  // Pause overlay timer: appears 2.5s after pause, immediately hides when playing
+  React.useEffect(() => {
+    if (paused) {
+      if (pauseTimerRef.current) window.clearTimeout(pauseTimerRef.current);
+      pauseTimerRef.current = window.setTimeout(() => {
+        setShowPauseOverlay(true);
+      }, 2500);
+    } else {
+      if (pauseTimerRef.current) window.clearTimeout(pauseTimerRef.current);
+      setShowPauseOverlay(false);
+    }
+
+    return () => {
+      if (pauseTimerRef.current) window.clearTimeout(pauseTimerRef.current);
+    };
+  }, [paused]);
+
+  const revealControls = React.useCallback(() => {
+    setShowControls(true);
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
     hideTimerRef.current = window.setTimeout(() => {
-      if (!videoRef.current?.paused) setShowBar(false);
-    }, 2800);
-  }, []);
+      const isVideoPaused = videoRef.current?.paused ?? false;
+      if (!isVideoPaused && panel === "none" && !isExternalMenuOpen) {
+        setShowControls(false);
+      }
+    }, 3200);
+  }, [panel, isExternalMenuOpen]);
+
+  // Keep controls visible whenever external menu or settings panel is open
+  React.useEffect(() => {
+    if (panel !== "none" || isExternalMenuOpen) {
+      setShowControls(true);
+      if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+    } else {
+      revealControls();
+    }
+  }, [panel, isExternalMenuOpen, revealControls]);
 
   React.useEffect(() => {
     const video = videoRef.current;
@@ -162,25 +226,27 @@ export function NativePlayer({
     const onWait = () => setBuffering(true);
     const onPlay = () => {
       setBuffering(false);
-      revealBar();
+      setPaused(false);
+      revealControls();
     };
     const onPause = () => {
       setPaused(true);
-      setShowBar(true);
+      setShowControls(true);
+      if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
     };
     video.addEventListener("timeupdate", onTime);
-    video.addEventListener("play", onTime);
+    video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("waiting", onWait);
     video.addEventListener("playing", onPlay);
     return () => {
       video.removeEventListener("timeupdate", onTime);
-      video.removeEventListener("play", onTime);
+      video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("waiting", onWait);
       video.removeEventListener("playing", onPlay);
     };
-  }, [onProgress, revealBar]);
+  }, [onProgress, revealControls]);
 
   React.useEffect(() => {
     didAutoSub.current = false;
@@ -232,10 +298,10 @@ export function NativePlayer({
   }, [subId, externalSubtitles]);
 
   React.useEffect(() => {
-    const onMove = () => revealBar();
+    const onMove = () => revealControls();
     document.addEventListener("mousemove", onMove);
     return () => document.removeEventListener("mousemove", onMove);
-  }, [revealBar]);
+  }, [revealControls]);
 
   React.useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -264,11 +330,18 @@ export function NativePlayer({
           return index + 1 >= externalSubtitles.length ? "off" : `ext-${index + 1}`;
         });
       }
-      revealBar();
+      revealControls();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [externalSubtitles.length, revealBar]);
+  }, [externalSubtitles.length, revealControls]);
+
+  React.useEffect(() => {
+    return () => {
+      if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+      if (pauseTimerRef.current) window.clearTimeout(pauseTimerRef.current);
+    };
+  }, []);
 
   const seekTo = (seconds: number) => {
     const video = videoRef.current;
@@ -298,19 +371,23 @@ export function NativePlayer({
   const lisbon4k =
     serverId === "lisbon" &&
     (playingHeight >= 2160 || selectedHeight >= 2160);
+
   const activeSub =
     subId === "off"
       ? "Off"
       : externalSubtitles[Number(subId.replace("ext-", ""))]?.label || "On";
 
+  const isControlsActive = showControls || panel !== "none" || isExternalMenuOpen || paused;
+
   return (
     <div
       ref={rootRef}
       className={cn(
-        "absolute inset-0 z-[1] bg-black",
-        showBar || panel !== "none" ? "cursor-auto" : "cursor-none",
+        "absolute inset-0 z-[1] bg-black select-none overflow-hidden",
+        isControlsActive ? "cursor-auto" : "cursor-none",
       )}
-      onMouseMove={revealBar}
+      onMouseMove={revealControls}
+      onTouchStart={revealControls}
       onClick={() => {
         if (panel !== "none") {
           setPanel("none");
@@ -322,6 +399,7 @@ export function NativePlayer({
         else video.pause();
       }}
     >
+      {/* Video Surface */}
       <div
         className="absolute inset-0 z-0"
         style={
@@ -341,31 +419,158 @@ export function NativePlayer({
           autoPlay
         />
       </div>
+
+      {/* Centered Pause Ambient Vignette */}
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(ellipse_at_center,_rgba(0,0,0,0.85)_0%,_rgba(0,0,0,0.45)_55%,_rgba(0,0,0,0.85)_100%)]",
+          "transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          showPauseOverlay ? "opacity-100" : "opacity-0",
+        )}
+      />
+
+      {/* Top Ambient Gradient */}
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/85 via-black/35 to-transparent z-10",
+          "transition-opacity duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          isControlsActive ? "opacity-100" : "opacity-0",
+        )}
+      />
+
+      {/* Centered Pause Cinematic Information Overlay */}
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center text-center px-6 pb-16 sm:pb-20 select-none",
+          "transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          showPauseOverlay
+            ? "opacity-100 scale-100"
+            : "opacity-0 scale-95 pointer-events-none",
+        )}
+      >
+        <div className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.3em] text-white/50 mb-3 sm:mb-4 font-mono">
+          YOU ARE WATCHING
+        </div>
+
+        {/* Authentic Movie / TV Show Logo Image if available, otherwise stylized title font */}
+        {logoUrl(logoPath, "w500") && !logoFailed ? (
+          <div className="relative mx-auto h-20 sm:h-28 md:h-36 lg:h-40 w-full max-w-xs sm:max-w-md md:max-w-lg mb-3 sm:mb-4">
+            <img
+              src={logoUrl(logoPath, "w500")!}
+              alt={title}
+              className="h-full w-full object-contain object-center drop-shadow-[0_8px_32px_rgba(0,0,0,0.95)]"
+              onError={() => setLogoFailed(true)}
+            />
+          </div>
+        ) : (
+          <h1 className="font-display text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tight text-white drop-shadow-[0_6px_24px_rgba(0,0,0,0.95)] mb-2 max-w-2xl">
+            {title}
+          </h1>
+        )}
+
+        {/* TV Series Episode Info or Movie Tagline */}
+        {mediaType === "tv" ? (
+          <div className="flex items-center justify-center gap-2 text-sm sm:text-base md:text-lg font-medium text-white/90 drop-shadow mb-2">
+            <span className="font-mono text-primary font-bold tracking-wider">
+              S{String(season ?? 1).padStart(2, "0")} E{String(episode ?? 1).padStart(2, "0")}
+            </span>
+            {episodeTitle ? (
+              <>
+                <span className="text-white/30">·</span>
+                <span className="text-white/90 font-medium">{episodeTitle}</span>
+              </>
+            ) : null}
+          </div>
+        ) : tagline ? (
+          <p className="text-sm sm:text-base md:text-lg text-white/80 italic font-serif tracking-wide drop-shadow mb-2 max-w-lg">
+            &ldquo;{tagline}&rdquo;
+          </p>
+        ) : null}
+
+        {/* Short Synopsis / Overview */}
+        {overview ? (
+          <p className="max-w-xl text-xs sm:text-sm text-white/70 line-clamp-2 sm:line-clamp-3 leading-relaxed drop-shadow mt-1">
+            {overview}
+          </p>
+        ) : null}
+      </div>
+
+      {/* Top Controls Area */}
+      <div
+        className={cn(
+          "absolute top-0 inset-x-0 z-[200] flex items-center justify-between gap-3 px-4 py-3 sm:px-6",
+          "transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          isControlsActive
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none -translate-y-2 opacity-0",
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Left: Minimal Back Button */}
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/80 transition-[background-color,transform,color] duration-150 hover:bg-white/10 hover:text-white active:scale-95"
+            title="Back (Esc)"
+            aria-label="Back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Center: Subtle Context Title */}
+        <div className="hidden md:flex flex-col items-center justify-center text-center pointer-events-none px-4 min-w-0">
+          <span className="text-[13px] font-medium tracking-wide text-white/90 truncate max-w-md">
+            {title}
+          </span>
+          {mediaType === "tv" && (
+            <span className="text-[10px] uppercase font-mono tracking-widest text-white/40 mt-0.5">
+              S{String(season ?? 1).padStart(2, "0")} E{String(episode ?? 1).padStart(2, "0")}
+              {episodeTitle ? ` · ${episodeTitle}` : ""}
+            </span>
+          )}
+        </div>
+
+        {/* Right: Existing Top Controls Slot */}
+        {topRightControls ? (
+          topRightControls
+        ) : (
+          <div className="w-10" />
+        )}
+      </div>
+
+      {/* Subtitles Overlay */}
       {cueText ? (
         <div
           className="pointer-events-none absolute inset-x-0 z-[80] flex justify-center px-8"
           style={{
             zIndex: 80,
-            bottom: showBar || panel !== "none" ? "6.5rem" : "2.5rem",
+            bottom: isControlsActive ? "6.5rem" : "2.5rem",
           }}
         >
-          <p className="max-w-3xl whitespace-pre-line text-center text-[1.05rem] font-medium leading-snug tracking-wide text-white sm:text-xl"
+          <p
+            className="max-w-3xl whitespace-pre-line text-center text-[1.05rem] font-medium leading-snug tracking-wide text-white sm:text-xl"
             style={{ textShadow: "0 1px 2px rgba(0,0,0,0.9), 0 0 12px rgba(0,0,0,0.7)" }}
           >
             {cueText}
           </p>
         </div>
       ) : null}
+
+      {/* Buffering Spinner */}
       {buffering ? (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
           <div className="h-9 w-9 animate-spin rounded-full border-[2px] border-white/15 border-t-white" />
         </div>
       ) : null}
+
+      {/* Bottom Playback Controls Bar */}
       <div
         className={cn(
-          "absolute inset-x-0 bottom-0 z-[100] bg-gradient-to-t from-black/90 via-black/50 to-transparent px-5 pb-5 pt-16 text-white",
-          "transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]",
-          showBar || panel !== "none"
+          "absolute inset-x-0 bottom-0 z-[100] bg-gradient-to-t from-black/95 via-black/50 to-transparent px-5 pb-5 pt-16 text-white",
+          "transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          isControlsActive
             ? "translate-y-0 opacity-100"
             : "pointer-events-none translate-y-2 opacity-0",
         )}
@@ -472,6 +677,7 @@ export function NativePlayer({
         </div>
       </div>
 
+      {/* Popover Setting Panels */}
       {panel !== "none" ? (
         <div
           className="absolute bottom-[5.25rem] right-5 z-[110] w-60 origin-bottom-right overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0c]/95 text-white shadow-[0_16px_50px_rgba(0,0,0,0.55)] backdrop-blur-md"

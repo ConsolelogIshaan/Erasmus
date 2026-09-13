@@ -135,6 +135,8 @@ export default async function MovieDetailPage({ params }: PageProps) {
             tmdbId={movie.id}
             mediaType="movie"
             identity={identity}
+            logoPath={movie.logoPath}
+            tagline={movie.tagline}
             variant="hero"
           />
           {directors.length ? (

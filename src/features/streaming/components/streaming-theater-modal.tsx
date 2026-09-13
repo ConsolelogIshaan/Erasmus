@@ -60,6 +60,8 @@ interface StreamingTheaterModalProps {
   identity?: MediaIdentity;
   currentSeason?: number;
   currentEpisode?: number;
+  logoPath?: string | null;
+  tagline?: string | null;
   isAnime?: boolean;
   onEpisodeChange?: (season: number, episode: number) => void;
 }
@@ -72,12 +74,40 @@ export function StreamingTheaterModal({
   mediaType,
   identity,
   currentSeason = 1,
-  currentEpisode = 1,
+  currentEpisode = 1,  logoPath,
+  tagline,
+
   isAnime = false,
   onEpisodeChange,
 }: StreamingTheaterModalProps) {
   const [activeSeason, setActiveSeason] = React.useState(currentSeason);
   const [activeEpisode, setActiveEpisode] = React.useState(currentEpisode);
+  const [resolvedLogoPath, setResolvedLogoPath] = React.useState<string | null>(logoPath ?? null);
+  const [resolvedTagline, setResolvedTagline] = React.useState<string | null>(tagline ?? null);
+
+  React.useEffect(() => {
+    if (logoPath !== undefined) setResolvedLogoPath(logoPath);
+  }, [logoPath]);
+
+  React.useEffect(() => {
+    if (tagline !== undefined) setResolvedTagline(tagline);
+  }, [tagline]);
+
+  React.useEffect(() => {
+    if (!open || !tmdbId) return;
+    let cancelled = false;
+    fetch(`/api/media/details?type=${mediaType}&id=${tmdbId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { logoPath?: string | null; tagline?: string | null } | null) => {
+        if (cancelled || !data) return;
+        if (data.logoPath) setResolvedLogoPath(data.logoPath);
+        if (data.tagline) setResolvedTagline(data.tagline);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mediaType, tmdbId]);
   const [key, setKey] = React.useState(0);
   const [extractNonce, setExtractNonce] = React.useState(0);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
@@ -515,7 +545,179 @@ export function StreamingTheaterModal({
     return () => window.cancelAnimationFrame(frame);
   }, [isFullscreen]);
 
+  const currentEpisodeData = React.useMemo(() => {
+    if (mediaType !== "tv") return null;
+    return seasonEpisodes.find(
+      (ep) => ep.seasonNumber === activeSeason && ep.episodeNumber === activeEpisode,
+    );
+  }, [mediaType, seasonEpisodes, activeSeason, activeEpisode]);
+
   const playerKey = `${mediaType}-${tmdbId}-s${activeSeason}-e${activeEpisode}`;
+
+  const topRightControls = (
+    <div className="flex items-center gap-0.5">
+      {mediaType === "tv" && (
+        <div className="relative">
+          <button
+            type="button"
+            className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-white/90 transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
+            onClick={() => {
+              setServersOpen(false);
+              setPickerSeason(activeSeason);
+              setEpisodesOpen((open) => !open);
+            }}
+            title="Choose episode"
+          >
+            <ListVideo className="h-4 w-4" />
+            <span className="text-[12px] font-medium tracking-wide">
+              S{activeSeason} E{activeEpisode}
+            </span>
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 text-white/40 transition-transform duration-200 ease-out",
+                episodesOpen && "rotate-180",
+              )}
+            />
+          </button>
+          {episodesOpen ? (
+            <div className="absolute right-0 top-[calc(100%+0.4rem)] z-[220] w-[min(20rem,84vw)] origin-top-right overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0c]/95 shadow-[0_16px_50px_rgba(0,0,0,0.55)] backdrop-blur-md">
+              <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2 py-1.5">
+                <p className="pl-1.5 text-[12px] font-medium tracking-wide text-white/70">
+                  Episodes
+                </p>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-25"
+                    disabled={pickerSeason <= 1}
+                    onClick={() => setPickerSeason((season) => Math.max(1, season - 1))}
+                    aria-label="Previous season"
+                  >
+                    <ChevronDown className="h-4 w-4 rotate-90" />
+                  </button>
+                  <span className="min-w-[4.75rem] text-center text-[12px] font-medium text-white">
+                    Season {pickerSeason}
+                  </span>
+                  <button
+                    type="button"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+                    onClick={() => setPickerSeason((season) => season + 1)}
+                    aria-label="Next season"
+                  >
+                    <ChevronDown className="h-4 w-4 -rotate-90" />
+                  </button>
+                </div>
+              </div>
+              <div className="max-h-[min(48vh,20rem)] overflow-y-auto py-1">
+                {seasonEpisodes.length === 0 ? (
+                  <p className="px-3 py-8 text-center text-[12px] text-white/35">
+                    No episodes in this season.
+                  </p>
+                ) : (
+                  seasonEpisodes.map((episode) => {
+                    const active =
+                      episode.seasonNumber === activeSeason &&
+                      episode.episodeNumber === activeEpisode;
+                    return (
+                      <button
+                        key={`${episode.seasonNumber}-${episode.episodeNumber}`}
+                        type="button"
+                        onClick={() =>
+                          handleSelectEpisode(
+                            episode.seasonNumber,
+                            episode.episodeNumber,
+                          )
+                        }
+                        className={cn(
+                          "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-white/[0.06]",
+                          active && "bg-white/[0.06]",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "mt-px w-7 shrink-0 font-mono text-[11px] tabular-nums",
+                            active ? "text-primary" : "text-white/35",
+                          )}
+                        >
+                          {String(episode.episodeNumber).padStart(2, "0")}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span
+                            className={cn(
+                              "block truncate text-[13px] font-medium",
+                              active ? "text-white" : "text-white/85",
+                            )}
+                          >
+                            {episode.name || `Episode ${episode.episodeNumber}`}
+                          </span>
+                          {episode.runtime ? (
+                            <span className="mt-0.5 block text-[11px] text-white/35">
+                              {episode.runtime} min
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      <button
+        type="button"
+        className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-white/90 transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
+        onClick={() => {
+          setEpisodesOpen(false);
+          setServersOpen(true);
+        }}
+        title="Choose server"
+      >
+        <Layers className="h-4 w-4" />
+        <span className="hidden text-[12px] font-medium tracking-wide sm:inline">
+          {selectedServer.name}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
+        onClick={handleReload}
+        title="Reload stream"
+      >
+        <RotateCw className="h-4 w-4" />
+      </button>
+
+      <button
+        type="button"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
+        onClick={toggleFullscreen}
+        title={isFullscreen ? "Exit Fullscreen (Esc)" : "Fullscreen"}
+      >
+        {isFullscreen ? (
+          <Minimize2 className="h-4 w-4" />
+        ) : (
+          <Maximize2 className="h-4 w-4" />
+        )}
+      </button>
+
+      <button
+        type="button"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
+        onClick={() => {
+          if (document.fullscreenElement) {
+            document.exitFullscreen?.().catch(() => {});
+          }
+          onOpenChange(false);
+        }}
+        title="Close (Esc)"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
 
   return (
     <>
@@ -539,246 +741,78 @@ export function StreamingTheaterModal({
               : undefined
           }
         >
+          <DialogTitle className="sr-only">{title}</DialogTitle>
           <div
             ref={containerRef}
-            onMouseMove={handleMouseMove}
             className="relative flex h-full w-full flex-col overflow-hidden bg-black select-none"
           >
-            <div
-              className={cn(
-                "absolute top-0 inset-x-0 z-[200] flex items-center justify-between gap-3 px-4 py-3 sm:px-5",
-                "bg-gradient-to-b from-black/80 via-black/40 to-transparent",
-                "transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]",
-                showControls
-                  ? "translate-y-0 opacity-100"
-                  : "pointer-events-none -translate-y-1 opacity-0",
-              )}
-            >
-              <div className="flex min-w-0 items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (document.fullscreenElement) {
-                      document.exitFullscreen?.().catch(() => {});
-                    }
-                    onOpenChange(false);
-                  }}
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
-                  title="Back (Esc)"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </button>
-
-                <div className="min-w-0">
-                  <DialogTitle className="truncate text-[15px] font-medium leading-tight tracking-tight text-white">
-                    {title}
-                  </DialogTitle>
-                  <p className="mt-0.5 truncate text-[11px] text-white/45">
-                    {mediaType === "tv" ? `S${activeSeason}  E${activeEpisode}` : "Movie"}
-                    <span className="mx-1.5 text-white/20">·</span>
-                    {selectedServer.name}
-                  </p>
+            {!directSrc && (
+              <div className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-3 bg-black">
+                <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-4 py-3 sm:px-6">
+                  <button
+                    type="button"
+                    onClick={() => onOpenChange(false)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                    title="Back (Esc)"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onOpenChange(false)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                    title="Close (Esc)"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-0.5">
-                {mediaType === "tv" && (
-                  <div className="relative">
-                    <button
-                      type="button"
-                      className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-white/90 transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
-                      onClick={() => {
-                        setServersOpen(false);
-                        setPickerSeason(activeSeason);
-                        setEpisodesOpen((open) => !open);
-                      }}
-                      title="Choose episode"
-                    >
-                      <ListVideo className="h-4 w-4" />
-                      <span className="text-[12px] font-medium tracking-wide">
-                        S{activeSeason} E{activeEpisode}
-                      </span>
-                      <ChevronDown
-                        className={cn(
-                          "h-3.5 w-3.5 text-white/40 transition-transform duration-200 ease-out",
-                          episodesOpen && "rotate-180",
-                        )}
-                      />
-                    </button>
-                    {episodesOpen ? (
-                      <div className="absolute right-0 top-[calc(100%+0.4rem)] z-[220] w-[min(20rem,84vw)] origin-top-right overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0c]/95 shadow-[0_16px_50px_rgba(0,0,0,0.55)] backdrop-blur-md">
-                        <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2 py-1.5">
-                          <p className="pl-1.5 text-[12px] font-medium tracking-wide text-white/70">
-                            Episodes
-                          </p>
-                          <div className="flex items-center">
-                            <button
-                              type="button"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-25"
-                              disabled={pickerSeason <= 1}
-                              onClick={() => setPickerSeason((season) => Math.max(1, season - 1))}
-                              aria-label="Previous season"
-                            >
-                              <ChevronDown className="h-4 w-4 rotate-90" />
-                            </button>
-                            <span className="min-w-[4.75rem] text-center text-[12px] font-medium text-white">
-                              Season {pickerSeason}
-                            </span>
-                            <button
-                              type="button"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white"
-                              onClick={() => setPickerSeason((season) => season + 1)}
-                              aria-label="Next season"
-                            >
-                              <ChevronDown className="h-4 w-4 -rotate-90" />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="max-h-[min(48vh,20rem)] overflow-y-auto py-1">
-                          {seasonEpisodes.length === 0 ? (
-                            <p className="px-3 py-8 text-center text-[12px] text-white/35">
-                              No episodes in this season.
-                            </p>
-                          ) : (
-                            seasonEpisodes.map((episode) => {
-                              const active =
-                                episode.seasonNumber === activeSeason &&
-                                episode.episodeNumber === activeEpisode;
-                              return (
-                                <button
-                                  key={`${episode.seasonNumber}-${episode.episodeNumber}`}
-                                  type="button"
-                                  onClick={() =>
-                                    handleSelectEpisode(
-                                      episode.seasonNumber,
-                                      episode.episodeNumber,
-                                    )
-                                  }
-                                  className={cn(
-                                    "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-white/[0.06]",
-                                    active && "bg-white/[0.06]",
-                                  )}
-                                >
-                                  <span
-                                    className={cn(
-                                      "mt-px w-7 shrink-0 font-mono text-[11px] tabular-nums",
-                                      active ? "text-primary" : "text-white/35",
-                                    )}
-                                  >
-                                    {String(episode.episodeNumber).padStart(2, "0")}
-                                  </span>
-                                  <span className="min-w-0 flex-1">
-                                    <span
-                                      className={cn(
-                                        "block truncate text-[13px] font-medium",
-                                        active ? "text-white" : "text-white/85",
-                                      )}
-                                    >
-                                      {episode.name || `Episode ${episode.episodeNumber}`}
-                                    </span>
-                                    {episode.runtime ? (
-                                      <span className="mt-0.5 block text-[11px] text-white/35">
-                                        {episode.runtime} min
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                </button>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-white/90 transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
-                  onClick={() => {
-                    setEpisodesOpen(false);
-                    setServersOpen(true);
-                  }}
-                  title="Choose server"
-                >
-                  <Layers className="h-4 w-4" />
-                  <span className="hidden text-[12px] font-medium tracking-wide sm:inline">
-                    {selectedServer.name}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
-                  onClick={handleReload}
-                  title="Reload stream"
-                >
-                  <RotateCw className="h-4 w-4" />
-                </button>
-
-                <button
-                  type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
-                  onClick={toggleFullscreen}
-                  title={isFullscreen ? "Exit Fullscreen (Esc)" : "Fullscreen"}
-                >
-                  {isFullscreen ? (
-                    <Minimize2 className="h-4 w-4" />
-                  ) : (
-                    <Maximize2 className="h-4 w-4" />
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
-                  onClick={() => {
-                    if (document.fullscreenElement) {
-                      document.exitFullscreen?.().catch(() => {});
-                    }
-                    onOpenChange(false);
-                  }}
-                  title="Close (Esc)"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="relative flex-1 w-full h-full bg-black overflow-hidden flex items-center justify-center">
-              {!directSrc && (
-                <div className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-3 bg-black">
-                  <div className="flex h-12 w-12 items-center justify-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-[2px] border-white/15 border-t-white" />
-                  </div>
-                  <p className="text-[13px] text-white/50">
-                    {loadError || "Starting playback"}
-                  </p>
+                <div className="flex h-12 w-12 items-center justify-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-[2px] border-white/15 border-t-white" />
                 </div>
-              )}
+                <p className="text-[13px] text-white/50">
+                  {loadError || "Starting playback"}
+                </p>
+              </div>
+            )}
 
-              {open && directSrc ? (
-                <NativePlayer
-                  key={playerKey}
-                  src={directSrc}
-                  kind={directKind}
-                  startAt={startAt}
-                  serverId={selectedServerId}
-                  externalSubtitles={externalSubtitles}
-                  onToggleFullscreen={toggleFullscreen}
-                  onProgress={(seconds, duration) => {
-                    persistProgress(seconds, duration);
-                  }}
-                />
-              ) : null}
-
-              <ServersModal
-                open={serversOpen}
-                onOpenChange={setServersOpen}
-                activeServerId={selectedServerId}
-                onSelectServer={handleSelectServer}
+            {open && directSrc ? (
+              <NativePlayer
+                key={playerKey}
+                src={directSrc}
+                kind={directKind}
+                startAt={startAt}
+                serverId={selectedServerId}
+                serverName={selectedServer.name}
+                externalSubtitles={externalSubtitles}
+                onToggleFullscreen={toggleFullscreen}
+                onProgress={(seconds, duration) => {
+                  persistProgress(seconds, duration);
+                }}
+                title={title}
+                mediaType={mediaType}
+                season={activeSeason}
+                episode={activeEpisode}
+                episodeTitle={currentEpisodeData?.name}
+                overview={currentEpisodeData?.overview || effectiveIdentity.overview || null}
+                logoPath={resolvedLogoPath}
+                tagline={resolvedTagline}
+                onBack={() => {
+                  if (document.fullscreenElement) {
+                    document.exitFullscreen?.().catch(() => {});
+                  }
+                  onOpenChange(false);
+                }}
+                isExternalMenuOpen={episodesOpen || serversOpen}
+                topRightControls={topRightControls}
               />
-            </div>
+            ) : null}
+
+            <ServersModal
+              open={serversOpen}
+              onOpenChange={setServersOpen}
+              activeServerId={selectedServerId}
+              onSelectServer={handleSelectServer}
+            />
           </div>
         </DialogContent>
       </Dialog>
