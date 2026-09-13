@@ -193,9 +193,28 @@ export function getRecentPlayback(): RecentPlaybackItem[] {
   try {
     const raw = localStorage.getItem(RECENT_KEY);
     if (!raw) return [];
-    const list = JSON.parse(raw) as RecentPlaybackItem[];
+    const list = JSON.parse(raw);
     if (Array.isArray(list)) {
-      return list.sort((a, b) => b.updatedAt - a.updatedAt);
+      const normalized: RecentPlaybackItem[] = [];
+      for (const item of list) {
+        if (!item) continue;
+        const rawId = item.tmdbId || item.mediaId || item.id;
+        const tmdbId = String(rawId || "").trim();
+        if (!tmdbId || tmdbId === "undefined" || tmdbId === "null") continue;
+        normalized.push({
+          tmdbId,
+          mediaType: (item.mediaType || "tv") as "movie" | "tv",
+          title: item.title || "",
+          posterPath: item.posterPath || item.poster_path || null,
+          backdropPath: item.backdropPath || item.backdrop_path || null,
+          season: item.season ?? item.seasonNumber ?? 1,
+          episode: item.episode ?? item.episodeNumber ?? 1,
+          seconds: item.seconds ?? item.currentTime ?? 0,
+          duration: item.duration ?? null,
+          updatedAt: item.updatedAt || Date.now(),
+        });
+      }
+      return normalized.sort((a, b) => b.updatedAt - a.updatedAt);
     }
     return [];
   } catch {

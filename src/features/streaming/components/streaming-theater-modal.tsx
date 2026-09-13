@@ -93,21 +93,28 @@ export function StreamingTheaterModal({
     if (tagline !== undefined) setResolvedTagline(tagline);
   }, [tagline]);
 
+  const [resolvedPosterPath, setResolvedPosterPath] = React.useState<string | null>(
+    identity?.posterPath ?? null
+  );
+  const [canonicalTitle, setCanonicalTitle] = React.useState<string>(title);
+
   React.useEffect(() => {
     if (!open || !tmdbId) return;
     let cancelled = false;
-    fetch(`/api/media/details?type=${mediaType}&id=${tmdbId}`)
+    fetch(`/api/media/details?type=${mediaType}&id=${tmdbId}&_v=2`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { logoPath?: string | null; tagline?: string | null } | null) => {
+      .then((data: { logoPath?: string | null; tagline?: string | null; posterPath?: string | null; title?: string | null } | null) => {
         if (cancelled || !data) return;
         if (data.logoPath) setResolvedLogoPath(data.logoPath);
         if (data.tagline) setResolvedTagline(data.tagline);
+        if (data.posterPath) setResolvedPosterPath(data.posterPath);
+        if (data.title && (title.includes(",") || title.length > 35)) setCanonicalTitle(data.title);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [open, mediaType, tmdbId]);
+  }, [open, mediaType, tmdbId, title]);
   const [key, setKey] = React.useState(0);
   const [extractNonce, setExtractNonce] = React.useState(0);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
@@ -165,6 +172,7 @@ export function StreamingTheaterModal({
     setSelectedServerId(readPreferredServer());
     setServersOpen(false);
     setEpisodesOpen(false);
+    setExternalSubtitles([]);
     setPickerSeason(season);
     const resume = resumeSeconds(
       getPlaybackProgress({
@@ -209,8 +217,8 @@ export function StreamingTheaterModal({
       tmdbId,
       season: activeSeason,
       episode: activeEpisode,
-      title,
-      posterPath: effectiveIdentity.posterPath ?? null,
+      title: canonicalTitle || title,
+      posterPath: resolvedPosterPath ?? effectiveIdentity.posterPath ?? null,
       backdropPath: effectiveIdentity.backdropPath ?? null,
     }),
     [mediaType, tmdbId, activeSeason, activeEpisode, title, effectiveIdentity],
@@ -245,9 +253,23 @@ export function StreamingTheaterModal({
             setDirectKind(hit.kind === "file" ? "file" : "hls");
             setDirectSrc(relayUrl(hit.url, data.referer));
             if (data.captions?.length) {
-              setExternalSubtitles((current) =>
-                current.length ? current : data.captions!,
-              );
+              const relayed = data.captions.map((c) => ({
+                ...c,
+                url: c.url.startsWith("http")
+                  ? `/api/stream/subs/file?url=${encodeURIComponent(c.url)}`
+                  : c.url,
+              }));
+              setExternalSubtitles((current) => {
+                const seen = new Set(relayed.map((r) => r.url));
+                const merged = [...relayed];
+                for (const item of current) {
+                  if (!seen.has(item.url)) {
+                    seen.add(item.url);
+                    merged.push(item);
+                  }
+                }
+                return merged;
+              });
             }
             wallStartRef.current = Date.now();
           } else {
@@ -289,7 +311,19 @@ export function StreamingTheaterModal({
       .then((data: { tracks?: ExternalSubtitle[] }) => {
         if (cancelled) return;
         const tracks = data.tracks ?? [];
-        if (tracks.length) setExternalSubtitles(tracks);
+        if (tracks.length) {
+          setExternalSubtitles((current) => {
+            const seen = new Set(current.map((c) => c.url));
+            const merged = [...current];
+            for (const item of tracks) {
+              if (!seen.has(item.url)) {
+                seen.add(item.url);
+                merged.push(item);
+              }
+            }
+            return merged;
+          });
+        }
       })
       .catch(() => {
         /* keep any captions already loaded */
@@ -560,7 +594,7 @@ export function StreamingTheaterModal({
         <div className="relative">
           <button
             type="button"
-            className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-white/90 transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
+            className="inline-flex h-11 items-center gap-2 rounded-full px-3.5 sm:px-4 text-white/90 transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
             onClick={() => {
               setServersOpen(false);
               setPickerSeason(activeSeason);
@@ -569,7 +603,7 @@ export function StreamingTheaterModal({
             title="Choose episode"
           >
             <ListVideo className="h-4 w-4" />
-            <span className="text-[12px] font-medium tracking-wide">
+            <span className="text-[13px] sm:text-sm font-medium tracking-wide">
               S{activeSeason} E{activeEpisode}
             </span>
             <ChevronDown
@@ -668,7 +702,7 @@ export function StreamingTheaterModal({
 
       <button
         type="button"
-        className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-white/90 transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
+        className="inline-flex h-11 items-center gap-2 rounded-full px-3.5 sm:px-4 text-white/90 transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
         onClick={() => {
           setEpisodesOpen(false);
           setServersOpen(true);
@@ -676,46 +710,12 @@ export function StreamingTheaterModal({
         title="Choose server"
       >
         <Layers className="h-4 w-4" />
-        <span className="hidden text-[12px] font-medium tracking-wide sm:inline">
+        <span className="hidden text-[13px] sm:text-sm font-medium tracking-wide sm:inline">
           {selectedServer.name}
         </span>
       </button>
 
-      <button
-        type="button"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
-        onClick={handleReload}
-        title="Reload stream"
-      >
-        <RotateCw className="h-4 w-4" />
-      </button>
 
-      <button
-        type="button"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
-        onClick={toggleFullscreen}
-        title={isFullscreen ? "Exit Fullscreen (Esc)" : "Fullscreen"}
-      >
-        {isFullscreen ? (
-          <Minimize2 className="h-4 w-4" />
-        ) : (
-          <Maximize2 className="h-4 w-4" />
-        )}
-      </button>
-
-      <button
-        type="button"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97]"
-        onClick={() => {
-          if (document.fullscreenElement) {
-            document.exitFullscreen?.().catch(() => {});
-          }
-          onOpenChange(false);
-        }}
-        title="Close (Esc)"
-      >
-        <X className="h-4 w-4" />
-      </button>
     </div>
   );
 
@@ -757,14 +757,7 @@ export function StreamingTheaterModal({
                   >
                     <ArrowLeft className="h-5 w-5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onOpenChange(false)}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-                    title="Close (Esc)"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+
                 </div>
                 <div className="flex h-12 w-12 items-center justify-center">
                   <div className="h-8 w-8 animate-spin rounded-full border-[2px] border-white/15 border-t-white" />
@@ -783,6 +776,7 @@ export function StreamingTheaterModal({
                 startAt={startAt}
                 serverId={selectedServerId}
                 serverName={selectedServer.name}
+                onOpenServers={() => setServersOpen(true)}
                 externalSubtitles={externalSubtitles}
                 onToggleFullscreen={toggleFullscreen}
                 onProgress={(seconds, duration) => {

@@ -20,13 +20,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           logoPath: movie?.logoPath ?? null,
+          posterPath: movie?.posterPath ?? null,
+          backdropPath: movie?.backdropPath ?? null,
           tagline: movie?.tagline ?? null,
           overview: movie?.overview ?? null,
           title: movie?.title ?? null,
         },
         {
           headers: {
-            "Cache-Control": "public, max-age=86400, stale-while-revalidate=86400",
+            "Cache-Control": "no-cache",
           },
         },
       );
@@ -35,19 +37,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           logoPath: show?.logoPath ?? null,
+          posterPath: show?.posterPath ?? null,
+          backdropPath: show?.backdropPath ?? null,
           tagline: show?.tagline ?? null,
           overview: show?.overview ?? null,
           title: show?.title ?? null,
         },
         {
           headers: {
-            "Cache-Control": "public, max-age=86400, stale-while-revalidate=86400",
+            "Cache-Control": "no-cache",
           },
         },
       );
     }
   } catch (err) {
     console.error("[api/media/details]", err);
-    return NextResponse.json({ logoPath: null, tagline: null }, { status: 200 });
+    return NextResponse.json(
+      { logoPath: null, posterPath: null, backdropPath: null, tagline: null, title: null },
+      { status: 200 },
+    );
   }
 }

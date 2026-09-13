@@ -5,8 +5,13 @@ import Hls from "hls.js";
 import {
   ArrowLeft,
   Check,
+  CheckCircle2,
   ChevronLeft,
+  ChevronRight,
+  Gauge,
+  Layers,
   Maximize2,
+  Music,
   Pause,
   PictureInPicture2,
   Play,
@@ -14,6 +19,7 @@ import {
   RotateCw,
   Settings2,
   Subtitles,
+  Tv2,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -27,6 +33,42 @@ import {
 } from "@/lib/streaming/subtitles";
 import { cn } from "@/lib/utils";
 
+const AUDIO_LANG_DISPLAY: Record<string, string> = {
+  en: "English",
+  eng: "English",
+  hi: "Hindi",
+  hin: "Hindi",
+  es: "Spanish",
+  spa: "Spanish",
+  ja: "Japanese",
+  jpn: "Japanese",
+  ko: "Korean",
+  kor: "Korean",
+  fr: "French",
+  fre: "French",
+  fra: "French",
+  de: "German",
+  ger: "German",
+  deu: "German",
+  it: "Italian",
+  ita: "Italian",
+  pt: "Portuguese",
+  por: "Portuguese",
+  ru: "Russian",
+  rus: "Russian",
+  zh: "Chinese",
+  chi: "Chinese",
+  zho: "Chinese",
+  ar: "Arabic",
+  ara: "Arabic",
+  ta: "Tamil",
+  tam: "Tamil",
+  te: "Telugu",
+  tel: "Telugu",
+  ml: "Malayalam",
+  mal: "Malayalam",
+};
+
 export interface ExternalSubtitle {
   label: string;
   language: string;
@@ -39,6 +81,7 @@ export interface NativePlayerProps {
   kind?: "hls" | "file";
   serverId?: string;
   serverName?: string;
+  onOpenServers?: () => void;
   externalSubtitles?: ExternalSubtitle[];
   onToggleFullscreen?: () => void;
   onProgress?: (seconds: number, duration: number) => void;
@@ -66,6 +109,7 @@ export function NativePlayer({
   kind = "hls",
   serverId,
   serverName,
+  onOpenServers,
   externalSubtitles = [],
   onToggleFullscreen,
   onProgress,
@@ -96,7 +140,7 @@ export function NativePlayer({
   const [levels, setLevels] = React.useState<{ height: number; index: number }[]>([]);
   const [level, setLevel] = React.useState(-1);
   const [playingHeight, setPlayingHeight] = React.useState(0);
-  const [audioTracks, setAudioTracks] = React.useState<{ name: string; index: number }[]>([]);
+  const [audioTracks, setAudioTracks] = React.useState<{ name: string; index: number; lang?: string }[]>([{ name: "Track 1", index: 0 }]);
   const [audio, setAudio] = React.useState(0);
   const [subId, setSubId] = React.useState<string>("off");
   const [cueText, setCueText] = React.useState("");
@@ -106,6 +150,7 @@ export function NativePlayer({
   const [logoFailed, setLogoFailed] = React.useState(false);
   const pauseTimerRef = React.useRef<number | null>(null);
   const didAutoSub = React.useRef(false);
+  const didAutoAudio = React.useRef(false);
 
   React.useEffect(() => {
     setLogoFailed(false);
@@ -173,6 +218,48 @@ export function NativePlayer({
       hlsRef.current = hls;
       hls.loadSource(src);
       hls.attachMedia(video);
+      const syncAudio = (tracks: typeof hls.audioTracks) => {
+        if (!tracks || tracks.length === 0) {
+          setAudioTracks([{ name: "Track 1", index: 0 }]);
+          return;
+        }
+        const hasExplicitEnglish = tracks.some((t) => {
+          const lang = (t.lang || "").toLowerCase();
+          const name = (t.name || "").toLowerCase();
+          return (
+            lang === "en" ||
+            lang === "eng" ||
+            lang.startsWith("en-") ||
+            /(^|\b)(en|eng|english)($|\b)/i.test(name) ||
+            name.includes("english")
+          );
+        });
+        const mapped = tracks.map((track, index) => {
+          let name = track.name;
+          if (!name || name === `Audio ${index + 1}` || name === "audio") {
+            name = `Track ${index + 1}`;
+          }
+          const langKey = (track.lang || "").toLowerCase();
+          const langName = AUDIO_LANG_DISPLAY[langKey];
+          if (langName && !name.toLowerCase().includes(langName.toLowerCase())) {
+            name = `${langName} (${name})`;
+          } else if (!hasExplicitEnglish && tracks.length >= 2 && index === 1) {
+            if (!name.toLowerCase().includes("english")) {
+              name = `English (${name})`;
+            }
+          }
+          return {
+            name,
+            index,
+            lang: track.lang || (!hasExplicitEnglish && tracks.length >= 2 && index === 1 ? "en" : undefined),
+          };
+        });
+        setAudioTracks(mapped);
+        if (hls.audioTrack >= 0 && hls.audioTrack < mapped.length) {
+          setAudio(hls.audioTrack);
+        }
+      };
+
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setLevels(
           hls.levels.map((item, index) => ({
@@ -180,17 +267,18 @@ export function NativePlayer({
             index,
           })),
         );
-        setAudioTracks(
-          hls.audioTracks.map((track, index) => ({
-            name: track.name || `Audio ${index + 1}`,
-            index,
-          })),
-        );
+        syncAudio(hls.audioTracks);
         if (hls.levels.length > 0) {
           hls.currentLevel = -1;
           setLevel(-1);
         }
         startPlayback();
+      });
+      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_event, data) => {
+        syncAudio(data.audioTracks);
+      });
+      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_event, data) => {
+        if (data.id >= 0) setAudio(data.id);
       });
       hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
         setPlayingHeight(hls.levels[data.level]?.height || 0);
@@ -202,7 +290,39 @@ export function NativePlayer({
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = src;
-      video.addEventListener("loadedmetadata", startPlayback, { once: true });
+      video.addEventListener("loadedmetadata", () => {
+        const v = video as any;
+        if (v.audioTracks && v.audioTracks.length > 0) {
+          const rawTracks = Array.from(v.audioTracks);
+          const hasExplicitEnglish = rawTracks.some((t: any) => {
+            const lang = (t.language || "").toLowerCase();
+            const label = (t.label || "").toLowerCase();
+            return lang === "en" || lang === "eng" || label.includes("english");
+          });
+          const mapped = rawTracks.map((t: any, i: number) => {
+            let name = t.label || `Track ${i + 1}`;
+            if (!hasExplicitEnglish && rawTracks.length >= 2 && i === 1) {
+              name = `English (${name})`;
+            }
+            return {
+              name,
+              index: i,
+              lang: t.language || (!hasExplicitEnglish && rawTracks.length >= 2 && i === 1 ? "en" : undefined),
+            };
+          });
+          setAudioTracks(mapped);
+          let targetIndex = mapped.findIndex(
+            (t) => t.lang === "en" || t.name.toLowerCase().includes("english")
+          );
+          if (targetIndex < 0 && mapped.length >= 2) targetIndex = 1;
+          const selected = targetIndex >= 0 ? targetIndex : 0;
+          for (let i = 0; i < v.audioTracks.length; i++) {
+            v.audioTracks[i].enabled = i === selected;
+          }
+          setAudio(selected);
+        }
+        startPlayback();
+      }, { once: true });
     }
 
     return () => {
@@ -250,6 +370,7 @@ export function NativePlayer({
 
   React.useEffect(() => {
     didAutoSub.current = false;
+    didAutoAudio.current = false;
   }, [src]);
 
   React.useEffect(() => {
@@ -260,6 +381,32 @@ export function NativePlayer({
     didAutoSub.current = true;
     setSubId(`ext-${index >= 0 ? index : 0}`);
   }, [externalSubtitles]);
+
+  // Default audio track to English if available across all movies and shows
+  React.useEffect(() => {
+    if (didAutoAudio.current || audioTracks.length === 0) return;
+    let englishIndex = audioTracks.findIndex((track) => {
+      const lang = (track.lang || "").toLowerCase();
+      const name = (track.name || "").toLowerCase();
+      return (
+        lang === "en" ||
+        lang === "eng" ||
+        lang.startsWith("en-") ||
+        /(^|\b)(en|eng|english)($|\b)/i.test(name) ||
+        name.includes("english") ||
+        name.includes("(en)")
+      );
+    });
+    // Fallback: If no explicit English tag, and multiple tracks exist, Track 2 (index 1) is English
+    if (englishIndex < 0 && audioTracks.length >= 2) {
+      englishIndex = 1;
+    }
+    didAutoAudio.current = true;
+    const target = englishIndex >= 0 ? englishIndex : 0;
+    if (target !== audio) {
+      applyAudio(target);
+    }
+  }, [audioTracks, audio]);
 
   React.useEffect(() => {
     if (subId === "off") {
@@ -360,8 +507,14 @@ export function NativePlayer({
 
   const applyAudio = (index: number) => {
     const hls = hlsRef.current;
-    if (!hls) return;
-    hls.audioTrack = index;
+    const video = videoRef.current as any;
+    if (hls && hls.audioTracks && hls.audioTracks.length > index) {
+      hls.audioTrack = index;
+    } else if (video && video.audioTracks && video.audioTracks.length > index) {
+      for (let i = 0; i < video.audioTracks.length; i++) {
+        video.audioTracks[i].enabled = i === index;
+      }
+    }
     setAudio(index);
     setPanel("none");
   };
@@ -511,21 +664,21 @@ export function NativePlayer({
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/80 transition-[background-color,transform,color] duration-150 hover:bg-white/10 hover:text-white active:scale-95"
+            className="inline-flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full text-white/80 transition-[background-color,transform,color] duration-150 hover:bg-white/10 hover:text-white active:scale-95"
             title="Back (Esc)"
             aria-label="Back"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-6 w-6" />
           </button>
         </div>
 
         {/* Center: Subtle Context Title */}
         <div className="hidden md:flex flex-col items-center justify-center text-center pointer-events-none px-4 min-w-0">
-          <span className="text-[13px] font-medium tracking-wide text-white/90 truncate max-w-md">
+          <span className="text-sm sm:text-base font-semibold tracking-wide text-white/90 truncate max-w-md">
             {title}
           </span>
           {mediaType === "tv" && (
-            <span className="text-[10px] uppercase font-mono tracking-widest text-white/40 mt-0.5">
+            <span className="text-xs uppercase font-mono tracking-widest text-white/50 mt-0.5">
               S{String(season ?? 1).padStart(2, "0")} E{String(episode ?? 1).padStart(2, "0")}
               {episodeTitle ? ` · ${episodeTitle}` : ""}
             </span>
@@ -568,7 +721,7 @@ export function NativePlayer({
       {/* Bottom Playback Controls Bar */}
       <div
         className={cn(
-          "absolute inset-x-0 bottom-0 z-[100] bg-gradient-to-t from-black/95 via-black/50 to-transparent px-5 pb-5 pt-16 text-white",
+          "absolute inset-x-0 bottom-0 z-[100] bg-gradient-to-t from-black/95 via-black/50 to-transparent px-6 pb-6 pt-20 text-white",
           "transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
           isControlsActive
             ? "translate-y-0 opacity-100"
@@ -589,28 +742,28 @@ export function NativePlayer({
             }}
           >
             {paused ? (
-              <Play className="h-[18px] w-[18px] fill-current" />
+              <Play className="h-5 w-5 sm:h-6 sm:w-6 fill-current ml-0.5" />
             ) : (
-              <Pause className="h-[18px] w-[18px] fill-current" />
+              <Pause className="h-5 w-5 sm:h-6 sm:w-6 fill-current" />
             )}
           </IconButton>
           <IconButton title="Back 10 seconds" onClick={() => seekTo(current - 10)}>
-            <span className="relative inline-flex h-[18px] w-[18px] items-center justify-center">
-              <RotateCcw className="h-[18px] w-[18px]" />
-              <span className="absolute inset-0 flex items-center justify-center pt-px text-[7px] font-semibold leading-none">
+            <span className="relative inline-flex h-5 w-5 sm:h-[22px] sm:w-[22px] items-center justify-center">
+              <RotateCcw className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
+              <span className="absolute inset-0 flex items-center justify-center pt-px text-[8px] sm:text-[9px] font-semibold leading-none">
                 10
               </span>
             </span>
           </IconButton>
           <IconButton title="Forward 10 seconds" onClick={() => seekTo(current + 10)}>
-            <span className="relative inline-flex h-[18px] w-[18px] items-center justify-center">
-              <RotateCw className="h-[18px] w-[18px]" />
-              <span className="absolute inset-0 flex items-center justify-center pt-px text-[7px] font-semibold leading-none">
+            <span className="relative inline-flex h-5 w-5 sm:h-[22px] sm:w-[22px] items-center justify-center">
+              <RotateCw className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
+              <span className="absolute inset-0 flex items-center justify-center pt-px text-[8px] sm:text-[9px] font-semibold leading-none">
                 10
               </span>
             </span>
           </IconButton>
-          <span className="ml-1.5 min-w-[7.5rem] font-mono text-[11px] tabular-nums tracking-wide text-white/70">
+          <span className="ml-2 min-w-[8.5rem] font-mono text-xs sm:text-sm tabular-nums tracking-wide text-white/75">
             {formatTimecode(current)}
             <span className="text-white/30"> / </span>
             {formatTimecode(duration)}
@@ -625,9 +778,9 @@ export function NativePlayer({
             }}
           >
             {muted || volume === 0 ? (
-              <VolumeX className="h-4 w-4" />
+              <VolumeX className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
             ) : (
-              <Volume2 className="h-4 w-4" />
+              <Volume2 className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
             )}
           </IconButton>
           <VolumeBar
@@ -644,18 +797,25 @@ export function NativePlayer({
           />
           <span className="flex-1" />
           <IconButton
+            title="Audio Tracks"
+            active={panel === "audio"}
+            onClick={() => setPanel(panel === "audio" ? "none" : "audio")}
+          >
+            <Music className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
+          </IconButton>
+          <IconButton
             title="Subtitles"
             active={subId !== "off"}
             onClick={() => setPanel(panel === "subs" ? "none" : "subs")}
           >
-            <Subtitles className="h-4 w-4" />
+            <Subtitles className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
           </IconButton>
           <IconButton
             title="Settings"
-            active={panel === "settings" || panel === "quality" || panel === "speed" || panel === "audio"}
+            active={panel === "settings" || panel === "quality" || panel === "speed"}
             onClick={() => setPanel(panel === "settings" ? "none" : "settings")}
           >
-            <Settings2 className="h-4 w-4" />
+            <Settings2 className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
           </IconButton>
           <IconButton
             title="Picture in picture"
@@ -669,47 +829,197 @@ export function NativePlayer({
               }
             }}
           >
-            <PictureInPicture2 className="h-4 w-4" />
+            <PictureInPicture2 className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
           </IconButton>
           <IconButton title="Fullscreen" onClick={() => onToggleFullscreen?.()}>
-            <Maximize2 className="h-4 w-4" />
+            <Maximize2 className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
           </IconButton>
         </div>
       </div>
 
-      {/* Popover Setting Panels */}
+      {/* Popover Setting Panels - Cinejoy Style */}
       {panel !== "none" ? (
         <div
-          className="absolute bottom-[5.25rem] right-5 z-[110] w-60 origin-bottom-right overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0c]/95 text-white shadow-[0_16px_50px_rgba(0,0,0,0.55)] backdrop-blur-md"
+          className="absolute bottom-[5.75rem] right-6 z-[110] w-72 sm:w-80 origin-bottom-right overflow-hidden rounded-2xl border border-white/15 bg-[#0e0e0e]/95 text-white shadow-[0_20px_60px_rgba(0,0,0,0.7)] backdrop-blur-xl"
           style={{ zIndex: 110 }}
           onClick={(event) => event.stopPropagation()}
         >
           {panel === "settings" ? (
-            <div className="py-1">
-              <MenuRow
-                label="Quality"
-                value={qualityLabel}
-                onClick={() => setPanel("quality")}
-              />
-              <MenuRow
-                label="Speed"
-                value={`${speed}x`}
-                onClick={() => setPanel("speed")}
-              />
-              {audioTracks.length > 1 ? (
-                <MenuRow
-                  label="Audio"
-                  value={audioTracks[audio]?.name ?? "Default"}
+            <div className="p-3">
+              {/* 2x2 Feature Grid Matching Cinejoy */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPanel("quality")}
+                  className="flex flex-col items-start rounded-xl border border-white/10 bg-white/[0.05] p-2.5 text-left transition hover:bg-white/10 active:scale-[0.98]"
+                >
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+                    <Tv2 className="h-3.5 w-3.5 text-white/60" />
+                    <span>Quality</span>
+                  </div>
+                  <span className="mt-1 text-sm font-bold text-white tracking-wide truncate max-w-full">
+                    {qualityLabel}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onOpenServers) {
+                      setPanel("none");
+                      onOpenServers();
+                    }
+                  }}
+                  className="flex flex-col items-start rounded-xl border border-white/10 bg-white/[0.05] p-2.5 text-left transition hover:bg-white/10 active:scale-[0.98]"
+                >
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+                    <Layers className="h-3.5 w-3.5 text-white/60" />
+                    <span>Server</span>
+                  </div>
+                  <span className="mt-1 text-sm font-bold text-white tracking-wide truncate max-w-full">
+                    {serverName || "Lisbon"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPanel("subs")}
+                  className="flex flex-col items-start rounded-xl border border-white/10 bg-white/[0.05] p-2.5 text-left transition hover:bg-white/10 active:scale-[0.98]"
+                >
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+                    <Subtitles className="h-3.5 w-3.5 text-white/60" />
+                    <span>Subtitles</span>
+                  </div>
+                  <span className="mt-1 text-sm font-bold text-white tracking-wide truncate max-w-full">
+                    {activeSub}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setPanel("audio")}
-                />
-              ) : null}
-              <MenuRow
-                label="Subtitles"
-                value={activeSub}
-                onClick={() => setPanel("subs")}
-              />
+                  className="flex flex-col items-start rounded-xl border border-white/10 bg-white/[0.05] p-2.5 text-left transition hover:bg-white/10 active:scale-[0.98]"
+                >
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+                    <Music className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>Audio</span>
+                  </div>
+                  <span className="mt-1 text-sm font-bold text-white tracking-wide truncate max-w-full">
+                    {audioTracks[audio]?.name ?? "Track 1"}
+                  </span>
+                </button>
+              </div>
+
+              <div className="my-2.5 h-px bg-white/10" />
+
+              {/* Subtitles Toggle Row */}
+              <div className="flex items-center justify-between rounded-xl px-2.5 py-2 text-white/90 hover:bg-white/[0.04] transition">
+                <div className="flex items-center gap-2.5 text-xs sm:text-sm font-medium">
+                  <Subtitles className="h-4 w-4 text-white/60" />
+                  <span>Enable Subtitles</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (subId !== "off") {
+                      setSubId("off");
+                    } else if (externalSubtitles.length > 0) {
+                      const idx = externalSubtitles.findIndex((s) => s.language === "en" || /english/i.test(s.label));
+                      setSubId(`ext-${idx >= 0 ? idx : 0}`);
+                    }
+                  }}
+                  className={cn(
+                    "relative inline-flex h-5 w-9 sm:h-6 sm:w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                    subId !== "off" ? "bg-primary" : "bg-white/20",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-white shadow transform ring-0 transition duration-200 ease-in-out",
+                      subId !== "off" ? "translate-x-4 sm:translate-x-5" : "translate-x-0",
+                    )}
+                  />
+                </button>
+              </div>
+
+              {/* Playback Settings (Speed) */}
+              <button
+                type="button"
+                onClick={() => setPanel("speed")}
+                className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-white/90 hover:bg-white/[0.05] transition"
+              >
+                <div className="flex items-center gap-2.5 text-xs sm:text-sm font-medium">
+                  <Gauge className="h-4 w-4 text-white/60" />
+                  <span>Playback Settings</span>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-white/50 font-mono">
+                  <span>{speed}x</span>
+                  <ChevronRight className="h-4 w-4 text-white/40" />
+                </div>
+              </button>
+
+              {/* Audio Tracks Row */}
+              <button
+                type="button"
+                onClick={() => setPanel("audio")}
+                className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-white/90 hover:bg-white/[0.05] transition"
+              >
+                <div className="flex items-center gap-2.5 text-xs sm:text-sm font-medium">
+                  <Music className="h-4 w-4 text-emerald-400" />
+                  <span>Audio Tracks</span>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-white/50">
+                  <span className="truncate max-w-[6rem] sm:max-w-[8rem]">
+                    {audioTracks[audio]?.name ?? "Track 1"}
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-white/40" />
+                </div>
+              </button>
             </div>
           ) : null}
+
+          {panel === "audio" ? (
+            <div className="p-2.5">
+              <div className="flex items-center gap-2 border-b border-white/10 px-1 pb-2.5 pt-1 text-white">
+                <button
+                  type="button"
+                  onClick={() => setPanel("settings")}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition"
+                  title="Back to Settings"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+                <span className="text-sm font-bold tracking-wide">Audio</span>
+              </div>
+              <div className="max-h-64 overflow-y-auto pt-1 space-y-1">
+                {audioTracks.map((track) => {
+                  const isSelected = audio === track.index;
+                  return (
+                    <button
+                      key={String(track.index)}
+                      type="button"
+                      onClick={() => applyAudio(track.index)}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs sm:text-sm transition",
+                        isSelected
+                          ? "bg-white/10 text-white font-semibold"
+                          : "text-white/80 hover:bg-white/[0.06] hover:text-white",
+                      )}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Music className={cn("h-4 w-4 shrink-0", isSelected ? "text-emerald-400" : "text-white/50")} />
+                        <span className="truncate">{track.name}</span>
+                      </div>
+                      {isSelected && (
+                        <CheckCircle2 className="h-5 w-5 text-emerald-400 fill-emerald-400/20 shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
           {panel === "speed" ? (
             <ChoiceList
               title="Speed"
@@ -726,6 +1036,7 @@ export function NativePlayer({
               }))}
             />
           ) : null}
+
           {panel === "quality" ? (
             <ChoiceList
               title="Quality"
@@ -748,18 +1059,7 @@ export function NativePlayer({
               ]}
             />
           ) : null}
-          {panel === "audio" ? (
-            <ChoiceList
-              title="Audio"
-              onBack={() => setPanel("settings")}
-              items={audioTracks.map((track) => ({
-                key: String(track.index),
-                label: track.name,
-                active: audio === track.index,
-                onSelect: () => applyAudio(track.index),
-              }))}
-            />
-          ) : null}
+
           {panel === "subs" ? (
             <ChoiceList
               title="Subtitles"
@@ -810,7 +1110,7 @@ function IconButton({
       aria-label={title}
       onClick={onClick}
       className={cn(
-        "inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition-[background-color,transform,color] duration-150 ease-out",
+        "inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full text-white transition-[background-color,transform,color] duration-150 ease-out",
         "hover:bg-white/10 active:scale-[0.97]",
         active && "text-primary",
       )}
@@ -909,7 +1209,7 @@ function VolumeBar({
   return (
     <div
       ref={trackRef}
-      className="group/vol relative mx-1 hidden h-5 w-[4.5rem] cursor-pointer items-center sm:flex"
+      className="group/vol relative mx-1 hidden h-6 w-20 sm:w-24 cursor-pointer items-center sm:flex"
       onPointerDown={(event) => {
         draggingRef.current = true;
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -927,7 +1227,7 @@ function VolumeBar({
       aria-valuemax={100}
       aria-valuenow={Math.round(pct)}
     >
-      <div className="relative h-[3px] w-full rounded-full bg-white/20">
+      <div className="relative h-[4px] w-full rounded-full bg-white/20">
         <div
           className="absolute inset-y-0 left-0 rounded-full bg-white"
           style={{ width: `${pct}%` }}
@@ -961,7 +1261,7 @@ function SeekBar({
   return (
     <div
       ref={trackRef}
-      className="group relative mb-3 flex h-5 w-full cursor-pointer items-center"
+      className="group relative mb-4 flex h-6 w-full cursor-pointer items-center"
       onPointerDown={(event) => {
         draggingRef.current = true;
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -982,14 +1282,14 @@ function SeekBar({
       aria-valuemax={Math.round(duration)}
       aria-valuenow={Math.round(current)}
     >
-      <div className="relative h-[3px] w-full rounded-full bg-white/20 transition-[height] duration-150 group-hover:h-1.5">
+      <div className="relative h-1 w-full rounded-full bg-white/25 transition-[height] duration-150 group-hover:h-2">
         <div
           className="absolute inset-y-0 left-0 rounded-full bg-primary"
           style={{ width: `${pct}%` }}
         />
       </div>
       <div
-        className="pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary opacity-0 shadow-[0_0_8px_rgba(29,144,245,0.65)] transition-opacity duration-150 group-hover:opacity-100 group-active:opacity-100"
+        className="pointer-events-none absolute top-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary opacity-0 shadow-[0_0_10px_rgba(29,144,245,0.85)] transition-opacity duration-150 group-hover:opacity-100 group-active:opacity-100"
         style={{ left: `${pct}%` }}
       />
     </div>

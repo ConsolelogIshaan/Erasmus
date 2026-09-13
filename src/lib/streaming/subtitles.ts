@@ -34,7 +34,8 @@ function parseTimestamp(raw: string): number {
 
 export function parseSubtitleCues(text: string): SubtitleCue[] {
   const source = isSrtText(text) ? srtToVtt(text) : text.replace(/^\uFEFF/, "");
-  const blocks = source.replace(/\r/g, "").split(/\n\n+/);
+  const cleanSource = source.replace(/\r/g, "").replace(/\n[ \t]+\n/g, "\n\n");
+  const blocks = cleanSource.split(/\n\n+/);
   const cues: SubtitleCue[] = [];
   for (const block of blocks) {
     const lines = block.split("\n").filter((line) => line.trim().length > 0);
@@ -48,6 +49,7 @@ export function parseSubtitleCues(text: string): SubtitleCue[] {
       .slice(timeIndex + 1)
       .join("\n")
       .replace(/<[^>]+>/g, "")
+      .replace(/\{[^}]+\}/g, "")
       .trim();
     if (!cueText || end <= start) continue;
     cues.push({ start, end, text: cueText });

@@ -1,3 +1,5 @@
+import dns from "node:dns";
+try { dns.setServers(["8.8.8.8", "1.1.1.1", "9.9.9.9"]); } catch {}
 import { NextResponse } from "next/server";
 import { isSrtText, srtToVtt } from "@/lib/streaming/subtitles";
 
@@ -30,13 +32,58 @@ function proxied(relay: string, absolute: string, referer: string): string {
   return `${relay}?${query.toString()}`;
 }
 
+function enrichAudioTracks(text: string): string {
+  const lines = text.split("\n");
+  const audioIndices: number[] = [];
+  lines.forEach((l, idx) => {
+    if (l.trim().startsWith("#EXT-X-MEDIA:") && l.includes("TYPE=AUDIO")) {
+      audioIndices.push(idx);
+    }
+  });
+
+  if (audioIndices.length <= 1) return text;
+
+  let hasExplicitEnglish = false;
+  let englishLineIdx = -1;
+
+  audioIndices.forEach((idx) => {
+    const l = lines[idx];
+    if (
+      /LANGUAGE="?(en|eng|english)"?/i.test(l) ||
+      /NAME="?[^"]*(english|\beng\b)[^"]*"?/i.test(l)
+    ) {
+      hasExplicitEnglish = true;
+      englishLineIdx = idx;
+    }
+  });
+
+  const targetEnglishIdx = hasExplicitEnglish ? englishLineIdx : audioIndices[1];
+
+  audioIndices.forEach((idx) => {
+    let l = lines[idx];
+    if (idx === targetEnglishIdx) {
+      l = l.replace(/DEFAULT=(YES|NO)/i, "DEFAULT=YES");
+      l = l.replace(/AUTOSELECT=(YES|NO)/i, "AUTOSELECT=YES");
+      if (!/LANGUAGE="[^"]+"/i.test(l)) {
+        l = l.replace(/NAME="([^"]+)"/i, 'NAME="English ($1)",LANGUAGE="en"');
+      }
+    } else {
+      l = l.replace(/DEFAULT=(YES|NO)/i, "DEFAULT=NO");
+    }
+    lines[idx] = l;
+  });
+
+  return lines.join("\n");
+}
+
 function rewritePlaylist(
   text: string,
   baseUrl: string,
   relay: string,
   referer: string,
 ): string {
-  return text
+  const enriched = enrichAudioTracks(text);
+  return enriched
     .split("\n")
     .map((line) => {
       const trimmed = line.trim();
@@ -92,8 +139,14 @@ export async function GET(request: Request) {
     contentType.includes("mpegurl") ||
     contentType.includes("m3u8") ||
     path.endsWith(".m3u8");
+  const isHtmlMediaSegment =
+    /video_\d+p_\d+\.html/i.test(path) ||
+    /audio_\d+_\d+\.html/i.test(path) ||
+    /_init\.html/i.test(path);
   const looksMedia =
-    /video|mp4/i.test(contentType) || /\.(mp4|m4s|ts)$/i.test(path);
+    /video|mp4/i.test(contentType) ||
+    /\.(mp4|m4s|ts)$/i.test(path) ||
+    isHtmlMediaSegment;
   const relay = "/api/stream/hls";
 
   const playlistResponse = (text: string) =>
@@ -124,9 +177,13 @@ export async function GET(request: Request) {
   }
 
   if (range || looksMedia) {
+    let responseType = contentType || "application/octet-stream";
+    if (isHtmlMediaSegment || /\.(mp4|m4s)$/i.test(path)) {
+      responseType = path.includes("audio") ? "audio/mp4" : "video/mp4";
+    }
     const passthrough: Record<string, string> = {
-      "Content-Type": contentType || "application/octet-stream",
-      "Cache-Control": "public, max-age=60",
+      "Content-Type": responseType,
+      "Cache-Control": "public, max-age=3600",
       "Accept-Ranges": "bytes",
     };
     const contentRange = upstream.headers.get("content-range");

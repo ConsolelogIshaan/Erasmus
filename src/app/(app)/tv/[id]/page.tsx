@@ -162,6 +162,7 @@ export default async function TvDetailPage({ params }: PageProps) {
               without checkboxes. */}
           <SeasonEpisodes
             showId={show.id}
+            showTitle={show.title}
             seasons={show.seasons}
             identity={personal.userId ? identity : undefined}
             episodeProgress={personal.episodeProgress}

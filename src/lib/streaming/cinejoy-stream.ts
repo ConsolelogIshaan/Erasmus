@@ -1,9 +1,67 @@
+import dns from "node:dns";
+try { dns.setServers(["8.8.8.8", "1.1.1.1", "9.9.9.9"]); } catch {}
 import { STREAMING_SERVERS } from "@/lib/streaming/stream-resolver";
 import { getMediaProvider } from "@/lib/media/providers";
 
 const ENC_API = "https://enc-dec.app/api";
 const SHEGU = "https://api.shegu.st";
 export const CINEJOY_REFERER = "https://cinejoy.to/";
+
+const LANG_DISPLAY: Record<string, string> = {
+  en: "English",
+  eng: "English",
+  zh: "Chinese",
+  chi: "Chinese",
+  zho: "Chinese",
+  zht: "Chinese (Traditional)",
+  id: "Indonesian",
+  ind: "Indonesian",
+  ms: "Malay",
+  may: "Malay",
+  th: "Thai",
+  tha: "Thai",
+  vi: "Vietnamese",
+  vie: "Vietnamese",
+  ja: "Japanese",
+  jpn: "Japanese",
+  ko: "Korean",
+  kor: "Korean",
+  ar: "Arabic",
+  ara: "Arabic",
+  es: "Spanish",
+  spa: "Spanish",
+  fr: "French",
+  fre: "French",
+  fra: "French",
+  de: "German",
+  ger: "German",
+  deu: "German",
+  it: "Italian",
+  ita: "Italian",
+  pt: "Portuguese",
+  por: "Portuguese",
+  ru: "Russian",
+  rus: "Russian",
+  hi: "Hindi",
+  hin: "Hindi",
+  tr: "Turkish",
+  tur: "Turkish",
+};
+
+export function formatCaptionLabel(label: string, language: string, url: string): string {
+  const urlLower = url.toLowerCase();
+  const langKey = (language || label).toLowerCase();
+  let name = LANG_DISPLAY[langKey] || label || language;
+  if (langKey.startsWith("zh") || name === "Chinese") {
+    if (urlLower.includes("traditional") || langKey === "zht") return "Chinese (Traditional)";
+    if (urlLower.includes("simplified") || langKey === "zhs") return "Chinese (Simplified)";
+  }
+  if (langKey.startsWith("pt") && (urlLower.includes("br") || langKey.includes("br"))) {
+    return "Portuguese (BR)";
+  }
+  return name;
+}
+
 
 const SHEGU_HEADERS = {
   Accept: "*/*",
@@ -85,10 +143,17 @@ async function catalogMeta(type: "movie" | "tv", tmdbId: string) {
     }
     const show = await provider.getTvShow(tmdbId);
     if (!show) return null;
+    const isAnime = Boolean(
+      show.genres?.some((g) => g.name === "Animation" || g.id === "16") &&
+      (show.spokenLanguages?.some((l) => l.code === "ja" || l.name?.toLowerCase() === "japanese") ||
+       show.productionCountries?.some((c) => c.code === "JP" || c.name?.toLowerCase() === "japan") ||
+       show.keywords?.some((k) => k.name?.toLowerCase().includes("anime")))
+    );
     return {
       title: show.title,
       year: (show.firstAirDate || show.releaseDate || "").slice(0, 4),
       imdbId: show.imdbId || "",
+      isAnime,
     };
   } catch {
     return null;
@@ -122,11 +187,16 @@ function pickStream(decoded: unknown): {
   const url = hit?.playlist || hit?.url || hit?.file;
   if (!url) return null;
   const captions = (hit?.captions || [])
-    .map((caption) => ({
-      label: caption.label || caption.language || "Subtitle",
-      language: caption.language || "und",
-      url: caption.file || caption.url || "",
-    }))
+    .map((caption) => {
+      const url = caption.file || caption.url || "";
+      const language = caption.language || caption.label || "und";
+      const label = formatCaptionLabel(caption.label || "", language, url);
+      return {
+        label,
+        language,
+        url,
+      };
+    })
     .filter((caption) => caption.url);
   return {
     url,
@@ -213,13 +283,63 @@ export async function resolveCinejoyStream(input: {
     preferred,
     ...STREAMING_SERVERS.map((server) => server.id).filter((id) => id !== preferred),
   ];
-  for (const serverId of order) {
+
+  const meta = await catalogMeta(input.type, input.tmdbId);
+  const isAnime = Boolean(meta?.isAnime);
+  const isAnimeCour2 =
+    isAnime && input.type === "tv" && (input.season ?? 1) === 1 && (input.episode ?? 1) > 12;
+  const s2Ep = isAnimeCour2 ? (input.episode ?? 1) - 12 : undefined;
+
+  let fallbackHit: CinejoyStreamHit | null = null;
+
+  // 1. If anime Cour 2, try preferred server on Season 2 first (resolves in ~200ms)
+  if (isAnimeCour2 && s2Ep) {
+    try {
+      const hit = await resolveCinejoyServer({
+        ...input,
+        season: 2,
+        episode: s2Ep,
+        serverId: preferred,
+      });
+      if (hit && !hit.url.includes("lol.movieboxnoob.cc")) return hit;
+      if (hit && !fallbackHit) fallbackHit = hit;
+    } catch {}
+  }
+
+  // 2. Try preferred server with requested episode
+  try {
+    const hit = await resolveCinejoyServer({ ...input, serverId: preferred });
+    if (hit) {
+      if (!hit.url.includes("lol.movieboxnoob.cc")) return hit;
+      fallbackHit = hit;
+    }
+  } catch {}
+
+  // 3. Try remaining servers
+  for (const serverId of order.slice(1)) {
     try {
       const hit = await resolveCinejoyServer({ ...input, serverId });
-      if (hit) return hit;
-    } catch {
-      /* try next named server */
+      if (hit) {
+        if (!hit.url.includes("lol.movieboxnoob.cc")) return hit;
+        if (!fallbackHit) fallbackHit = hit;
+      }
+    } catch {}
+
+    if (isAnimeCour2 && s2Ep) {
+      try {
+        const hit = await resolveCinejoyServer({
+          ...input,
+          season: 2,
+          episode: s2Ep,
+          serverId,
+        });
+        if (hit) {
+          if (!hit.url.includes("lol.movieboxnoob.cc")) return hit;
+          if (!fallbackHit) fallbackHit = hit;
+        }
+      } catch {}
     }
   }
-  return null;
+
+  return fallbackHit;
 }

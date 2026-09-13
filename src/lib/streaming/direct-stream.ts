@@ -1,3 +1,5 @@
+import dns from "node:dns";
+try { dns.setServers(["8.8.8.8", "1.1.1.1", "9.9.9.9"]); } catch {}
 import {
   resolveCinejoyStream,
   type CinejoyCaption,
@@ -19,7 +21,7 @@ export interface DirectStreamResult {
 }
 
 const extractCache = new Map<string, { at: number; result: DirectStreamResult }>();
-const CACHE_MS = 10 * 60 * 1000;
+const CACHE_MS = 3 * 60 * 1000;
 
 export async function extractDirectStream(input: {
   type: "movie" | "tv";

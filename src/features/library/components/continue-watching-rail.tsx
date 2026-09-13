@@ -5,7 +5,7 @@ import { Library } from "lucide-react";
 
 import { EmptyState } from "@/components/feedback/empty-state";
 import { LibraryPosterCard } from "@/features/library/components/library-poster-card";
-import { getRecentPlayback, type RecentPlaybackItem } from "@/lib/streaming/playback-progress";
+import { getRecentPlayback } from "@/lib/streaming/playback-progress";
 import type { LibraryEntry } from "@/types/library";
 
 interface ContinueWatchingRailProps {
@@ -39,6 +39,9 @@ export function ContinueWatchingRail({ initialEntries }: ContinueWatchingRailPro
         existing.status = "watching";
         existing.last_watched_at = new Date(item.updatedAt).toISOString();
         existing.progress_percent = progressPercent;
+        if (item.posterPath && !existing.poster_path) {
+          existing.poster_path = item.posterPath;
+        }
         if (item.mediaType === "tv") {
           existing.current_season = item.season ?? existing.current_season;
           existing.current_episode = item.episode ?? existing.current_episode;
@@ -91,7 +94,63 @@ export function ContinueWatchingRail({ initialEntries }: ContinueWatchingRailPro
       return bTime - aTime;
     });
 
-    setEntries(merged.slice(0, 8));
+    const displayList = merged.slice(0, 8);
+    setEntries(displayList);
+
+    // Auto-heal missing posters and fix episode titles to show titles
+    const missing = displayList.filter((e) => !e.poster_path || (e.title && e.title.includes(",")));
+    if (missing.length > 0) {
+      Promise.all(
+        missing.map(async (entry) => {
+          try {
+            const res = await fetch(`/api/media/details?type=${entry.media_type}&id=${entry.external_id}&_v=2`);
+            if (!res.ok) return null;
+            const data = await res.json();
+            return {
+              id: entry.id,
+              tmdbId: entry.external_id,
+              mediaType: entry.media_type,
+              posterPath: data.posterPath || null,
+              backdropPath: data.backdropPath || null,
+              title: data.title || null,
+            };
+          } catch {
+            return null;
+          }
+        })
+      ).then((resolved) => {
+        let updated = false;
+        const currentRecent = getRecentPlayback();
+        const nextEntries = displayList.map((e) => {
+          const r = resolved.find((item) => item && item.id === e.id);
+          if (r && (r.posterPath || r.title)) {
+            updated = true;
+            const fixedTitle = (r.title && (e.title.includes(",") || e.title.length > 35)) ? r.title : (e.title || r.title);
+            // Persist back to localStorage
+            const rec = currentRecent.find((x) => x.tmdbId === e.external_id && x.mediaType === e.media_type);
+            if (rec) {
+              if (r.posterPath) rec.posterPath = r.posterPath;
+              if (r.backdropPath) rec.backdropPath = r.backdropPath;
+              if (r.title && (rec.title.includes(",") || rec.title.length > 35)) rec.title = r.title;
+            }
+            return {
+              ...e,
+              poster_path: r.posterPath ?? e.poster_path,
+              backdrop_path: r.backdropPath ?? e.backdrop_path,
+              title: fixedTitle,
+            };
+          }
+          return e;
+        });
+
+        if (updated) {
+          try {
+            localStorage.setItem("argus:playback:recent", JSON.stringify(currentRecent));
+          } catch {}
+          setEntries(nextEntries);
+        }
+      });
+    }
   }, [initialEntries]);
 
   if (entries.length === 0) {

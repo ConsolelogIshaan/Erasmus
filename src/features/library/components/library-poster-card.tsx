@@ -81,11 +81,36 @@ export function LibraryPosterCard({
     }
   }, [entry.external_id, entry.media_type, entry.current_season, entry.current_episode]);
 
+  const [resolvedPoster, setResolvedPoster] = React.useState<string | null>(entry.poster_path ?? null);
+  const [displayTitle, setDisplayTitle] = React.useState<string>(entry.title);
+
+  React.useEffect(() => {
+    if (entry.poster_path) {
+      setResolvedPoster(entry.poster_path);
+      return;
+    }
+    if (!entry.external_id) return;
+    let cancelled = false;
+    fetch(`/api/media/details?type=${entry.media_type}&id=${entry.external_id}&_v=2`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        if (data.posterPath) setResolvedPoster(data.posterPath);
+        if (data.title && (entry.title.includes(",") || entry.title.length > 35)) {
+          setDisplayTitle(data.title);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [entry.poster_path, entry.external_id, entry.media_type, entry.title]);
+
   const href =
     entry.media_type === "movie"
       ? ROUTES.movie(entry.external_id)
       : ROUTES.show(entry.external_id);
-  const src = posterUrl(entry.poster_path, "w342");
+  const src = posterUrl(resolvedPoster ?? entry.poster_path, "w342");
   const progress = localProgress ?? Math.min(100, Math.max(0, entry.progress_percent ?? 0));
 
   const handlePlay = (e: React.MouseEvent) => {
@@ -177,7 +202,7 @@ export function LibraryPosterCard({
             </div>
           </div>
           <p className="mt-2 line-clamp-2 px-0.5 text-sm font-medium leading-snug">
-            {entry.title}
+            {displayTitle || entry.title}
           </p>
         </Link>
       </motion.div>

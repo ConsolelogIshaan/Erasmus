@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 
 interface SeasonEpisodesProps {
   showId: string;
+  showTitle?: string;
   seasons: TvSeason[];
   /**
    * Enables tracking. Absent for signed-out visitors, who get the same list
@@ -58,6 +59,7 @@ async function fetchSeason(showId: string, season: number): Promise<TvSeason> {
  */
 export function SeasonEpisodes({
   showId,
+  showTitle,
   seasons,
   identity,
   episodeProgress = [],
@@ -246,6 +248,7 @@ export function SeasonEpisodes({
           <SeasonRow
             key={season.id}
             showId={showId}
+            showTitle={showTitle}
             season={season}
             open={expanded.has(season.seasonNumber)}
             onOpenChange={(open) =>
@@ -270,6 +273,7 @@ export function SeasonEpisodes({
 
 interface SeasonRowProps {
   showId: string;
+  showTitle?: string;
   season: TvSeason;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -288,6 +292,7 @@ interface SeasonRowProps {
  */
 function SeasonRow({
   showId,
+  showTitle,
   season,
   open,
   onOpenChange,
@@ -389,6 +394,7 @@ function SeasonRow({
             <ul className="min-w-0 w-full space-y-1.5">
               {episodes.map((ep) => (
                 <EpisodeRow
+                  showTitle={showTitle}
                   key={ep.id}
                   showId={showId}
                   seasonNumber={season.seasonNumber}
@@ -418,6 +424,7 @@ function SeasonRow({
 
 interface EpisodeRowProps {
   showId: string;
+  showTitle?: string;
   seasonNumber: number;
   name: string;
   episodeNumber: number;
@@ -445,6 +452,7 @@ interface EpisodeRowProps {
  */
 function EpisodeRow({
   showId,
+  showTitle,
   seasonNumber,
   name,
   episodeNumber,
@@ -506,7 +514,7 @@ function EpisodeRow({
         </div>
         <div className="flex items-center gap-1.5">
           <StreamButton
-            title={name}
+            title={showTitle || name}
             tmdbId={showId}
             mediaType="tv"
             season={seasonNumber}
