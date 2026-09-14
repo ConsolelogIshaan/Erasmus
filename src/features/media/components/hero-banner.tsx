@@ -57,16 +57,32 @@ export function HeroBanner({
 
   const active = slides[index] ?? slides[0];
 
-  // Preload logo and details for the first few slides
+  // Preload logos and cache images immediately in browser memory
   React.useEffect(() => {
     if (!slides.length) return;
-    slides.slice(0, 6).forEach((slide) => {
+    slides.forEach((slide) => {
       const key = `${slide.mediaType}:${slide.id}`;
-      if (detailsCache[key] !== undefined) return;
+      const activeDetails = detailsCache[key];
+      const logoPath = activeDetails?.logoPath ?? slide.logoPath;
+      if (logoPath) {
+        const url = logoUrl(logoPath, "w500");
+        if (url) {
+          const img = new window.Image();
+          img.src = url;
+        }
+      }
+      if (detailsCache[key] !== undefined || slide.logoPath) return;
       fetch(`/api/media/details?type=${slide.mediaType}&id=${slide.id}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (!data) return;
+          if (data.logoPath) {
+            const url = logoUrl(data.logoPath, "w500");
+            if (url) {
+              const img = new window.Image();
+              img.src = url;
+            }
+          }
           setDetailsCache((prev) => ({
             ...prev,
             [key]: {
@@ -156,7 +172,7 @@ export function HeroBanner({
                 src={bg}
                 alt=""
                 fill
-                priority={index === 0}
+                priority={true}
                 sizes="100vw"
                 className="object-cover object-top sm:object-center filter brightness-[1.07] contrast-[1.03] saturate-[1.06]"
               />
@@ -259,10 +275,10 @@ export function HeroBanner({
           <AnimatePresence mode="wait">
             <motion.div
               key={`title-${active.mediaType}-${active.id}`}
-              initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+              initial={reduceMotion ? false : { opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
-              transition={{ duration: 0.4 }}
+              exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+              transition={{ duration: 0.2 }}
               className="space-y-3"
             >
               {logo ? (

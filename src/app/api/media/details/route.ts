@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         },
         {
           headers: {
-            "Cache-Control": "no-cache",
+            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
           },
         },
       );
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         },
         {
           headers: {
-            "Cache-Control": "no-cache",
+            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
           },
         },
       );

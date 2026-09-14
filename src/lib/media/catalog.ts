@@ -174,12 +174,37 @@ export async function getDiscoveryHome(): Promise<{
     ...popularTv.results,
   ];
   const seen = new Set<string>();
-  const heroItems = heroPool.filter((item) => {
+  const heroItemsRaw = heroPool.filter((item) => {
     const key = `${item.mediaType}:${item.id}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return Boolean(item.backdropPath || item.posterPath);
-  }).slice(0, 12);
+  }).slice(0, 10);
+
+  // Pre-enrich hero items with official logos & taglines so they render instantly with 0 client delay
+  const heroItems = await Promise.all(
+    heroItemsRaw.map(async (item) => {
+      try {
+        if (item.mediaType === "movie") {
+          const m = await provider.getMovie(item.id);
+          return {
+            ...item,
+            logoPath: m?.logoPath ?? null,
+            tagline: m?.tagline ?? null,
+          };
+        } else {
+          const t = await provider.getTvShow(item.id);
+          return {
+            ...item,
+            logoPath: t?.logoPath ?? null,
+            tagline: t?.tagline ?? null,
+          };
+        }
+      } catch {
+        return item;
+      }
+    }),
+  );
   const hero = heroItems[0] ?? trending.results[0] ?? popularMovies.results[0] ?? null;
 
   // Soft approach — use top trending items as "Editor's picks" placeholder
