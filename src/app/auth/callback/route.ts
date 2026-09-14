@@ -12,15 +12,25 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const next = searchParams.get("next");
+  const authError = searchParams.get("error");
+  const errorDescription = searchParams.get("error_description");
+
+  if (authError) {
+    console.error(`[auth/callback] OAuth provider error: ${authError} - ${errorDescription}`);
+    return NextResponse.redirect(`${origin}${ROUTES.login}?error=${encodeURIComponent(authError)}`);
+  }
 
   if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      // Concatenating to `origin` already keeps this on-host, but `next` is
-      // attacker-supplied and the same sanitiser is used here so both auth
-      // redirect paths behave identically and neither can drift.
-      return NextResponse.redirect(safeRedirectUrl(origin, next, ROUTES.dashboard));
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) {
+        console.error("[auth/callback] exchangeCodeForSession failed:", error.message, error);
+      } else if (data?.session) {
+        return NextResponse.redirect(safeRedirectUrl(origin, next, ROUTES.dashboard));
+      }
+    } catch (err) {
+      console.error("[auth/callback] Unexpected error during code exchange:", err);
     }
   }
 

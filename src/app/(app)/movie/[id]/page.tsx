@@ -158,7 +158,8 @@ export default async function MovieDetailPage({ params }: PageProps) {
         </div>
       </DetailHero>
 
-      <div className="grid w-full min-w-0 max-w-full gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(16.5rem,20rem)] lg:items-start lg:gap-6">
+      <div className="content-container pb-16 pt-2 md:pl-[calc(var(--current-sidebar-width)+1.5rem)]">
+        <div className="grid w-full min-w-0 max-w-full gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(16.5rem,20rem)] lg:items-start lg:gap-6">
         <div className="min-w-0 max-w-full space-y-10 overflow-x-hidden">
           <CastRow people={movie.cast} />
 
@@ -253,7 +254,8 @@ export default async function MovieDetailPage({ params }: PageProps) {
         </aside>
       </div>
 
-      <Separator className="opacity-0" />
+        <Separator className="opacity-0" />
+      </div>
     </div>
   );
 }

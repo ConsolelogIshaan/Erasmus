@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
+import { Volume2, VolumeX, Pause, Play } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { backdropUrl } from "@/lib/media/image";
@@ -19,9 +20,12 @@ interface HeroTrailerBackdropProps {
 interface YtPlayer {
   destroy: () => void;
   mute: () => void;
+  unMute: () => void;
+  isMuted?: () => boolean;
   playVideo: () => void;
   pauseVideo: () => void;
   getPlayerState: () => number;
+  seekTo?: (seconds: number, allowSeekAhead?: boolean) => void;
 }
 
 interface YtPlayerEvent {
@@ -104,8 +108,8 @@ function loadYouTubeApi(): Promise<void> {
 }
 
 /**
- * Full-bleed cinematic trailer stage — muted autoplay, no visible controls.
- * YouTube chrome is cropped out via scale + cover; overlays sit above the player.
+ * Full-bleed cinematic trailer stage with edge-to-edge seamless blending.
+ * Brighter video presentation with directional text contrast scrims and smooth dissolutions.
  */
 export function HeroTrailerBackdrop({
   videos,
@@ -121,12 +125,47 @@ export function HeroTrailerBackdrop({
 
   const [playing, setPlaying] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
+  const [muted, setMuted] = React.useState(true);
+  const [paused, setPaused] = React.useState(false);
+
+  const toggleMute = React.useCallback(() => {
+    if (!playerRef.current) return;
+    try {
+      if (muted) {
+        playerRef.current.unMute();
+        setMuted(false);
+      } else {
+        playerRef.current.mute();
+        setMuted(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, [muted]);
+
+  const togglePlay = React.useCallback(() => {
+    if (!playerRef.current) return;
+    try {
+      if (paused) {
+        playerRef.current.playVideo();
+        setPaused(false);
+      } else {
+        playerRef.current.pauseVideo();
+        setPaused(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, [paused]);
 
   React.useEffect(() => {
     if (!trailer || !hostRef.current) return;
 
     let cancelled = false;
     let player: YtPlayer | null = null;
+
+    let playTimer: ReturnType<typeof setTimeout> | null = null;
+    let hasRevealed = false;
 
     const mount = async () => {
       try {
@@ -153,14 +192,11 @@ export function HeroTrailerBackdrop({
             disablekb: 1,
             fs: 0,
             iv_load_policy: 3,
-            loop: 1,
-            playlist: trailer.key,
             modestbranding: 1,
             playsinline: 1,
             rel: 0,
             start: 2,
             cc_load_policy: 0,
-            // Hide related UI as much as the API allows
             showinfo: 0,
             origin: window.location.origin,
           },
@@ -170,27 +206,35 @@ export function HeroTrailerBackdrop({
               try {
                 e.target.mute();
                 e.target.playVideo();
-                window.setTimeout(() => {
-                  try {
-                    e.target.mute();
-                    e.target.playVideo();
-                  } catch {
-                    // ignore
-                  }
-                }, 350);
+                // single initial play to prevent re-triggering center HUD
+                try { e.target.playVideo(); } catch {}
               } catch {
                 // ignore
               }
             },
             onStateChange: (e) => {
               if (cancelled || !window.YT) return;
-              const { PLAYING, ENDED } = window.YT.PlayerState;
+              const { PLAYING, ENDED, PAUSED } = window.YT.PlayerState;
               if (e.data === PLAYING) {
-                setPlaying(true);
+                setPaused(false);
                 setFailed(false);
-              }
-              if (e.data === ENDED) {
+                // Keep the still backdrop visible while YouTube flashes its initial play HUD (~1.8s)
+                if (!hasRevealed) {
+                  if (playTimer) clearTimeout(playTimer);
+                  playTimer = setTimeout(() => {
+                    if (!cancelled) {
+                      hasRevealed = true;
+                      setPlaying(true);
+                    }
+                  }, 3200);
+                } else {
+                  setPlaying(true);
+                }
+              } else if (e.data === PAUSED) {
+                setPaused(true);
+              } else if (e.data === ENDED) {
                 try {
+                  e.target.seekTo?.(0, true);
                   e.target.playVideo();
                 } catch {
                   // ignore
@@ -215,6 +259,7 @@ export function HeroTrailerBackdrop({
 
     return () => {
       cancelled = true;
+      if (playTimer) clearTimeout(playTimer);
       try {
         player?.destroy();
       } catch {
@@ -226,7 +271,8 @@ export function HeroTrailerBackdrop({
   }, [trailer]);
 
   return (
-    <div className={cn("absolute inset-0 overflow-hidden bg-black", className)}>
+    <div className={cn("absolute inset-0 overflow-hidden bg-background", className)}>
+      {/* Still backdrop poster with brightness boost */}
       {still ? (
         <Image
           src={still}
@@ -235,7 +281,7 @@ export function HeroTrailerBackdrop({
           priority
           sizes="100vw"
           className={cn(
-            "object-cover transition-opacity duration-[1.2s] ease-out",
+            "object-cover transition-opacity duration-[1.2s] ease-out filter brightness-[1.08] contrast-[1.03] saturate-[1.05]",
             playing && !failed ? "opacity-0" : "opacity-100",
           )}
         />
@@ -243,6 +289,7 @@ export function HeroTrailerBackdrop({
         <div className="absolute inset-0 bg-muted" />
       )}
 
+      {/* YouTube Trailer Stage with edge feathering and vivid color tuning */}
       {trailer && !failed ? (
         <div
           className={cn(
@@ -251,27 +298,98 @@ export function HeroTrailerBackdrop({
           )}
           aria-hidden
         >
-          {/*
-            Oversized cover crop: YouTube’s flash of media chrome (play/pause,
-            next/prev) sits at the edges and is clipped outside the hero.
-          */}
-          <div className="absolute left-1/2 top-1/2 h-[max(120%,67.5vw)] w-[max(120%,213vh)] -translate-x-1/2 -translate-y-1/2 scale-[1.18]">
+          {/* Oversized crop removes YouTube branding and edge controls */}
+          <div
+            className="absolute left-1/2 top-1/2 h-[max(120%,67.5vw)] w-[max(120%,213vh)] -translate-x-1/2 -translate-y-1/2 scale-[1.18] filter brightness-[1.08] contrast-[1.03] saturate-[1.05]"
+            style={{
+              WebkitMaskImage:
+                "linear-gradient(to bottom, black 0%, black 72%, transparent 100%)",
+              maskImage:
+                "linear-gradient(to bottom, black 0%, black 72%, transparent 100%)",
+            }}
+          >
             <div
               ref={hostRef}
               className="pointer-events-none h-full w-full overflow-hidden [&_iframe]:pointer-events-none [&_iframe]:absolute [&_iframe]:left-0 [&_iframe]:top-0 [&_iframe]:!h-full [&_iframe]:!w-full"
             />
           </div>
-          {/* Full cover so any residual chrome cannot be clicked or seen cleanly */}
           <div className="pointer-events-none absolute inset-0 bg-transparent" />
         </div>
       ) : null}
 
-      {/* Readability scrims over the trailer — also mask edge chrome */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background via-background/50 to-background/30" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background/90 via-background/30 to-background/45" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/45 via-transparent to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/55 to-transparent" />
+      {/*
+        CINEMATIC SEAMLESS BLENDING GRADIENTS:
+        Replaces muddy dark overlays with targeted directional scrims that preserve video brightness.
+      */}
+
+      {/* 1. Translucent Left-to-Right contrast fade: allows trailer to shine through on the left while providing text legibility */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(to right, hsl(var(--background) / 0.68) 0%, hsl(var(--background) / 0.55) 20%, hsl(var(--background) / 0.32) 40%, hsl(var(--background) / 0.08) 60%, transparent 75%)",
+        }}
+      />
+
+      {/* 2. Soft localized text contrast accent (subtle, non-muddy) */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 65% 75% at 10% 70%, hsl(var(--background) / 0.5) 0%, hsl(var(--background) / 0.2) 40%, transparent 70%)",
+        }}
+      />
+
+      {/* 3. Deep smooth multi-stop bottom dissolve into page body */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-44 sm:h-56"
+        style={{
+          background:
+            "linear-gradient(to top, hsl(var(--background)) 0%, hsl(var(--background) / 0.94) 18%, hsl(var(--background) / 0.65) 42%, hsl(var(--background) / 0.2) 68%, transparent 100%)",
+        }}
+      />
+
+      {/* 4. Soft top gradient under navigation header */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-24 sm:h-32"
+        style={{
+          background:
+            "linear-gradient(to bottom, hsl(var(--background) / 0.7) 0%, hsl(var(--background) / 0.25) 45%, transparent 100%)",
+        }}
+      />
+
+      {/* 5. Subtle right-edge feather for ultra-wide displays */}
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 w-24 sm:w-40"
+        style={{
+          background:
+            "linear-gradient(to left, hsl(var(--background) / 0.35) 0%, transparent 100%)",
+        }}
+      />
+
+      {/* Sleek Floating Glass Trailer Controls (Bottom Right - identical to Cinejoy/Pic 2 reference) */}
+      {trailer && !failed && playing ? (
+        <div className="absolute bottom-8 right-6 sm:right-10 z-20 flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={toggleMute}
+            aria-label={muted ? "Unmute trailer" : "Mute trailer"}
+            title={muted ? "Unmute trailer" : "Mute trailer"}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white/90 backdrop-blur-md transition-all hover:scale-110 hover:border-white/40 hover:bg-black/70 hover:text-white active:scale-95 shadow-lg"
+          >
+            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={togglePlay}
+            aria-label={paused ? "Play trailer" : "Pause trailer"}
+            title={paused ? "Play trailer" : "Pause trailer"}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white/90 backdrop-blur-md transition-all hover:scale-110 hover:border-white/40 hover:bg-black/70 hover:text-white active:scale-95 shadow-lg"
+          >
+            {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

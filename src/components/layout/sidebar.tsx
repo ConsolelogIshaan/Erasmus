@@ -119,7 +119,7 @@ function NavList({
  * The toggle is the only control, and it sits in the icon column so it
  * doesn't move when the rail does.
  */
-export function Sidebar() {
+export function Sidebar({ isFullBleed }: { isFullBleed?: boolean }) {
   const pathname = usePathname();
   const { sidebarCollapsed, setSidebarCollapsed } = useUI();
 
@@ -128,8 +128,10 @@ export function Sidebar() {
       data-collapsed={sidebarCollapsed || undefined}
       aria-label="Main navigation"
       className={cn(
-        "group/rail sticky top-0 z-40 hidden h-dvh shrink-0 flex-col overflow-hidden",
-        "border-r border-white/[0.08] bg-background md:flex",
+        "group/rail hidden h-dvh shrink-0 flex-col overflow-hidden transition-all duration-300 md:flex",
+        isFullBleed
+          ? "fixed top-0 left-0 z-50 border-r border-white/[0.08] bg-black/30 backdrop-blur-2xl shadow-[4px_0_30px_rgba(0,0,0,0.15)]"
+          : "sticky top-0 z-40 border-r border-white/[0.08] bg-background",
         // Width is layout, not transform — the content pane is a sibling and
         // has to reflow with it. Kept short so it costs few frames.
         "transition-[width] duration-[var(--duration-fast)] ease-[var(--ease-out)]",

@@ -68,8 +68,8 @@ export function DetailHero({
   const runtimeLabel = formatRuntime(runtime);
 
   return (
-    <section className="relative -mx-4 overflow-hidden sm:-mx-6 lg:-mx-8">
-      <div className="relative min-h-[min(78vh,52rem)] w-full">
+    <section className="relative w-full overflow-hidden">
+      <div className="relative min-h-[min(84vh,54rem)] w-full">
         <HeroTrailerBackdrop
           videos={videos}
           backdropPath={backdropPath}
@@ -79,12 +79,12 @@ export function DetailHero({
         />
 
         <motion.div
-          className="relative z-[1] flex min-h-[min(78vh,52rem)] flex-col justify-end"
+          className="relative z-[1] flex min-h-[min(84vh,54rem)] flex-col justify-end"
           variants={reduceMotion ? undefined : heroContainer}
           initial={reduceMotion ? false : "hidden"}
           animate="visible"
         >
-          <div className="content-container max-w-3xl pb-8 pt-24 sm:pb-12 sm:pt-28">
+          <div className="w-full max-w-3xl px-6 pb-8 pt-[calc(var(--header-height)+2rem)] sm:px-10 sm:pb-12 sm:pt-[calc(var(--header-height)+3rem)] md:pl-[calc(var(--current-sidebar-width)+2rem)] lg:pl-[calc(var(--current-sidebar-width)+3rem)]">
             <div className="space-y-4 text-center sm:text-left">
               {logo ? (
                 <motion.div

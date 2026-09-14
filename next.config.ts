@@ -1,4 +1,9 @@
 import type { NextConfig } from "next";
+import dns from "node:dns";
+
+try {
+  dns.setDefaultResultOrder("ipv4first");
+} catch {}
 
 const isDev = process.env.NODE_ENV === "development";
 

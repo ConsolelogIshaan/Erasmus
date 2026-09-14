@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { withAuthBudget } from "@/lib/supabase/fetch";
 import type { Profile, UserPreferences, UserSettings } from "@/types";
@@ -16,6 +17,15 @@ import type { Profile, UserPreferences, UserSettings } from "@/types";
  * stalled check as "signed out" degrades to the public view instead of hanging.
  */
 export async function getCurrentUser() {
+  const cookieStore = await cookies();
+  const hasAuthCookie = cookieStore
+    .getAll()
+    .some((c) => c.name.startsWith("sb-") && (c.name.includes("-auth-token") || c.name.endsWith("-token")));
+
+  if (!hasAuthCookie) {
+    return null;
+  }
+
   return withAuthBudget(async () => {
     const supabase = await createClient();
     const {

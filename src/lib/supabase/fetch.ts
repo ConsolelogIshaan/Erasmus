@@ -1,3 +1,11 @@
+if (typeof window === "undefined") {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const dns = require("node:dns");
+    dns.setDefaultResultOrder?.("ipv4first");
+  } catch {}
+}
+
 /**
  * Timeout-bounded `fetch` for every Supabase client, with a circuit breaker.
  *
@@ -24,10 +32,10 @@
  * seconds is more than an order of magnitude of headroom while keeping the
  * worst case short enough that a person waits once rather than giving up.
  */
-const DEFAULT_TIMEOUT_MS = 6_000;
+const DEFAULT_TIMEOUT_MS = 8_000;
 
 /** How long to fail fast after a confirmed auth timeout. */
-const CIRCUIT_COOLDOWN_MS = 30_000;
+const CIRCUIT_COOLDOWN_MS = 10_000;
 
 /** Only auth traffic trips the breaker; data reads are judged independently. */
 const AUTH_PATH = "/auth/v1/";
@@ -82,26 +90,37 @@ export function isAuthCircuitOpen(): boolean {
  */
 export function createTimeoutFetch(timeoutMs: number = DEFAULT_TIMEOUT_MS): typeof fetch {
   return async function timeoutFetch(input, init) {
-    const isAuthRequest = requestUrl(input).includes(AUTH_PATH);
+    const url = requestUrl(input);
+    const isAuthRequest = url.includes(AUTH_PATH);
+    const isCriticalAuthOperation =
+      url.includes("/token") ||
+      url.includes("/callback") ||
+      url.includes("/verify") ||
+      url.includes("/signup");
 
-    if (isAuthRequest && isAuthCircuitOpen()) {
+    // Critical user auth operations and OAuth token exchanges must NEVER be short-circuited.
+    if (isAuthRequest && !isCriticalAuthOperation && isAuthCircuitOpen()) {
       throw new SupabaseUnreachableError();
     }
 
-    const deadline = AbortSignal.timeout(timeoutMs);
+    // Give OAuth code exchanges and critical token requests a generous timeout budget (15s)
+    const effectiveTimeout = isCriticalAuthOperation
+      ? Math.max(timeoutMs, 15_000)
+      : timeoutMs;
+
+    const deadline = AbortSignal.timeout(effectiveTimeout);
     const signal = init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline;
 
     try {
       const response = await fetch(input, { ...init, signal });
-      // A single success closes the circuit again.
+      // A single success closes the circuit again immediately.
       if (isAuthRequest) circuitOpenUntil = 0;
       return response;
     } catch (error) {
       if (isAuthRequest && isTimeoutError(error)) {
-        // Log only on the transition, not once per blocked request.
         if (!isAuthCircuitOpen()) {
           console.warn(
-            `[auth] Supabase auth did not respond within ${timeoutMs}ms. ` +
+            `[auth] Supabase auth did not respond within ${effectiveTimeout}ms. ` +
               `Failing fast for ${CIRCUIT_COOLDOWN_MS / 1000}s. ` +
               `If this persists the project is likely paused — check the Supabase dashboard.`,
           );
@@ -126,7 +145,7 @@ export const supabaseFetch = createTimeoutFetch();
  * fails instantly. Only an explicit deadline around the whole operation bounds
  * that, which is what keeps a render path from stalling during an outage.
  */
-export const AUTH_BUDGET_MS = 2_500;
+export const AUTH_BUDGET_MS = 6_000;
 
 /**
  * Runs an auth operation under a total-time budget, resolving to `fallback`

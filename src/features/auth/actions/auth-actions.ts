@@ -221,13 +221,6 @@ export async function signInWithOAuth(
     return { success: false, error: "Unable to start OAuth flow." };
   }
 
-  // The generated URL points at the same auth service. Sending the browser
-  // there while it is unresponsive would replace a readable error with a blank
-  // hanging tab, so refuse early instead.
-  if (isAuthCircuitOpen()) {
-    return { success: false, error: AUTH_UNREACHABLE };
-  }
-
   return { success: true, data: { url: data.url } };
 }
 
