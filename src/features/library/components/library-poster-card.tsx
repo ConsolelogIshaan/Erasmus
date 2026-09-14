@@ -4,7 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { Heart, Pin, Play } from "lucide-react";
+import { Heart, Pin, Play, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { posterUrl } from "@/lib/media/image";
@@ -23,6 +23,7 @@ interface LibraryPosterCardProps {
   entry: LibraryEntry;
   className?: string;
   showProgress?: boolean;
+  onRemove?: (entry: LibraryEntry) => void;
 }
 
 /**
@@ -33,6 +34,7 @@ export function LibraryPosterCard({
   entry,
   className,
   showProgress = true,
+  onRemove,
 }: LibraryPosterCardProps) {
   const reduceMotion = useReducedMotion();
   const [theaterOpen, setTheaterOpen] = React.useState(false);
@@ -110,7 +112,7 @@ export function LibraryPosterCard({
     entry.media_type === "movie"
       ? ROUTES.movie(entry.external_id)
       : ROUTES.show(entry.external_id);
-  const src = posterUrl(resolvedPoster ?? entry.poster_path, "w342");
+  const src = posterUrl(resolvedPoster ?? entry.poster_path, "w500");
   const progress = localProgress ?? Math.min(100, Math.max(0, entry.progress_percent ?? 0));
 
   const handlePlay = (e: React.MouseEvent) => {
@@ -148,7 +150,7 @@ export function LibraryPosterCard({
                 src={src}
                 alt=""
                 fill
-                sizes="(max-width: 640px) 33vw, 160px"
+                sizes="(max-width: 640px) 45vw, (max-width: 1024px) 208px, 224px"
                 className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
               />
             ) : (
@@ -170,6 +172,23 @@ export function LibraryPosterCard({
             >
               <Play className="h-5 w-5 fill-current ml-0.5" />
             </button>
+
+            {/* Remove from Continue Watching button */}
+            {onRemove ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRemove(entry);
+                }}
+                className="absolute right-2 top-2 z-30 flex h-7 w-7 items-center justify-center rounded-full bg-black/80 text-white/90 border border-white/20 backdrop-blur-md shadow-md transition-all duration-200 hover:bg-red-600 hover:border-red-600 hover:text-white hover:scale-110 active:scale-95 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-auto"
+                title={`Remove ${entry.title} from Continue Watching`}
+                aria-label={`Remove ${entry.title} from Continue Watching`}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
 
             <div className="absolute left-1.5 top-1.5 flex flex-col gap-1 z-10">
               {entry.is_favorite ? (

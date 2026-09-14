@@ -48,7 +48,7 @@
   --header-height: 3.5rem;
   --sidebar-width: 15.5rem;
   --sidebar-width-collapsed: 4.25rem;
-  --content-max: 90rem;
+  --content-max: 130rem;
 
   --noise-opacity: 0.02;
 }
@@ -604,8 +604,8 @@
   /* Section / rail titles — the "CONTINUE WATCHING" role */
   .text-section-title {
     font-family: var(--font-display);
-    font-weight: 500;
-    font-size: clamp(0.8125rem, 0.76rem + 0.28vw, 0.9375rem);
+    font-weight: 600;
+    font-size: clamp(0.875rem, 0.82rem + 0.35vw, 1.05rem);
     letter-spacing: 0.2em;
     text-transform: uppercase;
     line-height: 1.4;
@@ -1131,18 +1131,51 @@
     width: 100%;
     max-width: var(--content-max);
     margin-inline: auto;
-    padding-inline: 1.25rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
   }
 
   @media (min-width: 640px) {
     .content-container {
-      padding-inline: 1.75rem;
+      padding-left: 1.75rem;
+      padding-right: 1.75rem;
     }
   }
 
   @media (min-width: 1024px) {
     .content-container {
-      padding-inline: 2.25rem;
+      padding-left: 2.25rem;
+      padding-right: 2.25rem;
+    }
+  }
+
+  /* Full-bleed layout container: preserves proper clearance for fixed sidebar */
+  .content-container-fullbleed {
+    width: 100%;
+    max-width: var(--content-max);
+    margin-inline: auto;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  @media (min-width: 640px) {
+    .content-container-fullbleed {
+      padding-left: 1.75rem;
+      padding-right: 1.75rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .content-container-fullbleed {
+      padding-left: calc(var(--current-sidebar-width) + 2rem);
+      padding-right: 2rem;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .content-container-fullbleed {
+      padding-left: calc(var(--current-sidebar-width) + 2.5rem);
+      padding-right: 2.5rem;
     }
   }
 

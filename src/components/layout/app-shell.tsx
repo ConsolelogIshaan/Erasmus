@@ -27,7 +27,7 @@ export function AppShell({ user, children }: AppShellProps) {
   const pathname = usePathname();
   const { sidebarCollapsed } = useUI();
   const isFullBleed = Boolean(
-    pathname && /^\/(tv|movie)\/[^/]+$/.test(pathname)
+    pathname && (/^\/(tv|movie)\/[^/]+$/.test(pathname) || /^\/discover\/?$/.test(pathname))
   );
 
   const sidebarWidth = sidebarCollapsed

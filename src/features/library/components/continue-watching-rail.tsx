@@ -5,7 +5,13 @@ import { Library } from "lucide-react";
 
 import { EmptyState } from "@/components/feedback/empty-state";
 import { LibraryPosterCard } from "@/features/library/components/library-poster-card";
-import { getRecentPlayback } from "@/lib/streaming/playback-progress";
+import {
+  getRecentPlayback,
+  clearRecentPlaybackItem,
+  clearTvShowResume,
+} from "@/lib/streaming/playback-progress";
+import { actionRemoveFromLibrary } from "@/features/library/actions/library-actions";
+import { toast } from "sonner";
 import type { LibraryEntry } from "@/types/library";
 
 interface ContinueWatchingRailProps {
@@ -14,6 +20,27 @@ interface ContinueWatchingRailProps {
 
 export function ContinueWatchingRail({ initialEntries }: ContinueWatchingRailProps) {
   const [entries, setEntries] = React.useState<LibraryEntry[]>(initialEntries);
+
+  const handleRemove = React.useCallback((entry: LibraryEntry) => {
+    // 1. Immediately remove from local rail state
+    setEntries((prev) => prev.filter((item) => item.id !== entry.id));
+
+    // 2. Clear from local recent playback storage
+    clearRecentPlaybackItem(entry.external_id, entry.media_type);
+    if (entry.media_type === "tv") {
+      clearTvShowResume(entry.external_id);
+    }
+
+    // 3. Clear from server library if tracked
+    actionRemoveFromLibrary({
+      provider: entry.provider ?? "tmdb",
+      mediaType: entry.media_type,
+      externalId: entry.external_id,
+      title: entry.title,
+    }).catch(() => {});
+
+    toast.success(`Removed “${entry.title}” from Continue Watching`);
+  }, []);
 
   React.useEffect(() => {
     const recent = getRecentPlayback();
@@ -165,9 +192,9 @@ export function ContinueWatchingRail({ initialEntries }: ContinueWatchingRailPro
   }
 
   return (
-    <div className="grid grid-cols-3 gap-3 pt-4 sm:grid-cols-4">
-      {entries.slice(0, 8).map((e) => (
-        <LibraryPosterCard key={e.id} entry={e} />
+    <div className="grid grid-cols-2 gap-4 pt-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+      {entries.slice(0, 12).map((e) => (
+        <LibraryPosterCard key={e.id} entry={e} onRemove={handleRemove} />
       ))}
     </div>
   );

@@ -44,7 +44,7 @@ export function MediaRow({
 
   return (
     <section className={cn("min-w-0 max-w-full space-y-3", className)} aria-label={title}>
-      <div className="flex items-end justify-between gap-3 px-1">
+      <div className="flex items-end justify-between gap-3 px-2 sm:px-3">
         <div>
           {href ? (
             <Link
@@ -90,7 +90,7 @@ export function MediaRow({
       */}
       <div
         ref={scrollerRef}
-        className="scrollbar-thin flex gap-5 overflow-x-auto scroll-smooth py-16 pl-8 pr-8 snap-x snap-mandatory scroll-pl-8 scroll-pr-8"
+        className="scrollbar-thin flex gap-5 overflow-x-auto scroll-smooth py-12 px-2 sm:px-3 snap-x snap-mandatory scroll-px-2 sm:scroll-px-3"
         tabIndex={0}
         role="list"
       >

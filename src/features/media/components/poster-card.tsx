@@ -32,9 +32,9 @@ interface PosterCardProps {
 }
 
 const sizeClass = {
-  sm: "w-[7.5rem] sm:w-32",
-  md: "w-36 sm:w-40",
-  lg: "w-40 sm:w-48",
+  sm: "w-32 sm:w-36",
+  md: "w-44 sm:w-48 lg:w-52 xl:w-56",
+  lg: "w-52 sm:w-60 lg:w-64",
 };
 
 const QUICK_STATUSES = [
@@ -57,7 +57,7 @@ const STATUS_BADGE: Record<(typeof QUICK_STATUSES)[number], string> = {
 
 /** ~66% of previous h-9 (36px) → ~24px */
 const actionBtnClass =
-  "inline-flex h-6 w-full items-center justify-center gap-1.5 rounded-md text-[10px] font-semibold shadow-sm backdrop-blur-md transition disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+  "inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg text-[11px] font-semibold shadow-sm backdrop-blur-md transition disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 
 /** Smooth settle — no snappy bounce that fights the layout. */
 const popTransition = {
@@ -103,7 +103,7 @@ export function PosterCard({
   const [lastStatus, setLastStatus] = React.useState<WatchStatus | null>(null);
 
   const href = mediaHref(item.mediaType, item.id);
-  const src = posterUrl(item.posterPath, "w342");
+  const src = posterUrl(item.posterPath, "w500");
   const year = formatYear(item.releaseDate);
   const showActions = quickActions && hovered;
 
@@ -179,7 +179,7 @@ export function PosterCard({
                 src={src}
                 alt=""
                 fill
-                sizes="(max-width: 640px) 40vw, 160px"
+                sizes="(max-width: 640px) 45vw, (max-width: 1024px) 208px, 224px"
                 className={cn(
                   "object-cover transition-[transform,opacity] duration-500 ease-out",
                   hovered && "scale-[1.02]",
@@ -316,11 +316,11 @@ export function PosterCard({
         </AnimatePresence>
       </div>
 
-      <Link href={href} prefetch className="mt-2 block space-y-0.5 px-0.5">
-        <p className="line-clamp-2 text-sm leading-snug font-medium tracking-tight">
+      <Link href={href} prefetch className="mt-2.5 block space-y-1 px-0.5">
+        <p className="line-clamp-2 text-[15px] leading-snug font-semibold tracking-tight">
           {item.title}
         </p>
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-[13px]">
           {year ?? "—"}
           <span className="mx-1 opacity-40">·</span>
           {imdbVotes

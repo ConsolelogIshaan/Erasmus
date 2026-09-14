@@ -172,6 +172,8 @@ export interface MediaSummary {
   genreIds?: string[];
   adult?: boolean;
   originalLanguage?: string | null;
+  logoPath?: string | null;
+  tagline?: string | null;
 }
 
 export interface MovieDetails extends MediaSummary {

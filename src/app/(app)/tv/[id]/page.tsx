@@ -155,7 +155,7 @@ export default async function TvDetailPage({ params }: PageProps) {
         </div>
       </DetailHero>
 
-      <div className="content-container pb-16 pt-2 md:pl-[calc(var(--current-sidebar-width)+1.5rem)]">
+      <div className="content-container-fullbleed pb-16 pt-2">
         <div className="grid w-full min-w-0 max-w-full gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(16.5rem,20rem)] lg:items-start lg:gap-6">
         <div className="min-w-0 max-w-full space-y-10 overflow-x-hidden">
           {/* Progress is recorded here, on the episode rows themselves. Tracking
