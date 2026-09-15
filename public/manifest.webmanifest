@@ -1,6 +1,6 @@
 {
-  "name": "Argus",
-  "short_name": "Argus",
+  "name": "Erasmus",
+  "short_name": "Erasmus",
   "description": "Keep track of every film and series you watch, along with your ratings and notes.",
   "start_url": "/dashboard",
   "display": "standalone",
