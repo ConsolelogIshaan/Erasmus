@@ -124,6 +124,7 @@ export function NativePlayer({
   logoPath,
   tagline,
   onBack,
+  onNextEpisode,
   topRightControls,
   isExternalMenuOpen = false,
 }: NativePlayerProps) {
