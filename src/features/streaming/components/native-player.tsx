@@ -217,6 +217,7 @@ export function NativePlayer({
         startPosition: startAt > 0 ? startAt : -1,
         renderTextTracksNatively: false,
         enableWebVTT: false,
+        startFragPrefetch: true,
       });
       hlsRef.current = hls;
       hls.loadSource(src);
@@ -272,8 +273,28 @@ export function NativePlayer({
         );
         syncAudio(hls.audioTracks);
         if (hls.levels.length > 0) {
-          hls.currentLevel = -1;
-          setLevel(-1);
+          // Automatically select and lock to the highest quality available (4K > 1080p > 720p...)
+          let highestIndex = 0;
+          let maxHeight = 0;
+          let maxBitrate = 0;
+
+          hls.levels.forEach((lvl, idx) => {
+            const h = lvl.height || 0;
+            const br = lvl.bitrate || 0;
+            if (h > maxHeight || (h === maxHeight && br > maxBitrate)) {
+              maxHeight = h;
+              maxBitrate = br;
+              highestIndex = idx;
+            }
+          });
+
+          hls.startLevel = highestIndex;
+          hls.currentLevel = highestIndex;
+          hls.loadLevel = highestIndex;
+          setLevel(highestIndex);
+          if (maxHeight > 0) {
+            setPlayingHeight(maxHeight);
+          }
         }
         startPlayback();
       });
