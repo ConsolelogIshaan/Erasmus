@@ -284,14 +284,11 @@ export async function resolveCinejoyStream(input: {
     ...STREAMING_SERVERS.map((server) => server.id).filter((id) => id !== preferred),
   ];
 
-  let fallbackHit: CinejoyStreamHit | null = null;
-
   // 1. Try preferred server with requested episode
   try {
     const hit = await resolveCinejoyServer({ ...input, serverId: preferred });
-    if (hit) {
-      if (!hit.url.includes("lol.movieboxnoob.cc")) return hit;
-      fallbackHit = hit;
+    if (hit && !hit.url.includes("lol.movieboxnoob.cc")) {
+      return hit;
     }
   } catch {}
 
@@ -299,12 +296,11 @@ export async function resolveCinejoyStream(input: {
   for (const serverId of order.slice(1)) {
     try {
       const hit = await resolveCinejoyServer({ ...input, serverId });
-      if (hit) {
-        if (!hit.url.includes("lol.movieboxnoob.cc")) return hit;
-        if (!fallbackHit) fallbackHit = hit;
+      if (hit && !hit.url.includes("lol.movieboxnoob.cc")) {
+        return hit;
       }
     } catch {}
   }
 
-  return fallbackHit;
+  return null;
 }

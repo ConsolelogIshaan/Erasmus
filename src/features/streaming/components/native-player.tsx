@@ -18,6 +18,7 @@ import {
   RotateCcw,
   RotateCw,
   Settings2,
+  SkipForward,
   Subtitles,
   Tv2,
   Volume2,
@@ -95,6 +96,7 @@ export interface NativePlayerProps {
   logoPath?: string | null;
   tagline?: string | null;
   onBack?: () => void;
+  onNextEpisode?: () => void;
   topRightControls?: React.ReactNode;
   isExternalMenuOpen?: boolean;
 }
@@ -354,17 +356,24 @@ export function NativePlayer({
       setShowControls(true);
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
     };
+    const onEnded = () => {
+      if (onNextEpisode) {
+        onNextEpisode();
+      }
+    };
     video.addEventListener("timeupdate", onTime);
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("waiting", onWait);
     video.addEventListener("playing", onPlay);
+    video.addEventListener("ended", onEnded);
     return () => {
       video.removeEventListener("timeupdate", onTime);
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("waiting", onWait);
       video.removeEventListener("playing", onPlay);
+      video.removeEventListener("ended", onEnded);
     };
   }, [onProgress, revealControls]);
 
@@ -763,6 +772,11 @@ export function NativePlayer({
               </span>
             </span>
           </IconButton>
+          {onNextEpisode ? (
+            <IconButton title="Next Episode" onClick={onNextEpisode}>
+              <SkipForward className="h-5 w-5 sm:h-[22px] sm:w-[22px] fill-current" />
+            </IconButton>
+          ) : null}
           <span className="ml-2 min-w-[8.5rem] font-mono text-xs sm:text-sm tabular-nums tracking-wide text-white/75">
             {formatTimecode(current)}
             <span className="text-white/30"> / </span>

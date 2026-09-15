@@ -158,15 +158,8 @@ export function StreamingTheaterModal({
 
   React.useEffect(() => {
     if (!open) return;
-    let season = Math.max(1, currentSeason || 1);
-    let episode = Math.max(1, currentEpisode || 1);
-    if (mediaType === "tv" && currentSeason === 1 && currentEpisode === 1) {
-      const tvResume = getTvShowResume(tmdbId);
-      if (tvResume) {
-        season = tvResume.season;
-        episode = tvResume.episode;
-      }
-    }
+    const season = Math.max(1, currentSeason || 1);
+    const episode = Math.max(1, currentEpisode || 1);
     setActiveSeason(season);
     setActiveEpisode(episode);
     setSelectedServerId(readPreferredServer());
@@ -529,6 +522,17 @@ export function StreamingTheaterModal({
       cancelled = true;
     };
   }, [open, mediaType, tmdbId, pickerSeason]);
+
+  const handleNextEpisode = React.useCallback(() => {
+    if (mediaType !== "tv") return;
+    const nextEpNum = activeEpisode + 1;
+    const existsInCurrent = seasonEpisodes.some((ep) => ep.episodeNumber === nextEpNum);
+    if (existsInCurrent) {
+      handleSelectEpisode(activeSeason, nextEpNum);
+    } else {
+      handleSelectEpisode(activeSeason + 1, 1);
+    }
+  }, [mediaType, activeSeason, activeEpisode, seasonEpisodes]);
 
   const handleSelectEpisode = (season: number, episode: number) => {
     setActiveSeason(season);

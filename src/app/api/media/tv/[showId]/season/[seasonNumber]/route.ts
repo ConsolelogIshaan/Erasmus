@@ -1,12 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getTvSeason, isCatalogConfigured } from "@/lib/media/catalog";
-import {
-  RATE_LIMITS,
-  checkRateLimit,
-  rateLimitedResponse,
-  requireApiUser,
-} from "@/lib/api/guard";
 
 interface RouteContext {
   params: Promise<{ showId: string; seasonNumber: string }>;
@@ -15,22 +9,10 @@ interface RouteContext {
 /**
  * GET /api/media/tv/:showId/season/:seasonNumber
  *
- * Session-gated; the only caller is the season list on a title page. Both path
- * segments reach the provider, so both are validated to the shapes TMDB uses
- * rather than passed through as arbitrary strings.
+ * Public catalog endpoint serving season episode checklists and in-player
+ * episode selectors across all visitors. Cached for fast subsequent opens.
  */
 export async function GET(_request: NextRequest, context: RouteContext) {
-  const auth = await requireApiUser();
-  if (!auth.ok) return auth.response;
-
-  const limit = checkRateLimit(
-    "season",
-    auth.userId,
-    RATE_LIMITS.season.limit,
-    RATE_LIMITS.season.windowMs,
-  );
-  if (!limit.ok) return rateLimitedResponse(limit.retryAfterSeconds);
-
   if (!isCatalogConfigured()) {
     return NextResponse.json({ error: "Catalog not configured" }, { status: 503 });
   }
@@ -53,7 +35,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     }
     return NextResponse.json(data, {
       headers: {
-        "Cache-Control": "private, max-age=3600",
+        "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
       },
     });
   } catch (error) {
