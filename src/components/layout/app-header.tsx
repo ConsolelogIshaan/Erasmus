@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import { CommandTrigger } from "@/components/layout/command-trigger";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Logo } from "@/components/layout/logo";
@@ -21,6 +22,8 @@ interface AppHeaderProps {
  */
 export function AppHeader({ user, isFullBleed }: AppHeaderProps) {
   const [isScrolled, setIsScrolled] = React.useState(false);
+  const pathname = usePathname();
+  const isHomeScreen = pathname === ROUTES.dashboard || pathname === ROUTES.home;
 
   React.useEffect(() => {
     if (!isFullBleed) return;
@@ -66,15 +69,17 @@ export function AppHeader({ user, isFullBleed }: AppHeaderProps) {
         <MobileNav />
       </div>
 
-      {/* Wordmark with subtle shadow for clarity */}
-      <div
-        className={cn(
-          "hidden min-w-0 md:block transition-all",
-          isFullBleed && !isScrolled ? "drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)]" : ""
-        )}
-      >
-        <Logo href={ROUTES.dashboard} />
-      </div>
+      {/* Logo only rendered on the home screen */}
+      {isHomeScreen ? (
+        <div
+          className={cn(
+            "hidden min-w-0 md:block transition-all",
+            isFullBleed && !isScrolled ? "drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)]" : ""
+          )}
+        >
+          <Logo href={ROUTES.dashboard} />
+        </div>
+      ) : null}
 
       <div className="min-w-0 flex-1" aria-hidden />
 

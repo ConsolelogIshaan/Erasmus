@@ -3,70 +3,42 @@
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
-import { bostone } from "@/lib/fonts/bostone";
 import { APP_NAME } from "@/constants/app";
 import { ROUTES } from "@/constants/routes";
 
 interface LogoProps {
   href?: string;
   className?: string;
-  /** When true, renders icon mark only (no wordmark). */
+  /** Retained for backwards compatibility */
   iconOnly?: boolean;
 }
 
 /**
- * Erasmus brand mark — 3D orbit icon + Bostone wordmark.
- * Default: icon + wordmark side-by-side.
- * iconOnly: just the mark (collapsed sidebar, mobile etc.).
+ * Brand Logo — renders the transparent 3D orbit brand icon mark.
+ * Features true alpha transparency, organic contour glow on hover, and responsive sizing.
  */
-export function Logo({ href = ROUTES.home, className, iconOnly = false }: LogoProps) {
+export function Logo({ href = ROUTES.home, className }: LogoProps) {
   return (
     <span className={cn("inline-flex items-center", className)}>
       <Link
         href={href}
-        className="group relative inline-flex items-center gap-2.5 outline-none"
+        className="group relative inline-flex items-center outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-md"
         aria-label={`${APP_NAME} home`}
       >
-        {/* Icon mark */}
         <span className="relative flex shrink-0 items-center justify-center">
           <img
             src="/erasmus-mark.png"
-            alt=""
+            alt={APP_NAME}
             aria-hidden="true"
-            width={32}
-            height={32}
+            width={52}
+            height={40}
             className={cn(
-              "select-none object-contain transition-[filter,transform] duration-300 ease-out",
-              "group-hover:scale-110 group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.55)]",
-              "group-focus-visible:scale-110",
-              iconOnly ? "h-7 w-7" : "h-8 w-8",
+              "h-8 sm:h-9 md:h-[38px] w-auto select-none object-contain transition-[filter,transform] duration-300 ease-out",
+              "group-hover:scale-105 group-hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.75)]",
+              "group-focus-visible:scale-105 group-focus-visible:drop-shadow-[0_0_12px_rgba(255,255,255,0.75)]"
             )}
           />
         </span>
-
-        {/* Wordmark */}
-        {!iconOnly && (
-          <span className="relative">
-            <span
-              className={cn(
-                bostone.className,
-                "relative text-[1.45rem] leading-none tracking-[-0.02em] text-foreground",
-              )}
-            >
-              {APP_NAME.toUpperCase()}
-            </span>
-            {/* Animated underline on hover */}
-            <span
-              className={cn(
-                "absolute -bottom-1.5 left-0 h-px w-full origin-left scale-x-0 bg-primary",
-                "transition-transform duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]",
-                "group-hover:scale-x-100 group-focus-visible:scale-x-100",
-                "motion-reduce:transition-none motion-reduce:group-hover:scale-x-0",
-              )}
-              aria-hidden="true"
-            />
-          </span>
-        )}
       </Link>
     </span>
   );
