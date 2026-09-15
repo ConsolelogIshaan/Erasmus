@@ -10,46 +10,63 @@ import { ROUTES } from "@/constants/routes";
 interface LogoProps {
   href?: string;
   className?: string;
-  /** Kept for API compatibility — the wordmark *is* the mark. */
-  showWordmark?: boolean;
+  /** When true, renders icon mark only (no wordmark). */
+  iconOnly?: boolean;
 }
 
-/** "ARGUS" → "A R G U S" — a literal single space between each letter. */
-const SPACED_NAME = APP_NAME.toUpperCase().split("").join(" ");
-
 /**
- * Erasmus wordmark — set in Bostone, one letter at a time with a single space
- * between each. This is the only place Bostone is used in the app.
+ * Erasmus brand mark — 3D orbit icon + Bostone wordmark.
+ * Default: icon + wordmark side-by-side.
+ * iconOnly: just the mark (collapsed sidebar, mobile etc.).
  */
-export function Logo({ href = ROUTES.home, className }: LogoProps) {
+export function Logo({ href = ROUTES.home, className, iconOnly = false }: LogoProps) {
   return (
     <span className={cn("inline-flex items-center", className)}>
       <Link
         href={href}
-        className="group relative inline-flex items-center outline-none"
+        className="group relative inline-flex items-center gap-2.5 outline-none"
         aria-label={`${APP_NAME} home`}
       >
-        <span
-          className={cn(
-            bostone.className,
-            // Larger and set tighter: as a wordmark grows, the single spaces
-            // between letters read as gaps, so negative tracking pulls it back
-            // into one mark instead of five letters.
-            "relative text-[1.75rem] leading-none tracking-[-0.02em] text-foreground",
-          )}
-        >
-          {SPACED_NAME}
-          {/* Hairline that draws itself under the wordmark on hover / focus */}
-          <span
-            className={cn(
-              "absolute -bottom-1.5 left-0 h-px w-full origin-left scale-x-0 bg-primary",
-              "transition-transform duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]",
-              "group-hover:scale-x-100 group-focus-visible:scale-x-100",
-              "motion-reduce:transition-none motion-reduce:group-hover:scale-x-0",
-            )}
+        {/* Icon mark */}
+        <span className="relative flex shrink-0 items-center justify-center">
+          <img
+            src="/erasmus-mark.png"
+            alt=""
             aria-hidden="true"
+            width={32}
+            height={32}
+            className={cn(
+              "select-none object-contain transition-[filter,transform] duration-300 ease-out",
+              "group-hover:scale-110 group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.55)]",
+              "group-focus-visible:scale-110",
+              iconOnly ? "h-7 w-7" : "h-8 w-8",
+            )}
           />
         </span>
+
+        {/* Wordmark */}
+        {!iconOnly && (
+          <span className="relative">
+            <span
+              className={cn(
+                bostone.className,
+                "relative text-[1.45rem] leading-none tracking-[-0.02em] text-foreground",
+              )}
+            >
+              {APP_NAME.toUpperCase()}
+            </span>
+            {/* Animated underline on hover */}
+            <span
+              className={cn(
+                "absolute -bottom-1.5 left-0 h-px w-full origin-left scale-x-0 bg-primary",
+                "transition-transform duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]",
+                "group-hover:scale-x-100 group-focus-visible:scale-x-100",
+                "motion-reduce:transition-none motion-reduce:group-hover:scale-x-0",
+              )}
+              aria-hidden="true"
+            />
+          </span>
+        )}
       </Link>
     </span>
   );
