@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadWyzieFile } from "@/lib/streaming/wyzie";
-import { isSrtText, srtToVtt } from "@/lib/streaming/subtitles";
+import { isAssText, assToVtt, isSrtText, srtToVtt } from "@/lib/streaming/subtitles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +24,12 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "failed to fetch external subtitle" }, { status: 502 });
       }
       const text = await response.text();
-      const vtt = isSrtText(text) ? srtToVtt(text) : text;
+      let vtt = text;
+      if (isAssText(text)) {
+        vtt = assToVtt(text);
+      } else if (isSrtText(text)) {
+        vtt = srtToVtt(text);
+      }
       return new NextResponse(vtt, {
         headers: {
           "Content-Type": "text/vtt; charset=utf-8",

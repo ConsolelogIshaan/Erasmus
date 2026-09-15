@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { STREAMING_SERVERS } from "./stream-resolver";
 import { buildSheguQuery, sheguServerName } from "./cinejoy-stream";
-import { cuesAtTime, isSrtText, parseSubtitleCues, srtToVtt } from "./subtitles";
+import {
+  assToVtt,
+  cuesAtTime,
+  isAssText,
+  isSrtText,
+  parseSubtitleCues,
+  srtToVtt,
+} from "./subtitles";
 import { publicTracks } from "./wyzie";
 
 describe("direct stream proxy path", () => {
@@ -44,6 +51,32 @@ My dad was a farmer.
     expect(cues[0]?.text).toBe("My dad was a farmer.");
     expect(cuesAtTime(cues, 8)).toBe("My dad was a farmer.");
     expect(cuesAtTime(cues, 1)).toBe("");
+  });
+
+  it("converts ASS/SSA anime subtitles into WebVTT cues with clean text", () => {
+    const ass = `[Script Info]
+Title: Jujutsu Kaisen
+ScriptType: v4.00+
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:02.07,0:00:03.54,Main,Gojou,0000,0000,0000,,Morning.
+Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1}I'm in charge of the \\Nfirst-years at Jujutsu Tech.
+`;
+    expect(isAssText(ass)).toBe(true);
+    const vtt = assToVtt(ass);
+    expect(vtt.startsWith("WEBVTT")).toBe(true);
+    expect(vtt).toContain("00:00:02.070 --> 00:00:03.540");
+    expect(vtt).toContain("Morning.");
+    expect(vtt).toContain("00:00:29.600 --> 00:00:32.090");
+    expect(vtt).toContain("I'm in charge of the \nfirst-years at Jujutsu Tech.");
+
+    const cues = parseSubtitleCues(ass);
+    expect(cues).toHaveLength(2);
+    expect(cues[0]?.text).toBe("Morning.");
+    expect(cuesAtTime(cues, 2.5)).toBe("Morning.");
+    expect(cuesAtTime(cues, 30)).toBe("I'm in charge of the \nfirst-years at Jujutsu Tech.");
+    expect(cuesAtTime(cues, 50)).toBe("");
   });
 
   it("exposes subtitle files through the dedicated subs route", () => {

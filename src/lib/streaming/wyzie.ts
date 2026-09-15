@@ -1,4 +1,4 @@
-import { isSrtText, srtToVtt } from "@/lib/streaming/subtitles";
+import { isAssText, assToVtt, isSrtText, srtToVtt } from "@/lib/streaming/subtitles";
 import { getMediaProvider } from "@/lib/media/providers";
 
 export interface WyzieTrack {
@@ -251,5 +251,6 @@ export async function loadWyzieFile(input: {
   if (!response.ok) return null;
   const text = await response.text();
   if (!text.trim()) return null;
+  if (isAssText(text)) return assToVtt(text);
   return isSrtText(text) ? srtToVtt(text) : text;
 }
