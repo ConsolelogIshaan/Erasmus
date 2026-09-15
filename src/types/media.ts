@@ -18,7 +18,7 @@ export type MediaProviderId =
   | "imdb"
   | "rotten_tomatoes"
   | "metacritic"
-  | "argus"
+  | "erasmus"
   | "frame";
 
 /** Stable external reference: provider + type + remote id. */

@@ -1,7 +1,7 @@
 /**
  * Application-level constants.
  */
-export const APP_NAME = "Argus";
+export const APP_NAME = "Erasmus";
 export const APP_TAGLINE = "See everything you watch";
 export const APP_DESCRIPTION =
   "Every film and series you have watched, are watching, and keep meaning to start. All in one place, with your ratings and notes attached.";
@@ -24,9 +24,9 @@ export const LAYOUT = {
 
 /** Local storage keys for client-persisted preferences. */
 export const STORAGE_KEYS = {
-  sidebarCollapsed: "argus:sidebar-collapsed",
-  commandRecent: "argus:command-recent",
-  animationIntensity: "argus:animation-intensity",
-  posterDensity: "argus:poster-density",
-  pinnedSearches: "argus:pinned-searches",
+  sidebarCollapsed: "erasmus:sidebar-collapsed",
+  commandRecent: "erasmus:command-recent",
+  animationIntensity: "erasmus:animation-intensity",
+  posterDensity: "erasmus:poster-density",
+  pinnedSearches: "erasmus:pinned-searches",
 } as const;

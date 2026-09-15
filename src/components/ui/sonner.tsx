@@ -3,7 +3,7 @@
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
 /**
- * Toast notifications via Sonner. Argus is dark-only, so the theme is fixed.
+ * Toast notifications via Sonner. Erasmus is dark-only, so the theme is fixed.
  */
 function Toaster({ ...props }: ToasterProps) {
   return (

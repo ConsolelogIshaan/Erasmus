@@ -87,7 +87,7 @@ export default async function SettingsPage() {
         <CardHeader>
           <CardTitle className="text-base">Privacy & data</CardTitle>
           <CardDescription>
-            Export your journal data or review how Argus stores personal media.
+            Export your journal data or review how Erasmus stores personal media.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -113,7 +113,7 @@ export default async function SettingsPage() {
           </div>
           <p className="text-xs text-muted-foreground">
             Full JSON export via{" "}
-            <code className="rounded bg-muted px-1">buildArgusExport</code> is scaffolded
+            <code className="rounded bg-muted px-1">buildErasmusExport</code> is scaffolded
             in <code className="rounded bg-muted px-1">features/import-export</code> for a
             future UI action.
           </p>

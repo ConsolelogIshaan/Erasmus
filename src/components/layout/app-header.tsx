@@ -14,7 +14,7 @@ interface AppHeaderProps {
 }
 
 /**
- * Sleek floating top bar: Argus logo + search + profile.
+ * Sleek floating top bar: Erasmus logo + search + profile.
  * On media detail pages, floats with subtle, toned-down translucency over the trailer video
  * (delicate soft blur and gentle airy gradient that feathers seamlessly into the scene with zero harsh lines).
  * Smoothly transitions to solid frosted glass only when scrolling down into content.

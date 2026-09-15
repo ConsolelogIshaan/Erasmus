@@ -13,7 +13,7 @@ import { SignupForm } from "@/features/auth/components/signup-form";
 
 export const metadata: Metadata = {
   title: "Create account",
-  description: "Create your Argus account",
+  description: "Create your Erasmus account",
 };
 
 export default function SignupPage() {

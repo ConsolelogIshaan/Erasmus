@@ -12,7 +12,7 @@ import { LEGAL_OPERATOR, LEGAL_PLACEHOLDERS as P } from "@/features/legal/consta
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "What Argus stores about your account and library, how that information is used, and who else processes it.",
+    "What Erasmus stores about your account and library, how that information is used, and who else processes it.",
 };
 
 /**
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
  *
  * Written against the current implementation. Anything not verifiable in the
  * repository is either omitted or marked with a bracketed placeholder, so the
- * document does not describe data practices Argus does not have.
+ * document does not describe data practices Erasmus does not have.
  */
 const SECTIONS: LegalSection[] = [
   {

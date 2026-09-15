@@ -3,7 +3,7 @@
  *
  * The three media route handlers exist to serve authenticated UI — the command
  * palette and the season list on a title page — but nothing stopped an anonymous
- * caller from using them as a free, uncapped proxy onto Argus's TMDB quota. One
+ * caller from using them as a free, uncapped proxy onto Erasmus's TMDB quota. One
  * `/api/media/search` request fans out into several upstream calls, so the
  * amplification factor is well above one.
  *

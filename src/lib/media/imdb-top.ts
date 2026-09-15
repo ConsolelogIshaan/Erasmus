@@ -4,7 +4,7 @@
  * ## What this is, and what it is not
  *
  * IMDb publishes no free API for its Top 250, so this is **not** a mirror of
- * that list. It is Argus's own top-rated pool — TMDB's rating sort with a
+ * that list. It is Erasmus's own top-rated pool — TMDB's rating sort with a
  * credibility vote floor, which already puts Shawshank and Breaking Bad on page
  * one — with the *displayed rating and the ordering* taken from IMDb.
  *

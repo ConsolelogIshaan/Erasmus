@@ -1,8 +1,8 @@
 {
-  "name": "argus",
+  "name": "erasmus",
   "version": "0.1.0",
   "private": true,
-  "description": "Argus — see everything you watch",
+  "description": "Erasmus — see everything you watch",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",

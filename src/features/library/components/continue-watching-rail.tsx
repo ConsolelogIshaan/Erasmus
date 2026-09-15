@@ -172,7 +172,7 @@ export function ContinueWatchingRail({ initialEntries }: ContinueWatchingRailPro
 
         if (updated) {
           try {
-            localStorage.setItem("argus:playback:recent", JSON.stringify(currentRecent));
+            localStorage.setItem("erasmus:playback:recent", JSON.stringify(currentRecent));
           } catch {}
           setEntries(nextEntries);
         }

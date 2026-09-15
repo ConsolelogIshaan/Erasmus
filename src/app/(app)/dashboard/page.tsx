@@ -41,7 +41,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Premium intelligence dashboard — personal home for Argus.
+ * Premium intelligence dashboard — personal home for Erasmus.
  */
 export default async function DashboardPage() {
   const { user, profile } = await getSessionContext();

@@ -53,7 +53,7 @@ describe("playback progress", () => {
 
   it("keys movies and episodes separately", () => {
     expect(progressKey({ mediaType: "movie", tmdbId: "299536" })).toBe(
-      "argus:playback:movie:299536",
+      "erasmus:playback:movie:299536",
     );
     expect(
       progressKey({
@@ -62,8 +62,8 @@ describe("playback progress", () => {
         season: 1,
         episode: 3,
       }),
-    ).toBe("argus:playback:tv:66732:s1:e3");
-    expect(tvLastKey("66732")).toBe("argus:playback:tv-last:66732");
+    ).toBe("erasmus:playback:tv:66732:s1:e3");
+    expect(tvLastKey("66732")).toBe("erasmus:playback:tv-last:66732");
   });
 
   it("resumes from mid-title progress and skips intros or finished titles", () => {

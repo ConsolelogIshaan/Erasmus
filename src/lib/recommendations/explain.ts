@@ -242,7 +242,7 @@ export function explain(
     sentences[0] ??
     // No factor produced a nameable reason. Say that, rather than inventing one.
     (profile.signalStrength === "empty"
-      ? "Popular pick while Argus learns your taste"
+      ? "Popular pick while Erasmus learns your taste"
       : "Broadly matches your library");
 
   return { headline, details: details.slice(0, 3) };

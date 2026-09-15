@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import type { SearchResponse, SearchResultItem } from "@/types/media";
 
-const RECENT_KEY = "argus:search-recent";
+const RECENT_KEY = "erasmus:search-recent";
 const MAX_RECENT = 12;
 
 export function readRecentSearches(): string[] {

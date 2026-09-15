@@ -13,7 +13,7 @@ import { getImdbTopRated, PAGE_SIZE } from "@/lib/media/imdb-top";
 
 export const metadata: Metadata = {
   title: "TV Shows",
-  description: "Browse and filter TV series on Argus",
+  description: "Browse and filter TV series on Erasmus",
 };
 
 interface PageProps {

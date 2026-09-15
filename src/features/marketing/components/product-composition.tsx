@@ -29,7 +29,7 @@ const STATS = [
 const ACTIVITY = [34, 52, 28, 66, 44, 78, 58, 92, 48, 70, 38, 84] as const;
 
 /**
- * The product *is* the hero visual: an Argus surface sitting inside the
+ * The product *is* the hero visual: an Erasmus surface sitting inside the
  * environment, angled and lit by the same lightning as the background.
  *
  * Decorative duplication of copy that already exists in the page, so the whole
@@ -67,7 +67,7 @@ export function ProductComposition({ posters = [] }: { posters?: ShowcasePoster[
             {/* Chrome */}
             <div className="flex items-center gap-3 border-b border-white/[0.07] pb-3">
               <span className="font-mono text-[0.625rem] tracking-[0.22em] text-white/70 uppercase">
-                Argus
+                Erasmus
               </span>
               <span className="h-3 w-px bg-white/10" />
               {/* Capped so the ⌘K affordance stays on-screen when the panel bleeds. */}

@@ -14,7 +14,7 @@ import { getImdbTopRated, PAGE_SIZE } from "@/lib/media/imdb-top";
 
 export const metadata: Metadata = {
   title: "Movies",
-  description: "Browse and filter movies on Argus",
+  description: "Browse and filter movies on Erasmus",
 };
 
 interface PageProps {

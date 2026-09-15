@@ -47,7 +47,7 @@ export function LibrarySection({ posters = [] }: { posters?: ShowcasePoster[] })
     >
       <SectionHeader
         title="Everything, arranged the way you think."
-        lead="Argus does not force one shape on your collection. Status, tags, collections and progress are separate dimensions you can combine however you like."
+        lead="Erasmus does not force one shape on your collection. Status, tags, collections and progress are separate dimensions you can combine however you like."
       />
 
       <div className="mt-14 grid gap-14 sm:mt-16 lg:grid-cols-12 lg:gap-10">

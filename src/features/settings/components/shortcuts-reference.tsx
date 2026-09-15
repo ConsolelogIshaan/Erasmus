@@ -10,7 +10,7 @@ export function ShortcutsReference() {
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Keyboard shortcuts</h2>
         <p className="text-sm text-muted-foreground">
-          Navigate Argus without leaving the keyboard. Sequences like G then D work
+          Navigate Erasmus without leaving the keyboard. Sequences like G then D work
           outside text fields.
         </p>
       </div>

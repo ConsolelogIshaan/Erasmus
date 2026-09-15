@@ -23,7 +23,7 @@ export default function OfflinePage() {
         You&apos;re offline
       </h1>
       <p className="mt-2 max-w-md text-sm text-muted-foreground text-pretty">
-        Argus needs a connection for catalog and account features. Previously visited
+        Erasmus needs a connection for catalog and account features. Previously visited
         pages may still be available from cache.
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">

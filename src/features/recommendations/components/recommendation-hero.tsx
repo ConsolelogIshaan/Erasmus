@@ -6,7 +6,7 @@ import { toTenPoint } from "@/lib/recommendations/rating";
 import type { RecommendationRun, TasteProfile } from "@/types/recommendations";
 
 /**
- * Hero + "what Argus read" panel.
+ * Hero + "what Erasmus read" panel.
  *
  * A Server Component: nothing here is interactive, and the copy is derived from
  * the profile so the page can never claim more than the engine actually knows.
@@ -20,7 +20,7 @@ const STRENGTH_COPY: Record<
 > = {
   empty: {
     badge: "No history yet",
-    line: "Argus has not seen you watch anything yet, so nothing below is personal.",
+    line: "Erasmus has not seen you watch anything yet, so nothing below is personal.",
   },
   sparse: {
     badge: "Learning",
@@ -154,10 +154,10 @@ export function RecommendationHero({ run }: { run: RecommendationRun }) {
       {facts.length > 0 ? (
         <section
           className="surface-card panel-corner p-5"
-          aria-label="What Argus read from your library"
+          aria-label="What Erasmus read from your library"
         >
           <h2 className="text-muted-foreground font-mono text-[10px] tracking-[0.16em] uppercase">
-            What Argus read
+            What Erasmus read
           </h2>
           <dl className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {facts.map((fact) => (

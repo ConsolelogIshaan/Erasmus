@@ -37,7 +37,7 @@ interface SettingsFormProps {
 
 /**
  * Settings — density, notifications, accessibility.
- * Argus is dark-only; there is no light mode and no theme control.
+ * Erasmus is dark-only; there is no light mode and no theme control.
  */
 export function SettingsForm({ settings }: SettingsFormProps) {
   const [pending, startTransition] = React.useTransition();
@@ -80,7 +80,7 @@ export function SettingsForm({ settings }: SettingsFormProps) {
           <div>
             <h2 className="text-sm font-semibold tracking-tight">Appearance</h2>
             <p className="text-sm text-muted-foreground">
-              Argus is dark by design, so there is no light mode. Adjust density and
+              Erasmus is dark by design, so there is no light mode. Adjust density and
               motion below.
             </p>
           </div>

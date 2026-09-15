@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = {
   title: "Discover",
-  description: "Explore trending movies, TV shows, and more on Argus",
+  description: "Explore trending movies, TV shows, and more on Erasmus",
 };
 
 export const revalidate = 900;

@@ -71,7 +71,7 @@ export default async function RecommendationsPage({ searchParams }: PageProps) {
           description={
             run.mode === "unavailable"
               ? "Recommendations need a configured catalog provider. Once TMDB credentials are set, this page fills in automatically."
-              : "Argus could not find titles outside your library to suggest. Add a few more titles or ratings and check back."
+              : "Erasmus could not find titles outside your library to suggest. Add a few more titles or ratings and check back."
           }
         />
       )}

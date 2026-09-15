@@ -35,9 +35,9 @@ export interface TvShowResumeState {
   updatedAt: number;
 }
 
-const PREFIX = "argus:playback:";
-const TV_LAST_PREFIX = "argus:playback:tv-last:";
-const RECENT_KEY = "argus:playback:recent";
+const PREFIX = "erasmus:playback:";
+const TV_LAST_PREFIX = "erasmus:playback:tv-last:";
+const RECENT_KEY = "erasmus:playback:recent";
 const MAX_RECENT_ITEMS = 24;
 const MIN_RESUME_SECONDS = 15;
 const COMPLETE_RATIO = 0.9;
@@ -153,7 +153,7 @@ export function getTvShowResume(tmdbId: string): TvShowResumeState | null {
         return parsed;
       }
     }
-    // Backward-compatible fallback: scan localStorage for any argus:playback:tv:<tmdbId>:s*:e*
+    // Backward-compatible fallback: scan localStorage for any erasmus:playback:tv:<tmdbId>:s*:e*
     const targetPrefix = `${PREFIX}tv:${tmdbId}:s`;
     let latest: TvShowResumeState | null = null;
     for (let i = 0; i < localStorage.length; i++) {

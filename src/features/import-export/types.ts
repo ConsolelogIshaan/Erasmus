@@ -19,7 +19,7 @@ export interface ImportJobPlan {
   fields: string[];
   /** Estimated rows to import. */
   estimatedRows: number;
-  /** Mapping from source field → Argus library field. */
+  /** Mapping from source field → Erasmus library field. */
   fieldMap: Record<string, string>;
 }
 
@@ -39,7 +39,7 @@ export const importAdapterRegistry: Partial<Record<ImportSource, ImportAdapter>>
   // trakt: future TraktJsonAdapter
 };
 
-export interface ArgusExportPayload {
+export interface ErasmusExportPayload {
   version: 1;
   exportedAt: string;
   entries: unknown[];

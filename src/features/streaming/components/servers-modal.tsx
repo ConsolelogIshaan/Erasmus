@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { STREAMING_SERVERS, type StreamServer } from "@/lib/streaming/stream-resolver";
 import { cn } from "@/lib/utils";
 
-const STORAGE_KEY = "argus_preferred_server";
+const STORAGE_KEY = "erasmus_preferred_server";
 
 interface ServersModalProps {
   open: boolean;

@@ -10,7 +10,7 @@ interface CommandTriggerProps {
 }
 
 /**
- * Search trigger — Unlumen CommandMenu chrome, opens Argus media palette.
+ * Search trigger — Unlumen CommandMenu chrome, opens Erasmus media palette.
  */
 export function CommandTrigger({ className, compact }: CommandTriggerProps) {
   const { setCommandOpen } = useUI();

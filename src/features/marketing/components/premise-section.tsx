@@ -17,7 +17,7 @@ const PRINCIPLES = [
   {
     key: "Memory",
     title: "Ratings keep their history",
-    body: "Re-rate freely. Argus records the change instead of overwriting what you once thought.",
+    body: "Re-rate freely. Erasmus records the change instead of overwriting what you once thought.",
   },
 ] as const;
 
@@ -29,7 +29,7 @@ export function PremiseSection() {
     >
       <SectionHeader
         title="Nothing you watch should ever go missing."
-        lead="Discovery lives in one app, progress in another, opinions nowhere at all. Argus keeps all three together, so the series you meant to finish never quietly disappears."
+        lead="Discovery lives in one app, progress in another, opinions nowhere at all. Erasmus keeps all three together, so the series you meant to finish never quietly disappears."
       />
 
       <div className="mt-14 grid gap-x-10 gap-y-12 sm:mt-16 sm:grid-cols-3">

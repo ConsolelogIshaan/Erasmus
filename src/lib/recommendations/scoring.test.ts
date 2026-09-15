@@ -505,6 +505,6 @@ describe("explain", () => {
       { now: NOW },
     );
     const explanation = explain(scored, empty);
-    expect(explanation.headline).toBe("Popular pick while Argus learns your taste");
+    expect(explanation.headline).toBe("Popular pick while Erasmus learns your taste");
   });
 });

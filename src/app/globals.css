@@ -1,5 +1,5 @@
 /**
- * Argus / Frame — solid product design system
+ * Erasmus / Frame — solid product design system
  *
  * Clean opaque surfaces, soft elevation, calm blues.
  * No glassmorphism (no frost / blur / heavy transparency).
@@ -13,7 +13,7 @@
 /* ---------------------------------------------------------------------------
    Structural tokens — shared by every surface (no colour here)
 
-   Argus is dark-only: there is no light theme. Colour tokens live in the
+   Erasmus is dark-only: there is no light theme. Colour tokens live in the
    `:root, .dark` block below, which is always in effect.
 --------------------------------------------------------------------------- */
 :root {

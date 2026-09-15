@@ -22,7 +22,7 @@ const sourceSans = Source_Sans_3({
 /**
  * Display / brand / label face — Geist Mono.
  *
- * The instrument-panel voice: the Argus wordmark, page and rail titles, and
+ * The instrument-panel voice: the Erasmus wordmark, page and rail titles, and
  * every uppercase tracked-out label and numeral. Paired against Source Sans 3
  * for prose, so the two faces stay clearly different jobs.
  */
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.webmanifest",
   keywords: [
-    "Argus",
+    "Erasmus",
     "entertainment tracker",
     "movies",
     "TV shows",

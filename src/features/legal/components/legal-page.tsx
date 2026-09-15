@@ -51,9 +51,9 @@ export function LegalPage({ title, lede, sections, pendingReview }: LegalPagePro
               role="note"
             >
               <p className="text-xs leading-6 text-white/60">
-                Text shown in square brackets is a detail the operators of Argus still
+                Text shown in square brackets is a detail the operators of Erasmus still
                 have to supply, such as a contact address or a governing law. This document
-                is accurate about how Argus works today and has not yet had a final review
+                is accurate about how Erasmus works today and has not yet had a final review
                 by a lawyer.
               </p>
             </div>

@@ -611,7 +611,7 @@ export function StreamingTheaterModal({
   React.useEffect(() => {
     if (!open) return;
 
-    window.history.pushState({ argusTheaterOpen: true }, "");
+    window.history.pushState({ erasmusTheaterOpen: true }, "");
 
     const handlePopState = () => {
       if (document.fullscreenElement) {

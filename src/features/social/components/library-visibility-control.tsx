@@ -17,7 +17,7 @@ import { LIBRARY_VISIBILITY_LABELS, type LibraryVisibility } from "@/types/socia
 const DESCRIPTIONS: Record<LibraryVisibility, string> = {
   private: "Nobody can see what you watch, even friends.",
   friends: "Accepted friends can see your library and progress.",
-  public: "Any signed-in Argus user can see your library.",
+  public: "Any signed-in Erasmus user can see your library.",
 };
 
 /**

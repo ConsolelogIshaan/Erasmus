@@ -1,7 +1,7 @@
 import localFont from "next/font/local";
 
 /**
- * Bostone — used exclusively for the Argus wordmark.
+ * Bostone — used exclusively for the Erasmus wordmark.
  *
  * Personal-use license only (see `src/assets/fonts/README-LICENSE.txt`):
  * this file must not be referenced by anything other than the `Logo`

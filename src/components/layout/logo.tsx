@@ -18,7 +18,7 @@ interface LogoProps {
 const SPACED_NAME = APP_NAME.toUpperCase().split("").join(" ");
 
 /**
- * Argus wordmark — set in Bostone, one letter at a time with a single space
+ * Erasmus wordmark — set in Bostone, one letter at a time with a single space
  * between each. This is the only place Bostone is used in the app.
  */
 export function Logo({ href = ROUTES.home, className }: LogoProps) {

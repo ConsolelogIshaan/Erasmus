@@ -343,7 +343,7 @@ function emptyPage<T = MediaSummary>(): PaginatedResult<T> {
 export function createTmdbProvider(): TmdbMediaProvider {
   if (!isTmdbConfigured()) {
     console.warn(
-      "[Argus] TMDB credentials missing. Catalog endpoints will fail until configured.",
+      "[Erasmus] TMDB credentials missing. Catalog endpoints will fail until configured.",
     );
   }
   return new TmdbMediaProvider();

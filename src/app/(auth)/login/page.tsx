@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = {
   title: "Sign in",
-  description: "Sign in to Argus",
+  description: "Sign in to Erasmus",
 };
 
 export default function LoginPage() {

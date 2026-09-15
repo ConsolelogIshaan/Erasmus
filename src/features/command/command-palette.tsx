@@ -33,7 +33,7 @@ import type { SearchResultItem } from "@/types/media";
 import { cn } from "@/lib/utils";
 
 /**
- * Global spotlight search — Unlumen CommandMenu shell + Argus media results.
+ * Global spotlight search — Unlumen CommandMenu shell + Erasmus media results.
  * Unified cinematic discovery experience with centered play interaction and hover metadata.
  */
 export function CommandPalette() {
@@ -393,7 +393,7 @@ function PosterCard({
           )}
         />
 
-        {/* Subtle top indicator line in Argus primary blue - ONLY ON HOVER */}
+        {/* Subtle top indicator line in Erasmus primary blue - ONLY ON HOVER */}
         <div
           className={cn(
             "absolute top-0 left-0 right-0 h-[2px] bg-primary transition-transform duration-200 origin-left pointer-events-none",

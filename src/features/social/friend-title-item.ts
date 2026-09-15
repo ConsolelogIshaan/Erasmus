@@ -84,7 +84,7 @@ const SCALE_MAX: Record<RatingScale, number> = { five: 5, ten: 10, hundred: 100 
 /**
  * A friend's rating as a 10-point display value, or `null`.
  *
- * Argus lets each user pick their own scale, so the same enthusiasm is stored
+ * Erasmus lets each user pick their own scale, so the same enthusiasm is stored
  * as 4, 8 or 80. Showing the raw number next to someone else's would compare
  * two different units, so everything is converted to /10 for display.
  */

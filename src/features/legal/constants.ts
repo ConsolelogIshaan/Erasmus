@@ -10,7 +10,7 @@
 export const LEGAL_LAST_UPDATED = "30 August 2026";
 
 /**
- * Who operates Argus.
+ * Who operates Erasmus.
  *
  * Two named individuals rather than a registered company, so the documents say
  * "operators" and treat them as natural persons. If the service is ever moved

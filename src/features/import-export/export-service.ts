@@ -1,13 +1,13 @@
 /**
- * Export scaffold — builds an Argus JSON snapshot of personal data.
+ * Export scaffold — builds an Erasmus JSON snapshot of personal data.
  * UI wiring can call this from Settings in a later iteration.
  */
 
 import { createClient } from "@/lib/supabase/server";
 import { table } from "@/lib/library/supabase-table";
-import type { ArgusExportPayload } from "@/features/import-export/types";
+import type { ErasmusExportPayload } from "@/features/import-export/types";
 
-export async function buildArgusExport(userId: string): Promise<ArgusExportPayload> {
+export async function buildErasmusExport(userId: string): Promise<ErasmusExportPayload> {
   const supabase = await createClient();
 
   const [entries, collections, tags, reviews, notes] = await Promise.all([
@@ -29,5 +29,3 @@ export async function buildArgusExport(userId: string): Promise<ArgusExportPaylo
   };
 }
 
-/** @deprecated Use buildArgusExport */
-export const buildFrameExport = buildArgusExport;

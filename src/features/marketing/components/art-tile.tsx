@@ -10,7 +10,7 @@ import type { ShowcasePoster } from "../showcase";
  * Artwork tile for the landing compositions.
  *
  * With a `poster` it shows real TMDB artwork; without one it falls back to an
- * abstract gradient in the Argus blue/violet family, so the page still looks
+ * abstract gradient in the Erasmus blue/violet family, so the page still looks
  * designed when the catalog is unconfigured or unreachable. The gradient stays
  * underneath either way, acting as the loading colour.
  *

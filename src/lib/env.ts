@@ -16,7 +16,7 @@ const clientSchema = z.object({
     .string()
     .min(1, "NEXT_PUBLIC_SUPABASE_ANON_KEY is required"),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
-  NEXT_PUBLIC_APP_NAME: z.string().default("Argus"),
+  NEXT_PUBLIC_APP_NAME: z.string().default("Erasmus"),
 });
 
 const serverSchema = clientSchema.extend({

@@ -1,5 +1,5 @@
 /**
- * Canonical keyboard shortcuts for Argus.
+ * Canonical keyboard shortcuts for Erasmus.
  * Documented in docs/keyboard-shortcuts.md and Settings UI.
  */
 

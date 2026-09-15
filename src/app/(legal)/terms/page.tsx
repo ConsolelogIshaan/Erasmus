@@ -12,7 +12,7 @@ import { LEGAL_OPERATOR, LEGAL_PLACEHOLDERS as P } from "@/features/legal/consta
 export const metadata: Metadata = {
   title: "Terms of Service",
   description:
-    "The rules for using Argus: your account, your content, what the service does and does not promise, and how disputes are handled.",
+    "The rules for using Erasmus: your account, your content, what the service does and does not promise, and how disputes are handled.",
 };
 
 /**
@@ -42,7 +42,7 @@ const SECTIONS: LegalSection[] = [
   },
   {
     id: "the-service",
-    title: "What Argus is",
+    title: "What Erasmus is",
     body: (
       <>
         <p>

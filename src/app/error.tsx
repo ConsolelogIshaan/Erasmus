@@ -18,7 +18,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("[argus]", error.digest ?? error.message, error);
+    console.error("[erasmus]", error.digest ?? error.message, error);
   }, [error]);
 
   return (

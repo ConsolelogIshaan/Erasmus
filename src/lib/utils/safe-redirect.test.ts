@@ -85,20 +85,20 @@ describe("safeNextPath — preserves legitimate targets", () => {
 
 describe("safeRedirectUrl", () => {
   it("keeps a sanitised path on the supplied origin", () => {
-    expect(safeRedirectUrl("https://argus.app", "/library")).toBe(
-      "https://argus.app/library",
+    expect(safeRedirectUrl("https://erasmus.app", "/library")).toBe(
+      "https://erasmus.app/library",
     );
   });
 
   it("cannot be pushed off the origin", () => {
-    expect(safeRedirectUrl("https://argus.app", "//evil.com")).toBe(
-      "https://argus.app/dashboard",
+    expect(safeRedirectUrl("https://erasmus.app", "//evil.com")).toBe(
+      "https://erasmus.app/dashboard",
     );
-    expect(safeRedirectUrl("https://argus.app", "https://evil.com")).toBe(
-      "https://argus.app/dashboard",
+    expect(safeRedirectUrl("https://erasmus.app", "https://evil.com")).toBe(
+      "https://erasmus.app/dashboard",
     );
-    expect(safeRedirectUrl("https://argus.app", "/\\evil.com")).toBe(
-      "https://argus.app/dashboard",
+    expect(safeRedirectUrl("https://erasmus.app", "/\\evil.com")).toBe(
+      "https://erasmus.app/dashboard",
     );
   });
 
@@ -112,8 +112,8 @@ describe("safeRedirectUrl", () => {
       "javascript:alert(1)",
     ];
     for (const payload of payloads) {
-      const result = safeRedirectUrl("https://argus.app", payload);
-      expect(new URL(result).host).toBe("argus.app");
+      const result = safeRedirectUrl("https://erasmus.app", payload);
+      expect(new URL(result).host).toBe("erasmus.app");
     }
   });
 });
