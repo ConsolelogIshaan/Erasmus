@@ -4,10 +4,13 @@ import * as React from "react";
 import {
   ArrowLeft,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Layers,
   ListVideo,
   Maximize2,
   Minimize2,
+  Play,
   RotateCw,
   X,
 } from "lucide-react";
@@ -44,6 +47,7 @@ import {
   actionUpsertAndSetStatus,
 } from "@/features/library/actions/library-actions";
 import { cn } from "@/lib/utils";
+import { stillUrl } from "@/lib/media/image";
 
 function relayUrl(url: string, referer?: string) {
   const query = new URLSearchParams({ url });
@@ -64,6 +68,242 @@ interface StreamingTheaterModalProps {
   tagline?: string | null;
   isAnime?: boolean;
   onEpisodeChange?: (season: number, episode: number) => void;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EpisodeRail – Netflix-style horizontal episode card rail
+// ─────────────────────────────────────────────────────────────────────────────
+interface EpisodeRailProps {
+  episodes: TvEpisode[];
+  pickerSeason: number;
+  activeSeason: number;
+  activeEpisode: number;
+  onSeasonChange: (updater: (s: number) => number) => void;
+  onSelectEpisode: (season: number, episode: number) => void;
+}
+
+function EpisodeRail({
+  episodes,
+  pickerSeason,
+  activeSeason,
+  activeEpisode,
+  onSeasonChange,
+  onSelectEpisode,
+}: EpisodeRailProps) {
+  const railRef = React.useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = React.useState(false);
+  const [canScrollRight, setCanScrollRight] = React.useState(false);
+
+  const syncScroll = React.useCallback(() => {
+    const el = railRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  React.useEffect(() => {
+    syncScroll();
+  }, [episodes, syncScroll]);
+
+  // Auto-scroll to active episode
+  React.useEffect(() => {
+    const el = railRef.current;
+    if (!el || episodes.length === 0) return;
+    const activeIdx = episodes.findIndex(
+      (ep) => ep.seasonNumber === activeSeason && ep.episodeNumber === activeEpisode,
+    );
+    if (activeIdx < 0) return;
+    const cardW = 200;
+    const offset = Math.max(0, activeIdx * cardW - el.clientWidth / 2 + cardW / 2);
+    el.scrollTo({ left: offset, behavior: "smooth" });
+  }, [episodes, activeSeason, activeEpisode]);
+
+  const scroll = (dir: "left" | "right") => {
+    const el = railRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir === "right" ? 420 : -420, behavior: "smooth" });
+  };
+
+  return (
+    <div
+      className="absolute bottom-[calc(100%+0.6rem)] left-0 right-0 z-[220] origin-bottom overflow-hidden rounded-2xl border border-white/[0.14] bg-black/50 text-white shadow-[0_-8px_60px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-3xl ring-1 ring-white/[0.08]"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] bg-white/[0.03] px-4 py-3">
+        <div className="flex items-center gap-3">
+          <p className="text-sm font-bold tracking-widest uppercase text-white/90">
+            Episodes
+          </p>
+          {episodes.length > 0 && (
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/55">
+              {episodes.length}
+            </span>
+          )}
+        </div>
+        {/* Season switcher */}
+        <div className="flex items-center gap-0.5 rounded-full bg-white/[0.06] px-1 py-0.5 ring-1 ring-white/[0.1]">
+          <button
+            type="button"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-25"
+            disabled={pickerSeason <= 1}
+            onClick={() => onSeasonChange((s) => Math.max(1, s - 1))}
+            aria-label="Previous season"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <span className="min-w-[5rem] text-center text-[12px] font-semibold text-white">
+            Season {pickerSeason}
+          </span>
+          <button
+            type="button"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+            onClick={() => onSeasonChange((s) => s + 1)}
+            aria-label="Next season"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Card rail */}
+      <div className="relative">
+        {canScrollLeft && (
+          <button
+            type="button"
+            onClick={() => scroll("left")}
+            aria-label="Scroll episodes left"
+            className="absolute left-0 top-0 bottom-0 z-10 flex w-14 items-center justify-start pl-2 bg-gradient-to-r from-black/80 to-transparent text-white/80 transition-opacity hover:text-white"
+          >
+            <ChevronLeft className="h-6 w-6 drop-shadow-[0_0_6px_rgba(0,0,0,0.9)]" />
+          </button>
+        )}
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => scroll("right")}
+            aria-label="Scroll episodes right"
+            className="absolute right-0 top-0 bottom-0 z-10 flex w-14 items-center justify-end pr-2 bg-gradient-to-l from-black/80 to-transparent text-white/80 transition-opacity hover:text-white"
+          >
+            <ChevronRight className="h-6 w-6 drop-shadow-[0_0_6px_rgba(0,0,0,0.9)]" />
+          </button>
+        )}
+
+        {episodes.length === 0 ? (
+          <p className="px-4 py-10 text-center text-[13px] text-white/35">
+            No episodes in this season.
+          </p>
+        ) : (
+          <div
+            ref={railRef}
+            onScroll={syncScroll}
+            className="flex gap-3 overflow-x-auto px-4 py-4"
+            style={{ scrollbarWidth: "none" }}
+          >
+            {episodes.map((episode) => {
+              const active =
+                episode.seasonNumber === activeSeason &&
+                episode.episodeNumber === activeEpisode;
+              const thumb = stillUrl(episode.stillPath, "w300");
+              const epCode = `S${String(episode.seasonNumber).padStart(2, "0")}E${String(episode.episodeNumber).padStart(2, "0")}`;
+
+              return (
+                <button
+                  key={`${episode.seasonNumber}-${episode.episodeNumber}`}
+                  type="button"
+                  onClick={() =>
+                    onSelectEpisode(episode.seasonNumber, episode.episodeNumber)
+                  }
+                  className={cn(
+                    "group relative flex shrink-0 w-44 sm:w-48 flex-col overflow-hidden rounded-xl border text-left transition-all duration-200 active:scale-[0.97]",
+                    active
+                      ? "border-primary/60 ring-2 ring-primary/35 shadow-[0_0_22px_rgba(99,102,241,0.4)]"
+                      : "border-white/[0.07] hover:border-white/25 hover:shadow-[0_4px_24px_rgba(0,0,0,0.55)]",
+                  )}
+                  style={{ background: "rgba(255,255,255,0.04)" }}
+                >
+                  {/* Thumbnail */}
+                  <div className="relative aspect-[16/9] w-full overflow-hidden bg-white/[0.05]">
+                    {thumb ? (
+                      <img
+                        src={thumb}
+                        alt={episode.name ?? epCode}
+                        className={cn(
+                          "h-full w-full object-cover transition-transform duration-300",
+                          "group-hover:scale-[1.05]",
+                          active && "brightness-75",
+                        )}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Play className="h-8 w-8 text-white/20" />
+                      </div>
+                    )}
+                    {/* Bottom gradient */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent pointer-events-none" />
+
+                    {/* Episode code badge */}
+                    <span
+                      className={cn(
+                        "absolute left-2 top-2 rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-wider backdrop-blur-sm",
+                        active
+                          ? "bg-primary text-white"
+                          : "bg-black/55 text-white/65",
+                      )}
+                    >
+                      {epCode}
+                    </span>
+
+                    {/* Now Playing overlay */}
+                    {active && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span className="flex items-center gap-1.5 rounded-full bg-primary/90 px-3 py-1 text-[11px] font-bold tracking-wide text-white shadow-lg backdrop-blur-sm">
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                          Now Playing
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Hover play icon */}
+                    {!active && (
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none">
+                        <div className="rounded-full bg-white/20 p-2.5 backdrop-blur-sm ring-1 ring-white/20">
+                          <Play className="h-5 w-5 fill-white text-white" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card body */}
+                  <div className="flex flex-col gap-1 p-2.5">
+                    <p
+                      className={cn(
+                        "line-clamp-1 text-[12px] font-semibold leading-snug",
+                        active ? "text-white" : "text-white/90 group-hover:text-white",
+                      )}
+                    >
+                      {episode.name || `Episode ${episode.episodeNumber}`}
+                    </p>
+                    {episode.overview ? (
+                      <p className="line-clamp-2 text-[10px] leading-relaxed text-white/40">
+                        {episode.overview}
+                      </p>
+                    ) : null}
+                    {episode.runtime ? (
+                      <p className="mt-0.5 text-[10px] font-mono text-white/30">
+                        {episode.runtime} min
+                      </p>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function StreamingTheaterModal({
@@ -618,88 +858,14 @@ export function StreamingTheaterModal({
             />
           </button>
           {episodesOpen ? (
-            <div className="absolute right-0 top-[calc(100%+0.4rem)] z-[220] w-[min(20rem,84vw)] origin-top-right overflow-hidden rounded-2xl border border-white/[0.14] bg-black/45 text-white shadow-[0_24px_70px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.15)] backdrop-blur-3xl ring-1 ring-white/10">
-              <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2 py-1.5">
-                <p className="pl-1.5 text-[12px] font-medium tracking-wide text-white/70">
-                  Episodes
-                </p>
-                <div className="flex items-center">
-                  <button
-                    type="button"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-25"
-                    disabled={pickerSeason <= 1}
-                    onClick={() => setPickerSeason((season) => Math.max(1, season - 1))}
-                    aria-label="Previous season"
-                  >
-                    <ChevronDown className="h-4 w-4 rotate-90" />
-                  </button>
-                  <span className="min-w-[4.75rem] text-center text-[12px] font-medium text-white">
-                    Season {pickerSeason}
-                  </span>
-                  <button
-                    type="button"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white"
-                    onClick={() => setPickerSeason((season) => season + 1)}
-                    aria-label="Next season"
-                  >
-                    <ChevronDown className="h-4 w-4 -rotate-90" />
-                  </button>
-                </div>
-              </div>
-              <div className="max-h-[min(48vh,20rem)] overflow-y-auto py-1">
-                {seasonEpisodes.length === 0 ? (
-                  <p className="px-3 py-8 text-center text-[12px] text-white/35">
-                    No episodes in this season.
-                  </p>
-                ) : (
-                  seasonEpisodes.map((episode) => {
-                    const active =
-                      episode.seasonNumber === activeSeason &&
-                      episode.episodeNumber === activeEpisode;
-                    return (
-                      <button
-                        key={`${episode.seasonNumber}-${episode.episodeNumber}`}
-                        type="button"
-                        onClick={() =>
-                          handleSelectEpisode(
-                            episode.seasonNumber,
-                            episode.episodeNumber,
-                          )
-                        }
-                        className={cn(
-                          "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-white/[0.06]",
-                          active && "bg-white/[0.06]",
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "mt-px w-7 shrink-0 font-mono text-[11px] tabular-nums",
-                            active ? "text-primary" : "text-white/35",
-                          )}
-                        >
-                          {String(episode.episodeNumber).padStart(2, "0")}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span
-                            className={cn(
-                              "block truncate text-[13px] font-medium",
-                              active ? "text-white" : "text-white/85",
-                            )}
-                          >
-                            {episode.name || `Episode ${episode.episodeNumber}`}
-                          </span>
-                          {episode.runtime ? (
-                            <span className="mt-0.5 block text-[11px] text-white/35">
-                              {episode.runtime} min
-                            </span>
-                          ) : null}
-                        </span>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </div>
+            <EpisodeRail
+              episodes={seasonEpisodes}
+              pickerSeason={pickerSeason}
+              activeSeason={activeSeason}
+              activeEpisode={activeEpisode}
+              onSeasonChange={setPickerSeason}
+              onSelectEpisode={handleSelectEpisode}
+            />
           ) : null}
         </div>
       )}
