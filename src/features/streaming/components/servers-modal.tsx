@@ -27,8 +27,8 @@ export function ServersModal({
   if (!open) return null;
 
   return (
-    <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-[min(22rem,92vw)] rounded-2xl border border-white/10 bg-[#111] p-4 shadow-2xl">
+    <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-md">
+      <div className="w-[min(22rem,92vw)] rounded-2xl border border-white/[0.14] bg-black/45 p-4 text-white shadow-[0_24px_70px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.15)] backdrop-blur-3xl ring-1 ring-white/10">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold tracking-wide text-white">Servers</h2>
           <div className="flex items-center gap-1">

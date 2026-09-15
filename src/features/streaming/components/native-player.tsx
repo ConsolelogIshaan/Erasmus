@@ -529,7 +529,19 @@ export function NativePlayer({
     setPanel("none");
   };
 
-  const qualityLabel = level < 0 ? "Auto" : `${levels[level]?.height || ""}p`;
+  const selectedHeight = level >= 0 ? levels[level]?.height || 0 : 0;
+  const qualityLabel = React.useMemo(() => {
+    if (level < 0) {
+      if (playingHeight >= 2160) return "Auto (4K)";
+      if (playingHeight >= 1080) return "Auto (HD)";
+      if (playingHeight > 0) return `Auto (${playingHeight}p)`;
+      return "Auto";
+    }
+    const h = levels[level]?.height || 0;
+    if (h >= 2160) return "4K";
+    if (h >= 1080) return "HD";
+    return `${h}p`;
+  }, [level, levels, playingHeight]);
   const selectedHeight = level >= 0 ? levels[level]?.height || 0 : 0;
   const lisbon4k =
     serverId === "lisbon" &&
@@ -855,7 +867,7 @@ export function NativePlayer({
       {/* Popover Setting Panels - Cinejoy Style */}
       {panel !== "none" ? (
         <div
-          className="absolute bottom-[5.75rem] right-6 z-[110] w-72 sm:w-80 origin-bottom-right overflow-hidden rounded-2xl border border-white/15 bg-[#0e0e0e]/95 text-white shadow-[0_20px_60px_rgba(0,0,0,0.7)] backdrop-blur-xl"
+          className="absolute bottom-[5.75rem] right-6 z-[110] w-72 sm:w-80 origin-bottom-right overflow-hidden rounded-2xl border border-white/[0.14] bg-black/40 text-white shadow-[0_24px_70px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.15)] backdrop-blur-3xl ring-1 ring-white/10 transition-all duration-200"
           style={{ zIndex: 110 }}
           onClick={(event) => event.stopPropagation()}
         >
@@ -866,10 +878,10 @@ export function NativePlayer({
                 <button
                   type="button"
                   onClick={() => setPanel("quality")}
-                  className="flex flex-col items-start rounded-xl border border-white/10 bg-white/[0.05] p-2.5 text-left transition hover:bg-white/10 active:scale-[0.98]"
+                  className="group flex flex-col items-start rounded-xl border border-white/[0.08] bg-white/[0.04] p-2.5 text-left transition-all duration-150 hover:bg-white/[0.08] hover:border-white/20 active:scale-[0.98] backdrop-blur-sm"
                 >
                   <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
-                    <Tv2 className="h-3.5 w-3.5 text-white/60" />
+                    <Tv2 className="h-3.5 w-3.5 text-sky-400" />
                     <span>Quality</span>
                   </div>
                   <span className="mt-1 text-sm font-bold text-white tracking-wide truncate max-w-full">
@@ -885,10 +897,10 @@ export function NativePlayer({
                       onOpenServers();
                     }
                   }}
-                  className="flex flex-col items-start rounded-xl border border-white/10 bg-white/[0.05] p-2.5 text-left transition hover:bg-white/10 active:scale-[0.98]"
+                  className="group flex flex-col items-start rounded-xl border border-white/[0.08] bg-white/[0.04] p-2.5 text-left transition-all duration-150 hover:bg-white/[0.08] hover:border-white/20 active:scale-[0.98] backdrop-blur-sm"
                 >
                   <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
-                    <Layers className="h-3.5 w-3.5 text-white/60" />
+                    <Layers className="h-3.5 w-3.5 text-amber-400" />
                     <span>Server</span>
                   </div>
                   <span className="mt-1 text-sm font-bold text-white tracking-wide truncate max-w-full">
@@ -899,10 +911,10 @@ export function NativePlayer({
                 <button
                   type="button"
                   onClick={() => setPanel("subs")}
-                  className="flex flex-col items-start rounded-xl border border-white/10 bg-white/[0.05] p-2.5 text-left transition hover:bg-white/10 active:scale-[0.98]"
+                  className="group flex flex-col items-start rounded-xl border border-white/[0.08] bg-white/[0.04] p-2.5 text-left transition-all duration-150 hover:bg-white/[0.08] hover:border-white/20 active:scale-[0.98] backdrop-blur-sm"
                 >
                   <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
-                    <Subtitles className="h-3.5 w-3.5 text-white/60" />
+                    <Subtitles className="h-3.5 w-3.5 text-cyan-400" />
                     <span>Subtitles</span>
                   </div>
                   <span className="mt-1 text-sm font-bold text-white tracking-wide truncate max-w-full">
@@ -913,7 +925,7 @@ export function NativePlayer({
                 <button
                   type="button"
                   onClick={() => setPanel("audio")}
-                  className="flex flex-col items-start rounded-xl border border-white/10 bg-white/[0.05] p-2.5 text-left transition hover:bg-white/10 active:scale-[0.98]"
+                  className="group flex flex-col items-start rounded-xl border border-white/[0.08] bg-white/[0.04] p-2.5 text-left transition-all duration-150 hover:bg-white/[0.08] hover:border-white/20 active:scale-[0.98] backdrop-blur-sm"
                 >
                   <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
                     <Music className="h-3.5 w-3.5 text-emerald-400" />
@@ -995,7 +1007,7 @@ export function NativePlayer({
 
           {panel === "audio" ? (
             <div className="p-2.5">
-              <div className="flex items-center gap-2 border-b border-white/10 px-1 pb-2.5 pt-1 text-white">
+              <div className="flex items-center gap-2 border-b border-white/[0.08] bg-white/[0.02] px-2 pb-2.5 pt-1 text-white">
                 <button
                   type="button"
                   onClick={() => setPanel("settings")}
@@ -1004,9 +1016,9 @@ export function NativePlayer({
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </button>
-                <span className="text-sm font-bold tracking-wide">Audio</span>
+                <span className="text-xs font-bold tracking-wider uppercase text-white/90">Audio</span>
               </div>
-              <div className="max-h-64 overflow-y-auto pt-1 space-y-1">
+              <div className="max-h-64 overflow-y-auto pt-1.5 space-y-1">
                 {audioTracks.map((track) => {
                   const isSelected = audio === track.index;
                   return (
@@ -1015,18 +1027,18 @@ export function NativePlayer({
                       type="button"
                       onClick={() => applyAudio(track.index)}
                       className={cn(
-                        "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs sm:text-sm transition",
+                        "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs sm:text-sm transition duration-150",
                         isSelected
-                          ? "bg-white/10 text-white font-semibold"
-                          : "text-white/80 hover:bg-white/[0.06] hover:text-white",
+                          ? "bg-white/[0.12] text-white font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] border border-white/[0.1]"
+                          : "text-white/80 hover:bg-white/[0.06] hover:text-white border border-transparent active:scale-[0.98]",
                       )}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <Music className={cn("h-4 w-4 shrink-0", isSelected ? "text-emerald-400" : "text-white/50")} />
-                        <span className="truncate">{track.name}</span>
+                        <span className="truncate font-medium">{track.name}</span>
                       </div>
                       {isSelected && (
-                        <CheckCircle2 className="h-5 w-5 text-emerald-400 fill-emerald-400/20 shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-emerald-400 fill-emerald-400/20 shrink-0 ml-2" />
                       )}
                     </button>
                   );
@@ -1060,17 +1072,43 @@ export function NativePlayer({
                 {
                   key: "auto",
                   label: "Auto",
+                  sublabel:
+                    playingHeight > 0
+                      ? `${playingHeight >= 2160 ? "4K (2160p)" : playingHeight >= 1080 ? "HD (1080p)" : `${playingHeight}p`} · Current`
+                      : "Optimal",
                   active: level < 0,
                   onSelect: () => applyLevel(-1),
                 },
                 ...[...levels]
                   .sort((a, b) => b.height - a.height)
-                  .map((item) => ({
-                    key: String(item.index),
-                    label: `${item.height}p`,
-                    active: level === item.index,
-                    onSelect: () => applyLevel(item.index),
-                  })),
+                  .map((item) => {
+                    let label = `${item.height}p`;
+                    let sublabel: string | undefined = undefined;
+
+                    if (item.height >= 2160) {
+                      label = "4K";
+                      sublabel = "2160p";
+                    } else if (item.height >= 1080) {
+                      label = "HD";
+                      sublabel = "1080p";
+                    } else if (item.height >= 720) {
+                      label = "720p";
+                      sublabel = "HD";
+                    } else if (item.height >= 480) {
+                      label = "480p";
+                      sublabel = "SD";
+                    } else {
+                      label = `${item.height}p`;
+                    }
+
+                    return {
+                      key: String(item.index),
+                      label,
+                      sublabel,
+                      active: level === item.index,
+                      onSelect: () => applyLevel(item.index),
+                    };
+                  }),
               ]}
             />
           ) : null}
@@ -1163,16 +1201,22 @@ function ChoiceList({
 }: {
   title: string;
   onBack?: () => void;
-  items: { key: string; label: string; active: boolean; onSelect: () => void }[];
+  items: {
+    key: string;
+    label: string;
+    sublabel?: string;
+    active: boolean;
+    onSelect: () => void;
+  }[];
 }) {
   return (
     <div className="flex max-h-[50vh] flex-col">
-      <div className="flex items-center gap-1 border-b border-white/10 px-1.5 py-1.5">
+      <div className="flex items-center gap-2 border-b border-white/[0.08] bg-white/[0.02] px-3 py-2.5">
         {onBack ? (
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
             aria-label="Back"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -1180,21 +1224,32 @@ function ChoiceList({
         ) : (
           <span className="w-2" />
         )}
-        <p className="text-[12px] font-medium tracking-wide text-white/80">{title}</p>
+        <p className="text-xs font-bold tracking-wider uppercase text-white/90">{title}</p>
       </div>
-      <div className="overflow-y-auto py-1">
+      <div className="overflow-y-auto py-1.5 px-2 space-y-1">
         {items.map((item) => (
           <button
             key={item.key}
             type="button"
             className={cn(
-              "flex w-full items-center justify-between px-3.5 py-2 text-left text-[13px] transition-colors duration-150 hover:bg-white/[0.06]",
-              item.active ? "text-white" : "text-white/70",
+              "group flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-all duration-150",
+              item.active
+                ? "bg-white/[0.12] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] border border-white/[0.1]"
+                : "text-white/80 hover:bg-white/[0.06] hover:text-white border border-transparent active:scale-[0.98]",
             )}
             onClick={item.onSelect}
           >
-            <span>{item.label}</span>
-            {item.active ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+            <div className="flex flex-col items-start min-w-0">
+              <span className="text-sm font-semibold tracking-wide text-white">{item.label}</span>
+              {item.sublabel ? (
+                <span className="text-[11px] font-mono text-white/50 tracking-wider mt-0.5">
+                  {item.sublabel}
+                </span>
+              ) : null}
+            </div>
+            {item.active ? (
+              <CheckCircle2 className="h-4 w-4 text-primary fill-primary/20 shrink-0 ml-2" />
+            ) : null}
           </button>
         ))}
       </div>

@@ -618,7 +618,7 @@ export function StreamingTheaterModal({
             />
           </button>
           {episodesOpen ? (
-            <div className="absolute right-0 top-[calc(100%+0.4rem)] z-[220] w-[min(20rem,84vw)] origin-top-right overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0c]/95 shadow-[0_16px_50px_rgba(0,0,0,0.55)] backdrop-blur-md">
+            <div className="absolute right-0 top-[calc(100%+0.4rem)] z-[220] w-[min(20rem,84vw)] origin-top-right overflow-hidden rounded-2xl border border-white/[0.14] bg-black/45 text-white shadow-[0_24px_70px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.15)] backdrop-blur-3xl ring-1 ring-white/10">
               <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2 py-1.5">
                 <p className="pl-1.5 text-[12px] font-medium tracking-wide text-white/70">
                   Episodes
