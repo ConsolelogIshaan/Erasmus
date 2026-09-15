@@ -529,7 +529,6 @@ export function NativePlayer({
     setPanel("none");
   };
 
-  const selectedHeight = level >= 0 ? levels[level]?.height || 0 : 0;
   const qualityLabel = React.useMemo(() => {
     if (level < 0) {
       if (playingHeight >= 2160) return "Auto (4K)";
