@@ -127,7 +127,7 @@ function EpisodeRail({
 
   return (
     <div
-      className="absolute bottom-[calc(100%+0.6rem)] left-0 right-0 z-[220] origin-bottom overflow-hidden rounded-2xl border border-white/[0.14] bg-black/50 text-white shadow-[0_-8px_60px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-3xl ring-1 ring-white/[0.08]"
+      className="mx-4 overflow-hidden rounded-2xl border border-white/[0.14] bg-black/60 text-white shadow-[0_-8px_60px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-3xl ring-1 ring-white/[0.08]"
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] bg-white/[0.03] px-4 py-3">
@@ -857,16 +857,7 @@ export function StreamingTheaterModal({
               )}
             />
           </button>
-          {episodesOpen ? (
-            <EpisodeRail
-              episodes={seasonEpisodes}
-              pickerSeason={pickerSeason}
-              activeSeason={activeSeason}
-              activeEpisode={activeEpisode}
-              onSeasonChange={setPickerSeason}
-              onSelectEpisode={handleSelectEpisode}
-            />
-          ) : null}
+
         </div>
       )}
 
@@ -969,6 +960,24 @@ export function StreamingTheaterModal({
                 isExternalMenuOpen={episodesOpen || serversOpen}
                 topRightControls={topRightControls}
               />
+            ) : null}
+
+            {/* Episode Rail – full-width overlay above the bottom controls bar */}
+            {mediaType === "tv" && episodesOpen ? (
+              <div
+                className="absolute inset-x-0 z-[220] pointer-events-auto"
+                style={{ bottom: "5.75rem" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <EpisodeRail
+                  episodes={seasonEpisodes}
+                  pickerSeason={pickerSeason}
+                  activeSeason={activeSeason}
+                  activeEpisode={activeEpisode}
+                  onSeasonChange={setPickerSeason}
+                  onSelectEpisode={handleSelectEpisode}
+                />
+              </div>
             ) : null}
 
             <ServersModal
