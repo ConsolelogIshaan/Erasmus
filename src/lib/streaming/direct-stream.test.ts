@@ -55,4 +55,19 @@ My dad was a farmer.
     expect(tracks[0]!.url).toContain("index=0");
     expect(tracks[0]!.url).not.toContain("/api/stream/hls");
   });
+
+  it("builds exact query for multi-episode series and anime beyond episode 12 without rewriting season", () => {
+    const query = buildSheguQuery({
+      title: "Jujutsu Kaisen",
+      type: "tv",
+      year: "2020",
+      tmdbId: "95479",
+      serverName: "Lisbon",
+      season: 1,
+      episode: 13,
+    });
+    expect(query).toContain("season=1");
+    expect(query).toContain("episode=13");
+    expect(query).not.toContain("season=2");
+  });
 });

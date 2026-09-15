@@ -284,29 +284,9 @@ export async function resolveCinejoyStream(input: {
     ...STREAMING_SERVERS.map((server) => server.id).filter((id) => id !== preferred),
   ];
 
-  const meta = await catalogMeta(input.type, input.tmdbId);
-  const isAnime = Boolean(meta?.isAnime);
-  const isAnimeCour2 =
-    isAnime && input.type === "tv" && (input.season ?? 1) === 1 && (input.episode ?? 1) > 12;
-  const s2Ep = isAnimeCour2 ? (input.episode ?? 1) - 12 : undefined;
-
   let fallbackHit: CinejoyStreamHit | null = null;
 
-  // 1. If anime Cour 2, try preferred server on Season 2 first (resolves in ~200ms)
-  if (isAnimeCour2 && s2Ep) {
-    try {
-      const hit = await resolveCinejoyServer({
-        ...input,
-        season: 2,
-        episode: s2Ep,
-        serverId: preferred,
-      });
-      if (hit && !hit.url.includes("lol.movieboxnoob.cc")) return hit;
-      if (hit && !fallbackHit) fallbackHit = hit;
-    } catch {}
-  }
-
-  // 2. Try preferred server with requested episode
+  // 1. Try preferred server with requested episode
   try {
     const hit = await resolveCinejoyServer({ ...input, serverId: preferred });
     if (hit) {
@@ -315,7 +295,7 @@ export async function resolveCinejoyStream(input: {
     }
   } catch {}
 
-  // 3. Try remaining servers
+  // 2. Try remaining servers
   for (const serverId of order.slice(1)) {
     try {
       const hit = await resolveCinejoyServer({ ...input, serverId });
@@ -324,21 +304,6 @@ export async function resolveCinejoyStream(input: {
         if (!fallbackHit) fallbackHit = hit;
       }
     } catch {}
-
-    if (isAnimeCour2 && s2Ep) {
-      try {
-        const hit = await resolveCinejoyServer({
-          ...input,
-          season: 2,
-          episode: s2Ep,
-          serverId,
-        });
-        if (hit) {
-          if (!hit.url.includes("lol.movieboxnoob.cc")) return hit;
-          if (!fallbackHit) fallbackHit = hit;
-        }
-      } catch {}
-    }
   }
 
   return fallbackHit;

@@ -203,34 +203,7 @@ export async function loadWyzieList(input: {
       result = { tracks: [], cookies: "" };
     }
   }
-  let isAnimeShow = false;
-  if (!result.tracks.length && (input.season === "1" || !input.season) && Number(input.episode || 1) > 12) {
-    try {
-      const show = await getMediaProvider().getTvShow(input.id);
-      isAnimeShow = Boolean(
-        show?.genres?.some((g) => g.name === "Animation" || g.id === "16") &&
-        (show?.spokenLanguages?.some((l) => l.code === "ja" || l.name?.toLowerCase() === "japanese") ||
-         show?.productionCountries?.some((c) => c.code === "JP" || c.name?.toLowerCase() === "japan") ||
-         show?.keywords?.some((k) => k.name?.toLowerCase().includes("anime")))
-      );
-    } catch {}
-  }
 
-  if (!result.tracks.length && isAnimeShow && (input.season === "1" || !input.season) && Number(input.episode || 1) > 12) {
-    // Cour 2 fallback for anime: try Season 2, Episode N - 12
-    const s2Ep = String(Number(input.episode || 1) - 12);
-    try {
-      const s2Result = await loadWyzieList({
-        id: input.id,
-        season: "2",
-        episode: s2Ep,
-      });
-      if (s2Result.tracks.length) {
-        listCache.set(key, { at: Date.now(), ...s2Result });
-        return s2Result;
-      }
-    } catch {}
-  }
 
   if (result.tracks.length) {
     listCache.set(key, { at: Date.now(), ...result });
