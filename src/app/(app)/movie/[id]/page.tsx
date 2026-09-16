@@ -3,6 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DetailHero } from "@/features/media/components/detail-hero";
+import { AmbientThemeSetter } from "@/providers/ambient-provider";
+import { extractAmbientColors } from "@/lib/media/ambient-colors";
+import { backdropUrl } from "@/lib/media/image";
 import { StreamButton } from "@/features/streaming/components/stream-button";
 import { MediaMeta } from "@/features/media/components/media-meta";
 import { CastRow } from "@/features/media/components/cast-row";
@@ -110,8 +113,16 @@ export default async function MovieDetailPage({ params }: PageProps) {
     (c.job ?? "").split(" · ").includes("Director"),
   );
 
+    const ambientBackdrop = backdropUrl(movie.backdropPath ?? movie.posterPath, "w1280");
+  const ambientPalette = await extractAmbientColors(movie.backdropPath ?? movie.posterPath);
+
   return (
     <div className="space-y-10 animate-fade-up">
+      <AmbientThemeSetter
+        palette={ambientPalette}
+        backdropUrl={ambientBackdrop}
+        id={"movie-" + movie.id}
+      />
       <DetailHero
         title={movie.title}
         tagline={movie.tagline}

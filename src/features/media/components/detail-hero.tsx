@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
@@ -63,47 +64,51 @@ export function DetailHero({
   children,
 }: DetailHeroProps) {
   const reduceMotion = useReducedMotion();
-  const logo = logoUrl(logoPath, "w500");
+  const [logoFailed, setLogoFailed] = React.useState(false);
+  const logo = !logoFailed && logoPath ? logoUrl(logoPath, "w500") : null;
   const year = formatYear(releaseDate);
   const runtimeLabel = formatRuntime(runtime);
 
   return (
     <section className="relative w-full overflow-hidden">
-      <div className="relative min-h-[min(84vh,54rem)] w-full">
+      <div className="relative min-h-[min(84vh,54rem)] w-full flex flex-col justify-end">
+        {/* Video / Still Stage behind foreground */}
         <HeroTrailerBackdrop
           videos={videos}
           backdropPath={backdropPath}
           posterPath={posterPath}
           title={title}
-          className="absolute inset-0"
+          className="absolute inset-0 z-0"
         />
 
+        {/* Foreground Information: Title, Badges, Overview, Actions */}
         <motion.div
-          className="relative z-[1] flex min-h-[min(84vh,54rem)] flex-col justify-end"
+          className="relative z-10 flex flex-col justify-end pointer-events-none pb-10 sm:pb-14 pt-[calc(var(--header-height)+2rem)]"
           variants={reduceMotion ? undefined : heroContainer}
           initial={reduceMotion ? false : "hidden"}
           animate="visible"
         >
-          <div className="w-full max-w-3xl px-6 pb-8 pt-[calc(var(--header-height)+2rem)] sm:px-10 sm:pb-12 sm:pt-[calc(var(--header-height)+3rem)] md:pl-[calc(var(--current-sidebar-width)+2rem)] lg:pl-[calc(var(--current-sidebar-width)+3rem)]">
+          <div className="w-full max-w-3xl px-6 sm:px-10 md:pl-[calc(var(--current-sidebar-width)+2rem)] lg:pl-[calc(var(--current-sidebar-width)+3rem)] pointer-events-auto">
             <div className="space-y-4 text-center sm:text-left">
               {logo ? (
                 <motion.div
                   variants={reduceMotion ? undefined : heroItem}
-                  className="relative mx-auto h-16 w-full max-w-xs sm:mx-0 sm:h-20"
+                  className="relative mx-auto h-20 w-80 max-w-full sm:mx-0 sm:h-28 sm:w-96"
                 >
                   <Image
                     src={logo}
                     alt={title}
                     fill
-                    className="object-contain object-bottom drop-shadow-lg sm:object-left-bottom"
-                    sizes="320px"
+                    className="object-contain object-bottom sm:object-left-bottom filter drop-shadow-[0_8px_24px_rgba(0,0,0,0.85)]"
+                    sizes="(max-width: 768px) 320px, 480px"
                     priority
+                    onError={() => setLogoFailed(true)}
                   />
                 </motion.div>
               ) : (
                 <motion.h1
                   variants={reduceMotion ? undefined : heroItem}
-                  className="font-display text-balance text-[clamp(1.85rem,1.15rem+2.4vw,3.15rem)] font-bold leading-[1.08] tracking-[-0.03em] drop-shadow-sm"
+                  className="font-display text-balance text-[clamp(2.2rem,1.5rem+3vw,4rem)] font-extrabold leading-[1.05] tracking-[-0.03em] text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)]"
                 >
                   {title}
                 </motion.h1>
@@ -114,7 +119,7 @@ export function DetailHero({
               {tagline ? (
                 <motion.p
                   variants={reduceMotion ? undefined : heroItem}
-                  className="text-prose-soft italic text-muted-foreground text-pretty"
+                  className="text-base sm:text-lg italic text-white/90 text-pretty font-light tracking-wide drop-shadow-md"
                 >
                   {tagline}
                 </motion.p>
@@ -124,14 +129,20 @@ export function DetailHero({
                 variants={reduceMotion ? undefined : heroItem}
                 className="flex flex-wrap items-center justify-center gap-2 sm:justify-start"
               >
-                <Badge variant="secondary">{mediaTypeLabel}</Badge>
-                {certification ? <Badge variant="outline">{certification}</Badge> : null}
-                {year ? <span className="text-sm text-muted-foreground">{year}</span> : null}
+                <Badge variant="secondary" className="bg-white/15 text-white border-white/20 backdrop-blur-md">
+                  {mediaTypeLabel}
+                </Badge>
+                {certification ? (
+                  <Badge variant="outline" className="text-white/90 border-white/25 backdrop-blur-md">
+                    {certification}
+                  </Badge>
+                ) : null}
+                {year ? <span className="text-sm font-medium text-white/80">{year}</span> : null}
                 {runtimeLabel ? (
-                  <span className="text-sm text-muted-foreground">{runtimeLabel}</span>
+                  <span className="text-sm font-medium text-white/80">{runtimeLabel}</span>
                 ) : null}
                 {status ? (
-                  <span className="text-sm text-muted-foreground">{status}</span>
+                  <span className="text-sm font-medium text-white/80">{status}</span>
                 ) : null}
               </motion.div>
 
@@ -144,7 +155,7 @@ export function DetailHero({
                     <Link key={g.id} href={mediaHref("genre", g.id)}>
                       <Badge
                         variant="muted"
-                        className="transition-colors hover:bg-primary/15 hover:text-foreground"
+                        className="bg-white/10 text-white/90 border-white/15 backdrop-blur-md transition-colors hover:bg-white/20 hover:text-white"
                       >
                         {g.name}
                       </Badge>
@@ -168,7 +179,7 @@ export function DetailHero({
               {overview ? (
                 <motion.p
                   variants={reduceMotion ? undefined : heroItem}
-                  className="text-prose-soft max-w-2xl text-muted-foreground text-pretty"
+                  className="text-prose-soft max-w-2xl text-sm sm:text-base text-white/85 text-pretty leading-relaxed drop-shadow"
                 >
                   {overview}
                 </motion.p>

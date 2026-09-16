@@ -15,15 +15,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-/*
- * Rail geometry — the reason expanding feels calm.
- *
- * The icon column is a fixed 40px box and the rail's own padding is 12px, so
- * `12 + 40/2 = 32` — dead centre of the 64px collapsed rail. The icon column is
- * identical in both states, which means no icon, and not the selected row's
- * fill, ever changes x. Expanding only widens the rail and reveals the labels.
- */
-
 function isNavActive(pathname: string, href: string, comingSoon?: boolean) {
   if (comingSoon) return false;
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -36,9 +27,7 @@ interface NavRowProps {
 }
 
 /**
- * One rail row. Labels stay mounted in both states — clipped and transparent
- * while collapsed — so they can cross-fade instead of popping, and so the
- * accessible name is always the row's own text.
+ * One liquid glass rail row with frosted sheen, glowing active liquid capsule, and micro-fluid interactions.
  */
 function NavRow({ item, active, collapsed }: NavRowProps) {
   const comingSoon = Boolean(item.comingSoon);
@@ -54,23 +43,35 @@ function NavRow({ item, active, collapsed }: NavRowProps) {
             if (comingSoon) event.preventDefault();
           }}
           className={cn(
-            "flex h-9 w-full items-center overflow-hidden rounded-sm",
-            "text-sm font-medium transition-colors duration-150",
+            "group/row relative flex h-9 w-full items-center overflow-hidden rounded-lg border text-sm font-medium transition-all duration-200",
             active
-              ? "bg-foreground/10 text-foreground"
-              : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground",
+              ? "border-white/[0.18] bg-gradient-to-r from-white/[0.14] to-white/[0.06] text-white shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.25),inset_0_0_12px_rgba(255,255,255,0.03),0_4px_16px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+              : "border-transparent text-muted-foreground/90 hover:border-white/[0.09] hover:bg-white/[0.07] hover:text-white hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]",
             comingSoon && "cursor-not-allowed opacity-50",
           )}
         >
+          {active ? (
+            <span
+              className="absolute left-1 top-2 bottom-2 w-1 rounded-full bg-gradient-to-b from-primary via-primary to-blue-400 shadow-[0_0_10px_hsl(var(--primary)),0_0_3px_#fff]"
+              aria-hidden
+            />
+          ) : null}
           <span className="grid w-10 shrink-0 place-items-center">
-            <Icon className="size-[1.05rem]" aria-hidden />
+            <Icon
+              className={cn(
+                "size-[1.05rem] transition-all duration-200 group-hover/row:scale-110",
+                active
+                  ? "text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.75)]"
+                  : "group-hover/row:text-white"
+              )}
+              aria-hidden
+            />
           </span>
           <span
             className={cn(
-              "min-w-0 flex-1 truncate pr-3 text-left",
-              // Expanding: labels arrive just after the rail has opened.
+              "min-w-0 flex-1 truncate pr-3 text-left tracking-wide",
+              active ? "font-medium text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" : "",
               "transition-opacity delay-[90ms] duration-[120ms] ease-[var(--ease-out)]",
-              // Collapsing: they leave first, so the rail never guillotines text.
               "group-data-[collapsed]/rail:opacity-0",
               "group-data-[collapsed]/rail:delay-0",
               "group-data-[collapsed]/rail:duration-[80ms]",
@@ -81,7 +82,6 @@ function NavRow({ item, active, collapsed }: NavRowProps) {
           </span>
         </Link>
       </TooltipTrigger>
-      {/* Only worth a tooltip while the label is hidden. */}
       {collapsed ? (
         <TooltipContent side="right">{item.title}</TooltipContent>
       ) : null}
@@ -101,7 +101,7 @@ function NavList({
   pathname: string;
 }) {
   return (
-    <nav className="flex flex-col gap-0.5" aria-label={label}>
+    <nav className="flex flex-col gap-1" aria-label={label}>
       {items.map((item) => (
         <NavRow
           key={item.href}
@@ -115,9 +115,8 @@ function NavList({
 }
 
 /**
- * Desktop navigation — a minimal icon rail that widens to show labels.
- * The toggle is the only control, and it sits in the icon column so it
- * doesn't move when the rail does.
+ * Desktop navigation — an elegant, seamless translucent liquid glass rail.
+ * Features multi-layered optical refraction, specular edge highlights, and fluid micro-sheens.
  */
 export function Sidebar({ isFullBleed }: { isFullBleed?: boolean }) {
   const pathname = usePathname();
@@ -129,11 +128,11 @@ export function Sidebar({ isFullBleed }: { isFullBleed?: boolean }) {
       aria-label="Main navigation"
       className={cn(
         "group/rail hidden h-dvh shrink-0 flex-col overflow-hidden transition-all duration-300 md:flex",
+        // Liquid glass backdrop: heavy optical refraction, crystalline blur, and luminous translucent depth
+        "backdrop-blur-3xl backdrop-saturate-[190%] backdrop-contrast-[105%]",
         isFullBleed
-          ? "fixed top-0 left-0 z-50 border-r border-white/[0.08] bg-black/30 backdrop-blur-2xl shadow-[4px_0_30px_rgba(0,0,0,0.15)]"
-          : "sticky top-0 z-40 border-r border-white/[0.08] bg-background",
-        // Width is layout, not transform — the content pane is a sibling and
-        // has to reflow with it. Kept short so it costs few frames.
+          ? "fixed top-0 left-0 z-50 bg-[#03060c]/42 shadow-[6px_0_40px_rgba(0,0,0,0.4)] border-r border-white/[0.10]"
+          : "sticky top-0 z-40 bg-[#040710]/52 shadow-[4px_0_30px_rgba(0,0,0,0.3)] border-r border-white/[0.08]",
         "transition-[width] duration-[var(--duration-fast)] ease-[var(--ease-out)]",
         "motion-reduce:transition-none",
       )}
@@ -141,24 +140,56 @@ export function Sidebar({ isFullBleed }: { isFullBleed?: boolean }) {
         width: sidebarCollapsed
           ? LAYOUT.sidebarCollapsedWidth
           : LAYOUT.sidebarWidth,
+        boxShadow:
+          "inset -1px 0 0 0 rgba(255, 255, 255, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.06), inset 1px 0 0 0 rgba(255, 255, 255, 0.02), 8px 0 32px -4px rgba(0, 0, 0, 0.4)",
       }}
     >
-      <div className="flex h-[var(--header-height)] shrink-0 items-center px-3">
+      {/* 1. Base Liquid Glass Surface: Ambient diagonal refraction */}
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.04] via-transparent to-black/20"
+        aria-hidden
+      />
+
+      {/* 2. Top Specular Meniscus / Water Sheen */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-white/[0.09] via-white/[0.02] to-transparent"
+        aria-hidden
+      />
+      
+      {/* 3. Subtle Liquid Caustic Blooms (Organic color refraction) */}
+      <div
+        className="pointer-events-none absolute -top-12 -left-10 h-48 w-48 rounded-full bg-cyan-400/[0.04] blur-3xl"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute top-1/3 -right-12 h-52 w-52 rounded-full bg-blue-500/[0.03] blur-3xl"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute bottom-28 -left-8 h-44 w-44 rounded-full bg-indigo-500/[0.025] blur-3xl"
+        aria-hidden
+      />
+
+      {/* 4. Refractive Specular Right Edge Highlight (Polished crystal edge) */}
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-white/30 via-white/10 to-transparent"
+        aria-hidden
+      />
+
+      <div className="relative z-10 flex h-[var(--header-height)] shrink-0 items-center px-3">
         <span className="grid w-10 place-items-center">
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="rounded-sm text-muted-foreground hover:text-foreground"
+            className="h-7 w-7 rounded-full border border-white/[0.14] bg-white/[0.05] text-muted-foreground hover:bg-white/[0.12] hover:text-white hover:border-white/[0.28] backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_2px_8px_rgba(0,0,0,0.3)] transition-all duration-200"
             onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
             aria-label={sidebarCollapsed ? "Expand menu" : "Collapse menu"}
             aria-expanded={!sidebarCollapsed}
           >
-            {/* One glyph that turns, rather than two that swap: the rotation
-                rides the same curve and duration as the rail. */}
             <ChevronsLeft
               className={cn(
-                "h-4 w-4 transition-transform",
+                "h-3.5 w-3.5 transition-transform",
                 "duration-[var(--duration-fast)] ease-[var(--ease-out)]",
                 "group-data-[collapsed]/rail:rotate-180",
                 "motion-reduce:transition-none",
@@ -169,7 +200,7 @@ export function Sidebar({ isFullBleed }: { isFullBleed?: boolean }) {
         </span>
       </div>
 
-      <div className="no-scrollbar flex-1 overflow-y-auto px-3 pb-4">
+      <div className="no-scrollbar relative z-10 flex-1 overflow-y-auto px-3 pb-4">
         <NavList
           items={MAIN_NAV}
           label="Primary"
@@ -177,7 +208,7 @@ export function Sidebar({ isFullBleed }: { isFullBleed?: boolean }) {
           pathname={pathname}
         />
 
-        <div className="my-2 h-px w-full bg-white/[0.08]" aria-hidden />
+        <div className="my-3 h-px w-full bg-gradient-to-r from-transparent via-white/[0.14] to-transparent" aria-hidden />
 
         <NavList
           items={SECONDARY_NAV}

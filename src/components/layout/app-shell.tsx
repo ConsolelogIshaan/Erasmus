@@ -7,6 +7,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageTransition } from "@/components/layout/page-transition";
 import { KeyboardShortcutsProvider } from "@/components/layout/keyboard-shortcuts-provider";
 import { CommandPalette } from "@/features/command/command-palette";
+import { AmbientBackground } from "@/components/layout/ambient-background";
 import { useUI } from "@/providers/ui-provider";
 import { LAYOUT } from "@/constants/app";
 import { cn } from "@/lib/utils";
@@ -19,9 +20,9 @@ interface AppShellProps {
 
 /**
  * Resizable sidebar + content.
- * Detail pages with cinematic hero backdrops (/tv/[id], /movie/[id])
- * render full-bleed from (0,0), allowing the trailer to flow seamlessly underneath
- * the translucent frosted glass header and sidebar with zero harsh borders or box edges.
+ * Detail pages with cinematic hero backdrops (/tv/[id], /movie/[id]) and Discover (/discover)
+ * render full-bleed, with the persistent AmbientBackground flowing seamlessly underneath
+ * the translucent frosted glass header, sidebar, and all scrollable page sections.
  */
 export function AppShell({ user, children }: AppShellProps) {
   const pathname = usePathname();
@@ -45,20 +46,15 @@ export function AppShell({ user, children }: AppShellProps) {
           } as React.CSSProperties
         }
       >
-        <div
-          className="pointer-events-none absolute inset-0 overflow-hidden opacity-50 dark:opacity-40"
-          style={{
-            background:
-              "radial-gradient(ellipse 60% 40% at 10% 0%, hsl(210 100% 56% / 0.1), transparent 55%)",
-          }}
-          aria-hidden
-        />
+
+        {/* Dedicated Page-Level Ambient Background Layer */}
+        <AmbientBackground />
 
         <Sidebar isFullBleed={isFullBleed} />
 
         <div
           className={cn(
-            "relative z-0 flex min-w-0 flex-1 flex-col transition-all duration-300",
+            "relative z-[1] flex min-w-0 flex-1 flex-col transition-all duration-300",
             isFullBleed ? "pl-0" : ""
           )}
         >
@@ -66,7 +62,7 @@ export function AppShell({ user, children }: AppShellProps) {
           <main
             id="main-content"
             className={cn(
-              "relative z-0 min-w-0 flex-1 overflow-y-auto scroll-smooth",
+              "relative z-[1] min-w-0 flex-1 overflow-y-auto scroll-smooth bg-transparent",
               isFullBleed ? "h-dvh" : ""
             )}
           >

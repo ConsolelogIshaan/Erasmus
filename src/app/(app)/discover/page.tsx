@@ -8,6 +8,8 @@ import { CatalogConfigBanner } from "@/features/media/components/catalog-config-
 import { PageLoader } from "@/components/feedback/page-loader";
 import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { safeGetDiscoveryHome } from "@/lib/media/catalog";
+import { extractAmbientColors } from "@/lib/media/ambient-colors";
+import { backdropUrl } from "@/lib/media/image";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = {
@@ -22,12 +24,25 @@ export const revalidate = 900;
  */
 export default async function DiscoverPage() {
   const data = await safeGetDiscoveryHome();
-  const heroItems =
+  const rawHeroItems =
     data.heroItems?.length > 0
       ? data.heroItems
       : data.hero
         ? [data.hero]
         : [];
+
+  const heroItems = await Promise.all(
+    rawHeroItems.map(async (item) => {
+      const imgPath = item.backdropPath ?? item.posterPath;
+      const palette = await extractAmbientColors(imgPath);
+      const backdrop = backdropUrl(imgPath, "w1280");
+      return {
+        ...item,
+        ambientPalette: palette,
+        ambientBackdropUrl: backdrop,
+      };
+    })
+  );
 
   return (
     <div className="relative w-full min-h-dvh">

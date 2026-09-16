@@ -3,6 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DetailHero } from "@/features/media/components/detail-hero";
+import { AmbientThemeSetter } from "@/providers/ambient-provider";
+import { extractAmbientColors } from "@/lib/media/ambient-colors";
+import { backdropUrl } from "@/lib/media/image";
 import { StreamButton } from "@/features/streaming/components/stream-button";
 import { MediaMeta } from "@/features/media/components/media-meta";
 import { CastRow } from "@/features/media/components/cast-row";
@@ -103,8 +106,16 @@ export default async function TvDetailPage({ params }: PageProps) {
         )
       : null;
 
+    const ambientBackdrop = backdropUrl(show.backdropPath ?? show.posterPath, "w1280");
+  const ambientPalette = await extractAmbientColors(show.backdropPath ?? show.posterPath);
+
   return (
     <div className="space-y-10 animate-fade-up">
+      <AmbientThemeSetter
+        palette={ambientPalette}
+        backdropUrl={ambientBackdrop}
+        id={"tv-" + show.id}
+      />
       <DetailHero
         title={show.title}
         tagline={show.tagline}

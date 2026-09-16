@@ -16,9 +16,9 @@ interface AppHeaderProps {
 
 /**
  * Sleek floating top bar: Erasmus logo + search + profile.
- * On media detail pages, floats with subtle, toned-down translucency over the trailer video
- * (delicate soft blur and gentle airy gradient that feathers seamlessly into the scene with zero harsh lines).
- * Smoothly transitions to solid frosted glass only when scrolling down into content.
+ * Blends seamlessly into the ambient atmosphere across all pages when unscrolled
+ * (completely transparent, borderless, with a delicate feathered liquid glass meniscus and micro-sheen).
+ * Smoothly transitions to a luminous liquid glass frosted header when content scrolls underneath.
  */
 export function AppHeader({ user, isFullBleed }: AppHeaderProps) {
   const [isScrolled, setIsScrolled] = React.useState(false);
@@ -26,44 +26,81 @@ export function AppHeader({ user, isFullBleed }: AppHeaderProps) {
   const isHomeScreen = pathname === ROUTES.dashboard || pathname === ROUTES.home;
 
   React.useEffect(() => {
-    if (!isFullBleed) return;
     const main = document.getElementById("main-content");
-    if (!main) return;
     const handleScroll = () => {
-      setIsScrolled(main.scrollTop > 30);
+      const scrollY = main ? main.scrollTop : window.scrollY;
+      setIsScrolled(scrollY > 20);
     };
-    main.addEventListener("scroll", handleScroll, { passive: true });
+
+    if (main) {
+      main.addEventListener("scroll", handleScroll, { passive: true });
+    }
+    window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
-    return () => main.removeEventListener("scroll", handleScroll);
-  }, [isFullBleed]);
+
+    return () => {
+      if (main) {
+        main.removeEventListener("scroll", handleScroll);
+      }
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [pathname]);
 
   return (
     <header
       className={cn(
         "flex h-[var(--header-height)] items-center gap-2.5 px-3 transition-all duration-300 sm:gap-3 sm:px-5",
         isFullBleed
-          ? cn(
-              "fixed top-0 left-0 md:left-[var(--current-sidebar-width)] right-0 z-40 border-b-0",
-              isScrolled
-                ? "border-b border-white/[0.08] bg-black/80 backdrop-blur-xl shadow-lg"
-                : "bg-transparent"
-            )
-          : "sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-xl dark:border-white/[0.08]"
+          ? "fixed top-0 left-0 md:left-[var(--current-sidebar-width)] right-0 z-40 border-b-0"
+          : "sticky top-0 z-40",
+        isScrolled
+          ? "border-b border-white/[0.08] bg-[#040710]/65 backdrop-blur-3xl backdrop-saturate-[190%] backdrop-contrast-[105%] shadow-[0_4px_30px_rgba(0,0,0,0.35)]"
+          : "border-b border-transparent bg-transparent"
       )}
+      style={{
+        boxShadow: isScrolled
+          ? "inset 0 -1px 0 0 rgba(255, 255, 255, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.04), 0 8px 32px -4px rgba(0, 0, 0, 0.4)"
+          : undefined,
+      }}
     >
-      {/* Toned-down, feathered translucent frosted backdrop overlay for unscrolled hero */}
-      {isFullBleed && !isScrolled ? (
+      {/* Seamless liquid glass feathered ambient overlay for unscrolled state */}
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-0 -z-10 transition-opacity duration-300",
+          isScrolled ? "opacity-0" : "opacity-100"
+        )}
+        style={{
+          background:
+            "linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 0%, rgba(0, 0, 0, 0.12) 45%, transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(to bottom, black 0%, black 40%, transparent 100%)",
+          maskImage:
+            "linear-gradient(to bottom, black 0%, black 40%, transparent 100%)",
+          backdropFilter: "blur(5px)",
+          WebkitBackdropFilter: "blur(5px)",
+        }}
+        aria-hidden
+      />
+
+      {/* Top meniscus specular highlight */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.12] to-transparent"
+        aria-hidden
+      />
+
+      {/* Subtle liquid caustic bloom matching the sidebar aesthetic */}
+      <div
+        className="pointer-events-none absolute -top-8 right-1/4 h-20 w-64 rounded-full bg-cyan-400/[0.025] blur-3xl"
+        aria-hidden
+      />
+
+      {/* Refractive bottom specular highlight when scrolled */}
+      {isScrolled && (
         <div
-          className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-black/35 via-black/12 to-transparent backdrop-blur-[5px]"
-          style={{
-            WebkitMaskImage:
-              "linear-gradient(to bottom, black 0%, black 55%, transparent 100%)",
-            maskImage:
-              "linear-gradient(to bottom, black 0%, black 55%, transparent 100%)",
-          }}
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"
           aria-hidden
         />
-      ) : null}
+      )}
 
       <div className="md:hidden">
         <MobileNav />
@@ -74,7 +111,7 @@ export function AppHeader({ user, isFullBleed }: AppHeaderProps) {
         <div
           className={cn(
             "hidden min-w-0 md:block transition-all",
-            isFullBleed && !isScrolled ? "drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)]" : ""
+            !isScrolled ? "drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)]" : ""
           )}
         >
           <Logo href={ROUTES.dashboard} />
@@ -86,7 +123,7 @@ export function AppHeader({ user, isFullBleed }: AppHeaderProps) {
       <div
         className={cn(
           "ml-auto flex items-center gap-1.5 sm:gap-2 transition-all",
-          isFullBleed && !isScrolled ? "drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]" : ""
+          !isScrolled ? "drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]" : ""
         )}
       >
         <CommandTrigger className="hidden md:inline-flex" />

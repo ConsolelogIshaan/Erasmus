@@ -1,19 +1,13 @@
 import {
-  Activity,
   BarChart3,
   Bookmark,
-  CalendarDays,
-  Clapperboard,
   Compass,
   Film,
   Heart,
-  History,
   Home,
   LayoutDashboard,
   Library,
-  Lightbulb,
   Settings,
-  Sparkles,
   Target,
   Tv,
   User,
@@ -69,24 +63,6 @@ export const MAIN_NAV: readonly NavItem[] = [
     description: "Statistics & charts",
   },
   {
-    title: "Insights",
-    href: ROUTES.insights,
-    icon: Lightbulb,
-    description: "Personal insights",
-  },
-  {
-    title: "Calendar",
-    href: ROUTES.calendar,
-    icon: CalendarDays,
-    description: "Activity heatmap",
-  },
-  {
-    title: "Timeline",
-    href: ROUTES.timeline,
-    icon: Sparkles,
-    description: "Journal timeline",
-  },
-  {
     title: "Watchlist",
     href: ROUTES.watchlist,
     icon: Bookmark,
@@ -97,12 +73,6 @@ export const MAIN_NAV: readonly NavItem[] = [
     href: ROUTES.favorites,
     icon: Heart,
     description: "Titles you love",
-  },
-  {
-    title: "Collections",
-    href: ROUTES.collections,
-    icon: Clapperboard,
-    description: "Custom collections",
   },
   {
     title: "Movies",
@@ -119,18 +89,6 @@ export const MAIN_NAV: readonly NavItem[] = [
 ] as const;
 
 export const SECONDARY_NAV: readonly NavItem[] = [
-  {
-    title: "History",
-    href: ROUTES.history,
-    icon: History,
-    description: "Watch sessions",
-  },
-  {
-    title: "Activity",
-    href: ROUTES.activity,
-    icon: Activity,
-    description: "Recent activity",
-  },
   {
     title: "Profile",
     href: ROUTES.profile,
