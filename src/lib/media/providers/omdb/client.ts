@@ -21,12 +21,14 @@ export interface OmdbResponse {
   Type?: string;
 }
 
+const DEFAULT_OMDB_KEY = "trilogy";
+
 export function isOmdbConfigured(): boolean {
-  return Boolean(process.env.OMDB_API_KEY?.trim());
+  return Boolean(process.env.OMDB_API_KEY?.trim() || DEFAULT_OMDB_KEY);
 }
 
 async function omdbFetch(params: Record<string, string>): Promise<OmdbResponse | null> {
-  const key = process.env.OMDB_API_KEY?.trim();
+  const key = process.env.OMDB_API_KEY?.trim() || DEFAULT_OMDB_KEY;
   if (!key) return null;
 
   const url = new URL("https://www.omdbapi.com/");
