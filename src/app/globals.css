@@ -1,5 +1,5 @@
 /**
- * Argus / Frame — solid product design system
+ * Erasmus / Frame — solid product design system
  *
  * Clean opaque surfaces, soft elevation, calm blues.
  * No glassmorphism (no frost / blur / heavy transparency).
@@ -13,7 +13,7 @@
 /* ---------------------------------------------------------------------------
    Structural tokens — shared by every surface (no colour here)
 
-   Argus is dark-only: there is no light theme. Colour tokens live in the
+   Erasmus is dark-only: there is no light theme. Colour tokens live in the
    `:root, .dark` block below, which is always in effect.
 --------------------------------------------------------------------------- */
 :root {
@@ -48,7 +48,7 @@
   --header-height: 3.5rem;
   --sidebar-width: 15.5rem;
   --sidebar-width-collapsed: 4.25rem;
-  --content-max: 90rem;
+  --content-max: 130rem;
 
   --noise-opacity: 0.02;
 }
@@ -604,8 +604,8 @@
   /* Section / rail titles — the "CONTINUE WATCHING" role */
   .text-section-title {
     font-family: var(--font-display);
-    font-weight: 500;
-    font-size: clamp(0.8125rem, 0.76rem + 0.28vw, 0.9375rem);
+    font-weight: 600;
+    font-size: clamp(0.875rem, 0.82rem + 0.35vw, 1.05rem);
     letter-spacing: 0.2em;
     text-transform: uppercase;
     line-height: 1.4;
@@ -1112,41 +1112,6 @@
     display: none;
   }
 
-  /* Sleek floating scrollbar & 60fps smooth scrolling for main container */
-  #main-content {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
-    overscroll-behavior-y: contain;
-    -webkit-overflow-scrolling: touch;
-  }
-  #main-content::-webkit-scrollbar {
-    width: 6px;
-  }
-  #main-content::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  #main-content::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.18);
-    border-radius: 9999px;
-  }
-  #main-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.35);
-  }
-
-  /* Lenis 60fps fluid momentum scroller integration */
-  html.lenis, html.lenis body {
-    height: auto;
-  }
-  .lenis.lenis-smooth {
-    scroll-behavior: auto !important;
-  }
-  .lenis.lenis-smooth [data-lenis-prevent] {
-    overscroll-behavior: contain;
-  }
-  .lenis.lenis-stopped {
-    overflow: hidden;
-  }
-
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
@@ -1166,18 +1131,51 @@
     width: 100%;
     max-width: var(--content-max);
     margin-inline: auto;
-    padding-inline: 1.25rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
   }
 
   @media (min-width: 640px) {
     .content-container {
-      padding-inline: 1.75rem;
+      padding-left: 1.75rem;
+      padding-right: 1.75rem;
     }
   }
 
   @media (min-width: 1024px) {
     .content-container {
-      padding-inline: 2.25rem;
+      padding-left: 2.25rem;
+      padding-right: 2.25rem;
+    }
+  }
+
+  /* Full-bleed layout container: preserves proper clearance for fixed sidebar */
+  .content-container-fullbleed {
+    width: 100%;
+    max-width: var(--content-max);
+    margin-inline: auto;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  @media (min-width: 640px) {
+    .content-container-fullbleed {
+      padding-left: 1.75rem;
+      padding-right: 1.75rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .content-container-fullbleed {
+      padding-left: calc(var(--current-sidebar-width) + 2rem);
+      padding-right: 2rem;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .content-container-fullbleed {
+      padding-left: calc(var(--current-sidebar-width) + 2.5rem);
+      padding-right: 2.5rem;
     }
   }
 
@@ -2264,4 +2262,24 @@
       animation: none;
     }
   }
+}
+
+
+/* Sleek floating scrollbar for main scroll container */
+#main-content {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+#main-content::-webkit-scrollbar {
+  width: 6px;
+}
+#main-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+#main-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+}
+#main-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
 }
