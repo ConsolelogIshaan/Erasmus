@@ -1,5 +1,10 @@
 import dns from "node:dns";
 try { dns.setServers(["8.8.8.8", "1.1.1.1", "9.9.9.9"]); } catch {}
+
+if (typeof process !== "undefined" && process.env) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
 import { STREAMING_SERVERS } from "@/lib/streaming/stream-resolver";
 import { getMediaProvider } from "@/lib/media/providers";
 
@@ -61,7 +66,6 @@ export function formatCaptionLabel(label: string, language: string, url: string)
   }
   return name;
 }
-
 
 const SHEGU_HEADERS = {
   Accept: "*/*",
@@ -232,6 +236,7 @@ export async function resolveCinejoyServer(input: {
 
   const encRes = await fetch(
     `${ENC_API}/enc-cinejoy?url=${encodeURIComponent(queryUrl)}`,
+    { signal: AbortSignal.timeout(3500) }
   );
   const encJson = (await encRes.json()) as {
     status?: number;
@@ -245,6 +250,7 @@ export async function resolveCinejoyServer(input: {
     method: "POST",
     headers: SHEGU_HEADERS,
     body: new Uint8Array(b64urlDecode(encJson.result.data)),
+    signal: AbortSignal.timeout(3500),
   });
   if (!packed.ok) return null;
   const packedBuf = Buffer.from(await packed.arrayBuffer());
@@ -256,6 +262,7 @@ export async function resolveCinejoyServer(input: {
       text: b64urlEncode(packedBuf),
       state: encJson.result.state,
     }),
+    signal: AbortSignal.timeout(3500),
   });
   const decJson = (await decRes.json()) as { status?: number; result?: unknown };
   if (decJson.status !== 200) return null;
@@ -284,22 +291,27 @@ export async function resolveCinejoyStream(input: {
     ...STREAMING_SERVERS.map((server) => server.id).filter((id) => id !== preferred),
   ];
 
-  // 1. Try preferred server with requested episode
+  // Try preferred server first
   try {
     const hit = await resolveCinejoyServer({ ...input, serverId: preferred });
     if (hit && !hit.url.includes("lol.movieboxnoob.cc")) {
       return hit;
     }
-  } catch {}
+  } catch {
+    // If upstream Shegu is down, exit early to avoid stalling
+    return null;
+  }
 
-  // 2. Try remaining servers
-  for (const serverId of order.slice(1)) {
+  // Try remaining servers (up to 2 more)
+  for (const serverId of order.slice(1, 3)) {
     try {
       const hit = await resolveCinejoyServer({ ...input, serverId });
       if (hit && !hit.url.includes("lol.movieboxnoob.cc")) {
         return hit;
       }
-    } catch {}
+    } catch {
+      break;
+    }
   }
 
   return null;

@@ -1,9 +1,15 @@
 import dns from "node:dns";
 try { dns.setServers(["8.8.8.8", "1.1.1.1", "9.9.9.9"]); } catch {}
+
+if (typeof process !== "undefined" && process.env) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
 import {
   resolveCinejoyStream,
   type CinejoyCaption,
 } from "@/lib/streaming/cinejoy-stream";
+import { resolveVidfastDirectStream } from "@/lib/streaming/vidfast-direct";
 
 export interface DirectServer {
   name: string;
@@ -41,25 +47,46 @@ export async function extractDirectStream(input: {
 
   const started = Date.now();
   try {
-    const hit = await resolveCinejoyStream(input);
-    if (!hit) {
-      return { ok: false, error: "no stream", servers: [] };
+    // 1. Primary: VidFast direct stream resolver (high-bitrate 4K/1080p HLS)
+    const vidfastHit = await resolveVidfastDirectStream(input);
+    if (vidfastHit?.url) {
+      const result: DirectStreamResult = {
+        ok: true,
+        referer: vidfastHit.referer,
+        servers: [
+          {
+            name: vidfastHit.serverName,
+            url: vidfastHit.url,
+            kind: vidfastHit.kind,
+            ms: Date.now() - started,
+          },
+        ],
+      };
+      extractCache.set(cacheKey, { at: Date.now(), result });
+      return result;
     }
-    const result: DirectStreamResult = {
-      ok: true,
-      referer: hit.referer,
-      captions: hit.captions,
-      servers: [
-        {
-          name: hit.serverName,
-          url: hit.url,
-          kind: hit.kind,
-          ms: Date.now() - started,
-        },
-      ],
-    };
-    extractCache.set(cacheKey, { at: Date.now(), result });
-    return result;
+
+    // 2. Secondary: Cinejoy/Shegu stream resolver
+    const hit = await resolveCinejoyStream(input);
+    if (hit?.url) {
+      const result: DirectStreamResult = {
+        ok: true,
+        referer: hit.referer,
+        captions: hit.captions,
+        servers: [
+          {
+            name: hit.serverName,
+            url: hit.url,
+            kind: hit.kind,
+            ms: Date.now() - started,
+          },
+        ],
+      };
+      extractCache.set(cacheKey, { at: Date.now(), result });
+      return result;
+    }
+
+    return { ok: false, error: "no stream", servers: [] };
   } catch (error) {
     const message = error instanceof Error ? error.message : "resolve failed";
     return { ok: false, error: message, servers: [] };

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { STREAMING_SERVERS } from "./stream-resolver";
 import { buildSheguQuery, sheguServerName } from "./cinejoy-stream";
+import { extractDirectStream } from "./direct-stream";
 import {
   assToVtt,
   cuesAtTime,
@@ -103,4 +104,28 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
     expect(query).toContain("episode=13");
     expect(query).not.toContain("season=2");
   });
+
+  it("extracts direct stream for movie without iframes or popups", async () => {
+    const res = await extractDirectStream({
+      type: "movie",
+      tmdbId: "1011985",
+      serverId: "lisbon",
+    });
+    expect(res.ok).toBe(true);
+    expect(res.servers.length).toBeGreaterThan(0);
+    expect(res.servers[0]?.url).toContain(".m3u8");
+  }, 15000);
+
+  it("extracts direct stream for TV series without iframes or popups", async () => {
+    const res = await extractDirectStream({
+      type: "tv",
+      tmdbId: "1399",
+      season: 1,
+      episode: 1,
+      serverId: "nebula",
+    });
+    expect(res.ok).toBe(true);
+    expect(res.servers.length).toBeGreaterThan(0);
+    expect(res.servers[0]?.url).toContain(".m3u8");
+  }, 15000);
 });
