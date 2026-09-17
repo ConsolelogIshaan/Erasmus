@@ -140,4 +140,27 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
     expect(res.servers.length).toBeGreaterThan(0);
     expect(res.servers[0]?.url).toContain(".m3u8");
   }, 15000);
+  it("extracts direct stream for Solo Leveling S1 E24 and S1 E25 via smart cour fallback", async () => {
+    const res24 = await extractDirectStream({
+      type: "tv",
+      tmdbId: "127532",
+      season: 1,
+      episode: 24,
+      serverId: "lisbon",
+    });
+    expect(res24.ok).toBe(true);
+    expect(res24.servers.length).toBeGreaterThan(0);
+    expect(res24.servers[0]?.url).toContain(".m3u8");
+
+    const res25 = await extractDirectStream({
+      type: "tv",
+      tmdbId: "127532",
+      season: 1,
+      episode: 25,
+      serverId: "lisbon",
+    });
+    expect(res25.ok).toBe(true);
+    expect(res25.servers.length).toBeGreaterThan(0);
+    expect(res25.servers[0]?.url).toContain(".m3u8");
+  }, 25000);
 });

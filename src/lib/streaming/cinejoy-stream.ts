@@ -7,6 +7,7 @@ if (typeof process !== "undefined" && process.env) {
 
 import { STREAMING_SERVERS } from "@/lib/streaming/stream-resolver";
 import { getMediaProvider } from "@/lib/media/providers";
+import { getAlternateTvCoordinates } from "@/lib/streaming/vidfast-direct";
 
 const ENC_API = "https://enc-dec.app/api";
 const SHEGU = "https://api.shegu.st";
@@ -223,56 +224,84 @@ export async function resolveCinejoyServer(input: {
   const title = meta?.title || input.title;
   if (!title) return null;
   const serverName = sheguServerName(input.serverId || "lisbon");
-  const queryUrl = buildSheguQuery({
-    title,
-    type: input.type,
-    year: meta?.year || input.year,
-    imdbId: meta?.imdbId || input.imdbId,
-    tmdbId: input.tmdbId,
-    serverName,
-    season: input.season,
-    episode: input.episode,
-  });
 
-  const encRes = await fetch(
-    `${ENC_API}/enc-cinejoy?url=${encodeURIComponent(queryUrl)}`,
-    { signal: AbortSignal.timeout(3500) }
-  );
-  const encJson = (await encRes.json()) as {
-    status?: number;
-    result?: { data?: string; state?: unknown };
+  const trySheguFetch = async (queryTitle: string, queryYear?: string): Promise<CinejoyStreamHit | null> => {
+    const queryUrl = buildSheguQuery({
+      title: queryTitle,
+      type: input.type,
+      year: queryYear,
+      imdbId: meta?.imdbId || input.imdbId,
+      tmdbId: input.tmdbId,
+      serverName,
+      season: input.season,
+      episode: input.episode,
+    });
+
+    try {
+      const encRes = await fetch(
+        `${ENC_API}/enc-cinejoy?url=${encodeURIComponent(queryUrl)}`,
+        { signal: AbortSignal.timeout(3000) }
+      );
+      const encJson = (await encRes.json()) as {
+        status?: number;
+        result?: { data?: string; state?: unknown };
+      };
+      if (encJson.status !== 200 || !encJson.result?.data || !encJson.result.state) {
+        return null;
+      }
+
+      const packed = await fetch(`${SHEGU}/g`, {
+        method: "POST",
+        headers: SHEGU_HEADERS,
+        body: new Uint8Array(b64urlDecode(encJson.result.data)),
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!packed.ok) return null;
+      const packedBuf = Buffer.from(await packed.arrayBuffer());
+
+      const decRes = await fetch(`${ENC_API}/dec-cinejoy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: b64urlEncode(packedBuf),
+          state: encJson.result.state,
+        }),
+        signal: AbortSignal.timeout(3000),
+      });
+      const decJson = (await decRes.json()) as { status?: number; result?: unknown };
+      if (decJson.status !== 200) return null;
+      const stream = pickStream(decJson.result);
+      if (!stream) return null;
+      return {
+        ...stream,
+        referer: CINEJOY_REFERER,
+        serverName,
+      };
+    } catch {
+      return null;
+    }
   };
-  if (encJson.status !== 200 || !encJson.result?.data || !encJson.result.state) {
-    return null;
+
+  // 1. Primary lookup
+  const hit = await trySheguFetch(title, meta?.year || input.year);
+  if (hit) return hit;
+
+  // 2. Fallback for titles with colons/dashes (e.g. subtitles like "Dune: Part Two" -> "Dune")
+  if (title.includes(":") || title.includes(" - ")) {
+    const mainTitle = title.split(/[:\-]/)[0]?.trim();
+    if (mainTitle && mainTitle !== title) {
+      const subHit = await trySheguFetch(mainTitle, meta?.year || input.year);
+      if (subHit) return subHit;
+    }
   }
 
-  const packed = await fetch(`${SHEGU}/g`, {
-    method: "POST",
-    headers: SHEGU_HEADERS,
-    body: new Uint8Array(b64urlDecode(encJson.result.data)),
-    signal: AbortSignal.timeout(3500),
-  });
-  if (!packed.ok) return null;
-  const packedBuf = Buffer.from(await packed.arrayBuffer());
+  // 3. Fallback without year restriction for movies
+  if (meta?.year || input.year) {
+    const noYearHit = await trySheguFetch(title, undefined);
+    if (noYearHit) return noYearHit;
+  }
 
-  const decRes = await fetch(`${ENC_API}/dec-cinejoy`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      text: b64urlEncode(packedBuf),
-      state: encJson.result.state,
-    }),
-    signal: AbortSignal.timeout(3500),
-  });
-  const decJson = (await decRes.json()) as { status?: number; result?: unknown };
-  if (decJson.status !== 200) return null;
-  const stream = pickStream(decJson.result);
-  if (!stream) return null;
-  return {
-    ...stream,
-    referer: CINEJOY_REFERER,
-    serverName,
-  };
+  return null;
 }
 
 export async function resolveCinejoyStream(input: {
@@ -284,6 +313,7 @@ export async function resolveCinejoyStream(input: {
   season?: number;
   episode?: number;
   serverId?: string;
+  isFallback?: boolean;
 }): Promise<CinejoyStreamHit | null> {
   const preferred = input.serverId || "lisbon";
   const order = [
@@ -298,8 +328,7 @@ export async function resolveCinejoyStream(input: {
       return hit;
     }
   } catch {
-    // If upstream Shegu is down, exit early to avoid stalling
-    return null;
+    // Shegu down or timed out
   }
 
   // Try remaining servers (up to 2 more)
@@ -311,6 +340,24 @@ export async function resolveCinejoyStream(input: {
       }
     } catch {
       break;
+    }
+  }
+
+  // If TV and primary coordinates produced no stream, evaluate smart alternate cour/season coordinates
+  if (input.type === "tv" && !input.isFallback) {
+    const alternates = getAlternateTvCoordinates(input.season ?? 1, input.episode ?? 1);
+    for (const alt of alternates.slice(0, 3)) {
+      try {
+        const altHit = await resolveCinejoyStream({
+          ...input,
+          season: alt.season,
+          episode: alt.episode,
+          isFallback: true,
+        });
+        if (altHit && !altHit.url.includes("lol.movieboxnoob.cc")) {
+          return altHit;
+        }
+      } catch {}
     }
   }
 
