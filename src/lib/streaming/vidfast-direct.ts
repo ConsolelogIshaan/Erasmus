@@ -39,7 +39,7 @@ export async function resolveVidfastDirectStream(input: {
   season?: number;
   episode?: number;
   serverId?: string;
-}): Promise<VidfastDirectHit | null> {
+}): Promise<{ hit: VidfastDirectHit | null; debug?: string }> {
   const pageUrl =
     input.type === "tv"
       ? `https://vidfast.vc/tv/${input.tmdbId}/${input.season ?? 1}/${input.episode ?? 1}`
@@ -50,13 +50,18 @@ export async function resolveVidfastDirectStream(input: {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
       signal: AbortSignal.timeout(8000),
     });
-    if (!pageRes.ok) return null;
+    if (!pageRes.ok) {
+      return { hit: null, debug: `page fetch failed: status ${pageRes.status}` };
+    }
     const html = await pageRes.text();
     const match = html.match(/\\"(?:en|token)\\":\\"([^\\"]+)\\"/);
-    if (!match?.[1]) return null;
+    if (!match?.[1]) {
+      return { hit: null, debug: `no session token found in page payload (html len ${html.length})` };
+    }
 
     const encRes = await fetch(
       `${ENC_API}/enc-vidfast?text=${encodeURIComponent(match[1])}`,
@@ -74,7 +79,7 @@ export async function resolveVidfastDirectStream(input: {
       !encJson.result?.stream ||
       !encJson.result?.token
     ) {
-      return null;
+      return { hit: null, debug: `enc-vidfast returned status ${encJson.status}` };
     }
 
     const { servers, stream, token } = encJson.result;
@@ -92,7 +97,9 @@ export async function resolveVidfastDirectStream(input: {
       signal: AbortSignal.timeout(6000),
     });
     const serversEncText = await serversRes.text();
-    if (!serversEncText) return null;
+    if (!serversEncText) {
+      return { hit: null, debug: `servers endpoint returned empty text (status ${serversRes.status})` };
+    }
 
     const decServersRes = await fetch(`${ENC_API}/dec-vidfast`, {
       method: "POST",
@@ -105,7 +112,7 @@ export async function resolveVidfastDirectStream(input: {
       result?: DecryptedServer[];
     };
     if (decServersJson.status !== 200 || !Array.isArray(decServersJson.result)) {
-      return null;
+      return { hit: null, debug: `dec-vidfast servers returned status ${decServersJson.status}` };
     }
 
     const serverList = decServersJson.result;
@@ -115,7 +122,9 @@ export async function resolveVidfastDirectStream(input: {
     const candidate =
       serverList.find((s) => preferredNames.includes(s.name) && s.data) ||
       serverList.find((s) => Boolean(s.data));
-    if (!candidate || !candidate.data) return null;
+    if (!candidate || !candidate.data) {
+      return { hit: null, debug: `no candidate with data found among ${serverList.length} servers` };
+    }
 
     const streamUrl = `${stream}/${candidate.data}`;
     const streamRes = await fetch(streamUrl, {
@@ -124,7 +133,9 @@ export async function resolveVidfastDirectStream(input: {
       signal: AbortSignal.timeout(6000),
     });
     const streamEncText = await streamRes.text();
-    if (!streamEncText) return null;
+    if (!streamEncText) {
+      return { hit: null, debug: `stream endpoint returned empty text (status ${streamRes.status})` };
+    }
 
     const decStreamRes = await fetch(`${ENC_API}/dec-vidfast`, {
       method: "POST",
@@ -137,16 +148,20 @@ export async function resolveVidfastDirectStream(input: {
       result?: { url?: string };
     };
     const streamResult = decStreamJson.result;
-    if (decStreamJson.status !== 200 || !streamResult?.url) return null;
+    if (decStreamJson.status !== 200 || !streamResult?.url) {
+      return { hit: null, debug: `dec-vidfast stream returned status ${decStreamJson.status}` };
+    }
 
     const finalUrl = streamResult.url;
     return {
-      url: finalUrl,
-      kind: finalUrl.includes(".mp4") ? "file" : "hls",
-      referer: VIDFAST_REFERER,
-      serverName: candidate.name,
+      hit: {
+        url: finalUrl,
+        kind: finalUrl.includes(".mp4") ? "file" : "hls",
+        referer: VIDFAST_REFERER,
+        serverName: candidate.name,
+      },
     };
-  } catch {
-    return null;
+  } catch (error) {
+    return { hit: null, debug: `vidfast exception: ${error instanceof Error ? error.message : String(error)}` };
   }
 }

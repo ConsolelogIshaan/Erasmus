@@ -21,6 +21,7 @@ export interface DirectServer {
 export interface DirectStreamResult {
   ok: boolean;
   error?: string;
+  debug?: string;
   referer?: string;
   captions?: CinejoyCaption[];
   servers: DirectServer[];
@@ -46,18 +47,19 @@ export async function extractDirectStream(input: {
   }
 
   const started = Date.now();
+  let debugLog = "";
   try {
     // 1. Primary: VidFast direct stream resolver (high-bitrate 4K/1080p HLS)
-    const vidfastHit = await resolveVidfastDirectStream(input);
-    if (vidfastHit?.url) {
+    const vidfastRes = await resolveVidfastDirectStream(input);
+    if (vidfastRes.hit?.url) {
       const result: DirectStreamResult = {
         ok: true,
-        referer: vidfastHit.referer,
+        referer: vidfastRes.hit.referer,
         servers: [
           {
-            name: vidfastHit.serverName,
-            url: vidfastHit.url,
-            kind: vidfastHit.kind,
+            name: vidfastRes.hit.serverName,
+            url: vidfastRes.hit.url,
+            kind: vidfastRes.hit.kind,
             ms: Date.now() - started,
           },
         ],
@@ -65,6 +67,7 @@ export async function extractDirectStream(input: {
       extractCache.set(cacheKey, { at: Date.now(), result });
       return result;
     }
+    if (vidfastRes.debug) debugLog += `vidfast: ${vidfastRes.debug}; `;
 
     // 2. Secondary: Cinejoy/Shegu stream resolver
     const hit = await resolveCinejoyStream(input);
@@ -86,9 +89,9 @@ export async function extractDirectStream(input: {
       return result;
     }
 
-    return { ok: false, error: "no stream", servers: [] };
+    return { ok: false, error: "no stream", debug: debugLog, servers: [] };
   } catch (error) {
     const message = error instanceof Error ? error.message : "resolve failed";
-    return { ok: false, error: message, servers: [] };
+    return { ok: false, error: message, debug: debugLog, servers: [] };
   }
 }
