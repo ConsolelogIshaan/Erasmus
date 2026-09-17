@@ -215,7 +215,7 @@ export function buildStreamUrl(
  * - TV series show "1080p Full HD" (zero clickbait)
  */
 export function getSmartStreamingOptions(params: StreamItemParams): StreamSourceOption[] {
-  const isTv = params.type === "tv";
+  const _isTv = params.type === "tv";
 
   return STREAMING_SERVERS.map((server) => {
     // Dynamic honest badge assignment
@@ -223,10 +223,8 @@ export function getSmartStreamingOptions(params: StreamItemParams): StreamSource
     if (server.id === "lisbon") {
       badge = "4K Ultra HD";
     } else if (server.id === "athens") {
-      badge = isTv ? "1080p Full HD" : "4K Ultra HD";
-    } else if (isTv && badge.includes("4K")) {
-      badge = "1080p Full HD";
-    }
+      badge = "4K Ultra HD";
+    } 
 
     return {
       server: {

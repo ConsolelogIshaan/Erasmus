@@ -9,11 +9,11 @@ const ENC_API = "https://enc-dec.app/api";
 export const VIDFAST_REFERER = "https://vidfast.vc/";
 
 const SERVER_PREFERENCES: Record<string, string[]> = {
-  lisbon: ["vRapid", "vEdge", "vFast", "Cine", "Cobra"],
+  lisbon: ["vFast", "vEdge", "vRapid", "Cobra", "Bravo", "Horizon", "Cine"],
   sakura: ["Cine", "vFast", "vRapid"],
   nebula: ["vEdge", "vFast", "Cobra"],
   solara: ["Horizon", "vFast", "vEdge"],
-  athens: ["vRapid", "vEdge", "vFast", "Cobra"],
+  athens: ["vFast", "vEdge", "vRapid", "Cobra", "Bravo", "Horizon"],
   joy: ["Bravo", "vFast", "vEdge"],
   castle: ["vRapid", "vFast", "Cobra"],
   canaias: ["vEdge", "Horizon", "Bravo"],
@@ -24,6 +24,9 @@ export interface VidfastDirectHit {
   kind: "hls" | "file";
   referer: string;
   serverName: string;
+  is4K?: boolean;
+  hdUrl?: string;
+  fourKUrl?: string;
 }
 
 interface DecryptedServer {
@@ -132,8 +135,8 @@ export async function resolveVidfastDirectStream(input: {
       }
     };
 
-    if (requestedServer === "lisbon") {
-      const fourKOrder = ["vRapid", "vEdge", "vFast"];
+    if (requestedServer === "lisbon" || requestedServer === "athens") {
+      const fourKOrder = ["vFast", "vEdge", "vRapid", "Cobra", "Bravo", "Horizon", "Cine"];
       for (const name of fourKOrder) {
         const match = serverList.find(
           (s) => s.name.toLowerCase() === name.toLowerCase() && s.data,
@@ -169,6 +172,30 @@ export async function resolveVidfastDirectStream(input: {
       };
     }
 
+    const resolveCandidateUrl = async (cand?: DecryptedServer): Promise<string | null> => {
+      if (!cand?.data) return null;
+      try {
+        const sUrl = `${stream}/${cand.data}`;
+        const sRes = await fetch(sUrl, {
+          method: "POST",
+          headers,
+          signal: AbortSignal.timeout(4500),
+        });
+        const sEnc = await sRes.text();
+        if (!sEnc) return null;
+        const dRes = await fetch(`${ENC_API}/dec-vidfast`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: sEnc }),
+          signal: AbortSignal.timeout(4500),
+        });
+        const dJson = (await dRes.json()) as { status?: number; result?: { url?: string } };
+        return dJson.status === 200 && dJson.result?.url ? dJson.result.url : null;
+      } catch {
+        return null;
+      }
+    };
+
     let lastError = "";
     for (const candidate of orderedCandidates.slice(0, 5)) {
       try {
@@ -197,12 +224,60 @@ export async function resolveVidfastDirectStream(input: {
         const streamResult = decStreamJson.result;
         if (decStreamJson.status === 200 && streamResult?.url) {
           const finalUrl = streamResult.url;
+          const is4K =
+            candidate.name.toLowerCase() === "vfast" ||
+            Boolean(candidate.description?.toLowerCase().includes("4k")) ||
+            Boolean(candidate.image?.includes("4k")) ||
+            finalUrl.includes("2160") ||
+            finalUrl.includes("4k") ||
+            finalUrl.includes("4K") ||
+            finalUrl.includes("cdn1") ||
+            requestedServer === "lisbon" ||
+            requestedServer === "athens";
+
+          let hdUrl: string | undefined = undefined;
+          let fourKUrl: string | undefined = undefined;
+
+          if (is4K) {
+            fourKUrl = finalUrl;
+            const hdCandidate = serverList.find(
+              (s) =>
+                s.data &&
+                s.name.toLowerCase() !== candidate.name.toLowerCase() &&
+                (s.name.toLowerCase() === "vedge" ||
+                  s.name.toLowerCase() === "vrapid" ||
+                  s.name.toLowerCase() === "cobra" ||
+                  s.name.toLowerCase() === "horizon"),
+            );
+            if (hdCandidate) {
+              const companionUrl = await resolveCandidateUrl(hdCandidate);
+              if (companionUrl) hdUrl = companionUrl;
+            }
+          } else {
+            hdUrl = finalUrl;
+            const fourKCandidate = serverList.find(
+              (s) =>
+                s.data &&
+                s.name.toLowerCase() !== candidate.name.toLowerCase() &&
+                (s.name.toLowerCase() === "vfast" ||
+                  Boolean(s.description?.toLowerCase().includes("4k")) ||
+                  Boolean(s.image?.includes("4k"))),
+            );
+            if (fourKCandidate) {
+              const companionUrl = await resolveCandidateUrl(fourKCandidate);
+              if (companionUrl) fourKUrl = companionUrl;
+            }
+          }
+
           return {
             hit: {
               url: finalUrl,
               kind: finalUrl.includes(".mp4") ? "file" : "hls",
               referer: VIDFAST_REFERER,
               serverName: candidate.name,
+              is4K,
+              hdUrl,
+              fourKUrl,
             },
           };
         }

@@ -16,6 +16,9 @@ export interface DirectServer {
   url: string;
   ms?: number;
   kind?: "hls" | "file";
+  is4K?: boolean;
+  hdUrl?: string;
+  fourKUrl?: string;
 }
 
 export interface DirectStreamResult {
@@ -60,6 +63,9 @@ export async function extractDirectStream(input: {
             name: vidfastRes.hit.serverName,
             url: vidfastRes.hit.url,
             kind: vidfastRes.hit.kind,
+            is4K: vidfastRes.hit.is4K,
+            hdUrl: vidfastRes.hit.hdUrl,
+            fourKUrl: vidfastRes.hit.fourKUrl,
             ms: Date.now() - started,
           },
         ],

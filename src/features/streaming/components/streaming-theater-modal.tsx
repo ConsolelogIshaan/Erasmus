@@ -361,6 +361,9 @@ export function StreamingTheaterModal({
   const [directSrc, setDirectSrc] = React.useState<string | null>(null);
   const [directKind, setDirectKind] = React.useState<"hls" | "file">("hls");
   const [directTried, setDirectTried] = React.useState(false);
+  const [directIs4K, setDirectIs4K] = React.useState(false);
+  const [directHdSrc, setDirectHdSrc] = React.useState<string | null>(null);
+  const [directFourKSrc, setDirectFourKSrc] = React.useState<string | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [selectedServerId, setSelectedServerId] = React.useState("lisbon");
   const [serversOpen, setServersOpen] = React.useState(false);
@@ -462,6 +465,9 @@ export function StreamingTheaterModal({
     let cancelled = false;
     setDirectTried(false);
     setDirectSrc(null);
+    setDirectIs4K(false);
+    setDirectHdSrc(null);
+    setDirectFourKSrc(null);
     setLoadError(null);
     const query = new URLSearchParams({
       type: mediaType,
@@ -485,6 +491,10 @@ export function StreamingTheaterModal({
           if (data.ok && hit?.url) {
             setDirectKind(hit.kind === "file" ? "file" : "hls");
             setDirectSrc(relayUrl(hit.url, data.referer));
+            setDirectIs4K(Boolean((hit as { is4K?: boolean })?.is4K));
+            const rawHit = hit as { hdUrl?: string; fourKUrl?: string };
+            setDirectHdSrc(rawHit.hdUrl ? relayUrl(rawHit.hdUrl, data.referer) : null);
+            setDirectFourKSrc(rawHit.fourKUrl ? relayUrl(rawHit.fourKUrl, data.referer) : null);
             if (data.captions?.length) {
               const relayed = data.captions.map((c) => ({
                 ...c,
@@ -937,6 +947,9 @@ export function StreamingTheaterModal({
                 startAt={startAt}
                 serverId={selectedServerId}
                 serverName={selectedServer.name}
+                is4KHint={directIs4K}
+                hdSrc={directHdSrc ?? undefined}
+                fourKSrc={directFourKSrc ?? undefined}
                 onOpenServers={() => setServersOpen(true)}
                 externalSubtitles={externalSubtitles}
                 onToggleFullscreen={toggleFullscreen}

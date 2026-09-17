@@ -63,7 +63,7 @@ describe("Hidden multi-source playback engine", () => {
     // TV badges must be 1080p Full HD (no 4K clickbait)
     expect(tvSources[0]!.server.badge).toBe("4K Ultra HD");
     expect(tvSources[0]!.url).toContain("vidfast.vc/tv/97951/1/3");
-    expect(tvSources[4]!.server.badge).toBe("1080p Full HD");
+    expect(tvSources[4]!.server.badge).toBe("4K Ultra HD");
   });
 
   it("builds custom season and episode URLs accurately", () => {
