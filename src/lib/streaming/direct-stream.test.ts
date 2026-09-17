@@ -128,4 +128,16 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
     expect(res.servers.length).toBeGreaterThan(0);
     expect(res.servers[0]?.url).toContain(".m3u8");
   }, 15000);
+  it("extracts 4K-capable direct stream for Off Campus TV series on Lisbon", async () => {
+    const res = await extractDirectStream({
+      type: "tv",
+      tmdbId: "273240",
+      season: 1,
+      episode: 1,
+      serverId: "lisbon",
+    });
+    expect(res.ok).toBe(true);
+    expect(res.servers.length).toBeGreaterThan(0);
+    expect(res.servers[0]?.url).toContain(".m3u8");
+  }, 15000);
 });

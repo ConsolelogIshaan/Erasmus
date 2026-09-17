@@ -51,7 +51,7 @@ describe("Hidden multi-source playback engine", () => {
     expect(movieSources[7]!.server.flag).toBe("🇧🇷");
   });
 
-  it("resolves all 8 servers for TV series with honest 1080p Full HD badges", () => {
+  it("resolves all 8 servers for TV series with 4K Lisbon and 1080p fallback badges", () => {
     const tvSources = getSmartStreamingOptions({
       type: "tv",
       tmdbId: "97951", // Severance
@@ -61,7 +61,7 @@ describe("Hidden multi-source playback engine", () => {
 
     expect(tvSources.length).toBe(8);
     // TV badges must be 1080p Full HD (no 4K clickbait)
-    expect(tvSources[0]!.server.badge).toBe("1080p Full HD");
+    expect(tvSources[0]!.server.badge).toBe("4K Ultra HD");
     expect(tvSources[0]!.url).toContain("vidfast.vc/tv/97951/1/3");
     expect(tvSources[4]!.server.badge).toBe("1080p Full HD");
   });

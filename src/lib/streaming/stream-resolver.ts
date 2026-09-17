@@ -42,7 +42,7 @@ export const STREAMING_SERVERS: StreamServer[] = [
     name: "Lisbon",
     flag: "🇺🇸",
     country: "US",
-    badge: "4K / 1080p",
+    badge: "4K Ultra HD",
     description: "Primary flagship server with ultra-high bitrate and multi-audio",
     isPrimary: true,
   },
@@ -220,10 +220,12 @@ export function getSmartStreamingOptions(params: StreamItemParams): StreamSource
   return STREAMING_SERVERS.map((server) => {
     // Dynamic honest badge assignment
     let badge = server.badge;
-    if (isTv && badge.includes("4K")) {
-      badge = "1080p Full HD";
-    } else if (!isTv && (server.id === "lisbon" || server.id === "athens")) {
+    if (server.id === "lisbon") {
       badge = "4K Ultra HD";
+    } else if (server.id === "athens") {
+      badge = isTv ? "1080p Full HD" : "4K Ultra HD";
+    } else if (isTv && badge.includes("4K")) {
+      badge = "1080p Full HD";
     }
 
     return {

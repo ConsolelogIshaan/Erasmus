@@ -42,7 +42,7 @@ describe("Randomized titles audit across all 8 streaming sources", () => {
       expect(options.length).toBe(8);
       // Primary Lisbon has 1080p Full HD badge
       expect(options[0]!.server.id).toBe("lisbon");
-      expect(options[0]!.server.badge).toBe("1080p Full HD");
+      expect(options[0]!.server.badge).toBe("4K Ultra HD");
       expect(options[0]!.url).toContain(`vidfast.vc/tv/${tmdbId}/${season}/${episode}`);
       // Sakura (anime/intl) server is ready
       expect(options[1]!.server.id).toBe("sakura");

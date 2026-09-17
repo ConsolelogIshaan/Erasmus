@@ -9,7 +9,7 @@ const ENC_API = "https://enc-dec.app/api";
 export const VIDFAST_REFERER = "https://vidfast.vc/";
 
 const SERVER_PREFERENCES: Record<string, string[]> = {
-  lisbon: ["vFast", "vRapid", "vEdge", "Cine", "Cobra"],
+  lisbon: ["vRapid", "vEdge", "vFast", "Cine", "Cobra"],
   sakura: ["Cine", "vFast", "vRapid"],
   nebula: ["vEdge", "vFast", "Cobra"],
   solara: ["Horizon", "vFast", "vEdge"],
@@ -116,50 +116,105 @@ export async function resolveVidfastDirectStream(input: {
     }
 
     const serverList = decServersJson.result;
+    const requestedServer = input.serverId || "lisbon";
     const preferredNames =
-      SERVER_PREFERENCES[input.serverId || "lisbon"] || ["vFast", "vRapid"];
+      SERVER_PREFERENCES[requestedServer] || ["vRapid", "vEdge", "vFast"];
 
-    const candidate =
-      serverList.find((s) => preferredNames.includes(s.name) && s.data) ||
-      serverList.find((s) => Boolean(s.data));
-    if (!candidate || !candidate.data) {
-      return { hit: null, debug: `no candidate with data found among ${serverList.length} servers` };
-    }
+    // Build ordered list of candidates:
+    // For Lisbon (flagship 4K server), prioritize servers that deliver 4K
+    const orderedCandidates: DecryptedServer[] = [];
+    const addedNames = new Set<string>();
 
-    const streamUrl = `${stream}/${candidate.data}`;
-    const streamRes = await fetch(streamUrl, {
-      method: "POST",
-      headers,
-      signal: AbortSignal.timeout(6000),
-    });
-    const streamEncText = await streamRes.text();
-    if (!streamEncText) {
-      return { hit: null, debug: `stream endpoint returned empty text (status ${streamRes.status})` };
-    }
-
-    const decStreamRes = await fetch(`${ENC_API}/dec-vidfast`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: streamEncText }),
-      signal: AbortSignal.timeout(6000),
-    });
-    const decStreamJson = (await decStreamRes.json()) as {
-      status?: number;
-      result?: { url?: string };
+    const pushCandidate = (s: DecryptedServer) => {
+      if (s.data && !addedNames.has(s.name)) {
+        addedNames.add(s.name);
+        orderedCandidates.push(s);
+      }
     };
-    const streamResult = decStreamJson.result;
-    if (decStreamJson.status !== 200 || !streamResult?.url) {
-      return { hit: null, debug: `dec-vidfast stream returned status ${decStreamJson.status}` };
+
+    if (requestedServer === "lisbon") {
+      const fourKOrder = ["vRapid", "vEdge", "vFast"];
+      for (const name of fourKOrder) {
+        const match = serverList.find(
+          (s) => s.name.toLowerCase() === name.toLowerCase() && s.data,
+        );
+        if (match) pushCandidate(match);
+      }
+      const other4K = serverList.filter(
+        (s) =>
+          s.data &&
+          (s.image?.includes("4k") ||
+            s.description?.toLowerCase().includes("4k")),
+      );
+      for (const s of other4K) {
+        pushCandidate(s);
+      }
     }
 
-    const finalUrl = streamResult.url;
+    for (const pref of preferredNames) {
+      const match = serverList.find(
+        (s) => s.name.toLowerCase() === pref.toLowerCase() && s.data,
+      );
+      if (match) pushCandidate(match);
+    }
+
+    for (const s of serverList) {
+      if (s.data) pushCandidate(s);
+    }
+
+    if (orderedCandidates.length === 0) {
+      return {
+        hit: null,
+        debug: `no candidate with data found among ${serverList.length} servers`,
+      };
+    }
+
+    let lastError = "";
+    for (const candidate of orderedCandidates.slice(0, 5)) {
+      try {
+        const streamUrl = `${stream}/${candidate.data}`;
+        const streamRes = await fetch(streamUrl, {
+          method: "POST",
+          headers,
+          signal: AbortSignal.timeout(6000),
+        });
+        const streamEncText = await streamRes.text();
+        if (!streamEncText) {
+          lastError = `${candidate.name}: empty response`;
+          continue;
+        }
+
+        const decStreamRes = await fetch(`${ENC_API}/dec-vidfast`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: streamEncText }),
+          signal: AbortSignal.timeout(6000),
+        });
+        const decStreamJson = (await decStreamRes.json()) as {
+          status?: number;
+          result?: { url?: string };
+        };
+        const streamResult = decStreamJson.result;
+        if (decStreamJson.status === 200 && streamResult?.url) {
+          const finalUrl = streamResult.url;
+          return {
+            hit: {
+              url: finalUrl,
+              kind: finalUrl.includes(".mp4") ? "file" : "hls",
+              referer: VIDFAST_REFERER,
+              serverName: candidate.name,
+            },
+          };
+        }
+        lastError = `${candidate.name}: returned status ${decStreamJson.status}`;
+      } catch (candErr) {
+        lastError = `${candidate.name}: ${candErr instanceof Error ? candErr.message : String(candErr)}`;
+      }
+    }
+
     return {
-      hit: {
-        url: finalUrl,
-        kind: finalUrl.includes(".mp4") ? "file" : "hls",
-        referer: VIDFAST_REFERER,
-        serverName: candidate.name,
-      },
+      hit: null,
+      debug: `tried ${orderedCandidates.length} servers, last error: ${lastError}`,
     };
   } catch (error) {
     return { hit: null, debug: `vidfast exception: ${error instanceof Error ? error.message : String(error)}` };

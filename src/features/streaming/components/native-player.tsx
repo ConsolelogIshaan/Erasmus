@@ -140,9 +140,10 @@ export function NativePlayer({
   const [volume, setVolume] = React.useState(1);
   const [speed, setSpeed] = React.useState(1);
   const [panel, setPanel] = React.useState<Panel>("none");
-  const [levels, setLevels] = React.useState<{ height: number; index: number }[]>([]);
+  const [levels, setLevels] = React.useState<{ height: number; width?: number; bitrate?: number; index: number }[]>([]);
   const [level, setLevel] = React.useState(-1);
   const [playingHeight, setPlayingHeight] = React.useState(0);
+  const [playingWidth, setPlayingWidth] = React.useState(0);
   const [audioTracks, setAudioTracks] = React.useState<{ name: string; index: number; lang?: string }[]>([{ name: "Track 1", index: 0 }]);
   const [audio, setAudio] = React.useState(0);
   const [subId, setSubId] = React.useState<string>("off");
@@ -268,6 +269,8 @@ export function NativePlayer({
         setLevels(
           hls.levels.map((item, index) => ({
             height: item.height || 0,
+            width: item.width || 0,
+            bitrate: item.bitrate || 0,
             index,
           })),
         );
@@ -275,15 +278,16 @@ export function NativePlayer({
         if (hls.levels.length > 0) {
           // Automatically select and lock to the highest quality available (4K > 1080p > 720p...)
           let highestIndex = 0;
-          let maxHeight = 0;
-          let maxBitrate = 0;
+          let maxScore = 0;
 
           hls.levels.forEach((lvl, idx) => {
             const h = lvl.height || 0;
+            const w = lvl.width || 0;
             const br = lvl.bitrate || 0;
-            if (h > maxHeight || (h === maxHeight && br > maxBitrate)) {
-              maxHeight = h;
-              maxBitrate = br;
+            const pixels = w > 0 && h > 0 ? w * h : h * h;
+            const score = pixels * 1000 + (br / 1000);
+            if (score > maxScore) {
+              maxScore = score;
               highestIndex = idx;
             }
           });
@@ -292,8 +296,10 @@ export function NativePlayer({
           hls.currentLevel = highestIndex;
           hls.loadLevel = highestIndex;
           setLevel(highestIndex);
-          if (maxHeight > 0) {
-            setPlayingHeight(maxHeight);
+          const topLevel = hls.levels[highestIndex];
+          if (topLevel) {
+            setPlayingHeight(topLevel.height || 0);
+            setPlayingWidth(topLevel.width || 0);
           }
         }
         startPlayback();
@@ -305,7 +311,11 @@ export function NativePlayer({
         if (data.id >= 0) setAudio(data.id);
       });
       hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
-        setPlayingHeight(hls.levels[data.level]?.height || 0);
+        const lvl = hls.levels[data.level];
+        if (lvl) {
+          setPlayingHeight(lvl.height || 0);
+          setPlayingWidth(lvl.width || 0);
+        }
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal) return;
@@ -360,12 +370,29 @@ export function NativePlayer({
   React.useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    const onDimensions = () => {
+      if (video.videoHeight > 0) {
+        setPlayingHeight((prev) => (prev > 0 ? prev : video.videoHeight));
+      }
+      if (video.videoWidth > 0) {
+        setPlayingWidth((prev) => (prev > 0 ? prev : video.videoWidth));
+      }
+    };
+    video.addEventListener("loadedmetadata", onDimensions);
+    video.addEventListener("resize", onDimensions);
+
     const onTime = () => {
       setCurrent(video.currentTime);
       setDuration(video.duration || 0);
       setPaused(video.paused);
       setCueText(cuesAtTime(cuesRef.current, video.currentTime));
       onProgress?.(video.currentTime, video.duration || 0);
+      if (video.videoHeight > 0 && playingHeight === 0) {
+        setPlayingHeight(video.videoHeight);
+      }
+      if (video.videoWidth > 0 && playingWidth === 0) {
+        setPlayingWidth(video.videoWidth);
+      }
     };
     const onWait = () => setBuffering(true);
     const onPlay = () => {
@@ -527,12 +554,42 @@ export function NativePlayer({
     video.currentTime = Math.max(0, seconds);
   };
 
+  const is4KSource = React.useCallback(
+    (dims?: { height?: number; width?: number }) => {
+      const w = dims?.width || 0;
+      const h = dims?.height || 0;
+      // 4K standard (3840x2160) or widescreen/cinematic 4K (3840x1920, 3840x1600)
+      if (w >= 3800 || h >= 2100) return true;
+      if (src && (src.includes("2160") || src.includes("4k") || src.includes("4K"))) return true;
+      return false;
+    },
+    [src],
+  );
+
+  const is1080pSource = React.useCallback(
+    (dims?: { height?: number; width?: number }) => {
+      const w = dims?.width || 0;
+      const h = dims?.height || 0;
+      if (is4KSource(dims)) return false;
+      if (w >= 1900 || h >= 1000) return true;
+      if (src && src.includes("1080")) return true;
+      return false;
+    },
+    [is4KSource, src],
+  );
+
   const applyLevel = (index: number) => {
     const hls = hlsRef.current;
     if (!hls) return;
     hls.currentLevel = index;
     setLevel(index);
-    if (index >= 0) setPlayingHeight(hls.levels[index]?.height || 0);
+    if (index >= 0) {
+      const lvl = hls.levels[index];
+      if (lvl) {
+        setPlayingHeight(lvl.height || 0);
+        setPlayingWidth(lvl.width || 0);
+      }
+    }
     setPanel("none");
   };
 
@@ -551,21 +608,32 @@ export function NativePlayer({
   };
 
   const qualityLabel = React.useMemo(() => {
+    const activeLevel = level >= 0 ? levels[level] : undefined;
+    const currentDims = activeLevel
+      ? { height: activeLevel.height, width: activeLevel.width }
+      : { height: playingHeight, width: playingWidth };
+
     if (level < 0) {
-      if (playingHeight >= 2160) return "Auto (4K)";
-      if (playingHeight >= 1080) return "Auto (HD)";
+      if (is4KSource(currentDims)) return "Auto (4K)";
+      if (is1080pSource(currentDims)) return "Auto (1080p)";
       if (playingHeight > 0) return `Auto (${playingHeight}p)`;
       return "Auto";
     }
-    const h = levels[level]?.height || 0;
-    if (h >= 2160) return "4K";
-    if (h >= 1080) return "HD";
-    return `${h}p`;
-  }, [level, levels, playingHeight]);
-  const selectedHeight = level >= 0 ? levels[level]?.height || 0 : 0;
+
+    if (is4KSource(currentDims)) return "4K";
+    if (is1080pSource(currentDims)) return "1080p";
+    if (activeLevel && activeLevel.height > 0) return `${activeLevel.height}p`;
+    return "HD";
+  }, [level, levels, playingHeight, playingWidth, is4KSource, is1080pSource]);
+
+  const activeLevel = level >= 0 ? levels[level] : undefined;
+  const currentQualityDims = activeLevel
+    ? { height: activeLevel.height, width: activeLevel.width }
+    : { height: playingHeight, width: playingWidth };
   const lisbon4k =
     serverId === "lisbon" &&
-    (playingHeight >= 2160 || selectedHeight >= 2160);
+    (is4KSource(currentQualityDims) ||
+      levels.some((lvl) => is4KSource({ height: lvl.height, width: lvl.width })));
 
   const activeSub =
     subId === "off"
@@ -1093,24 +1161,32 @@ export function NativePlayer({
                   key: "auto",
                   label: "Auto",
                   sublabel:
-                    playingHeight > 0
-                      ? `${playingHeight >= 2160 ? "4K (2160p)" : playingHeight >= 1080 ? "HD (1080p)" : `${playingHeight}p`} · Current`
+                    playingHeight > 0 || playingWidth > 0
+                      ? is4KSource({ height: playingHeight, width: playingWidth })
+                        ? "4K (2160p) · Current"
+                        : is1080pSource({ height: playingHeight, width: playingWidth })
+                          ? "1080p Full HD · Current"
+                          : `${playingHeight}p · Current`
                       : "Optimal",
                   active: level < 0,
                   onSelect: () => applyLevel(-1),
                 },
                 ...[...levels]
-                  .sort((a, b) => b.height - a.height)
+                  .sort((a, b) => {
+                    const scoreA = (a.width || 0) * (a.height || 0) || a.height * 1000;
+                    const scoreB = (b.width || 0) * (b.height || 0) || b.height * 1000;
+                    return scoreB - scoreA;
+                  })
                   .map((item) => {
                     let label = `${item.height}p`;
                     let sublabel: string | undefined = undefined;
 
-                    if (item.height >= 2160) {
+                    if (is4KSource({ height: item.height, width: item.width })) {
                       label = "4K";
-                      sublabel = "2160p";
-                    } else if (item.height >= 1080) {
-                      label = "HD";
-                      sublabel = "1080p";
+                      sublabel = "2160p Ultra HD";
+                    } else if (is1080pSource({ height: item.height, width: item.width })) {
+                      label = "1080p";
+                      sublabel = "Full HD";
                     } else if (item.height >= 720) {
                       label = "720p";
                       sublabel = "HD";
