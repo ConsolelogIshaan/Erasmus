@@ -13,7 +13,7 @@ const SERVER_PREFERENCES: Record<string, string[]> = {
   sakura: ["Cine", "vFast", "vRapid"],
   nebula: ["vEdge", "vFast", "Cobra"],
   solara: ["Horizon", "vFast", "vEdge"],
-  athens: ["Cobra", "vFast", "vRapid"],
+  athens: ["vRapid", "vEdge", "vFast", "Cobra"],
   joy: ["Bravo", "vFast", "vEdge"],
   castle: ["vRapid", "vFast", "Cobra"],
   canaias: ["vEdge", "Horizon", "Bravo"],

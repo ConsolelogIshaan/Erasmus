@@ -203,7 +203,6 @@ export function NativePlayer({
     if (!video || !src) return;
 
     const startPlayback = () => {
-      if (startAt > 0) video.currentTime = startAt;
       video.play().catch(() => {});
     };
 
@@ -266,40 +265,38 @@ export function NativePlayer({
       };
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        setLevels(
-          hls.levels.map((item, index) => ({
+        const validLevels = hls.levels
+          .map((item, index) => ({
             height: item.height || 0,
             width: item.width || 0,
             bitrate: item.bitrate || 0,
             index,
-          })),
-        );
+          }))
+          .filter((lvl) => lvl.height > 0 || lvl.width > 0);
+
+        setLevels(validLevels);
         syncAudio(hls.audioTracks);
-        if (hls.levels.length > 0) {
-          // Automatically select and lock to the highest quality available (4K > 1080p > 720p...)
-          let highestIndex = 0;
-          let maxScore = 0;
 
-          hls.levels.forEach((lvl, idx) => {
-            const h = lvl.height || 0;
-            const w = lvl.width || 0;
-            const br = lvl.bitrate || 0;
-            const pixels = w > 0 && h > 0 ? w * h : h * h;
-            const score = pixels * 1000 + (br / 1000);
-            if (score > maxScore) {
-              maxScore = score;
-              highestIndex = idx;
+        // Start in Auto (-1) so ABR buffers smoothly without freezing, while tracking top level
+        hls.currentLevel = -1;
+        setLevel(-1);
+
+        if (hls.levels.length > 0 && hls.levels[0]) {
+          let top = hls.levels[0];
+          let topScore = (top.width || 0) * (top.height || 0) || (top.height || 0) * 1000;
+          for (let i = 1; i < hls.levels.length; i++) {
+            const lvl = hls.levels[i];
+            if (lvl) {
+              const score = (lvl.width || 0) * (lvl.height || 0) || (lvl.height || 0) * 1000;
+              if (score > topScore) {
+                topScore = score;
+                top = lvl;
+              }
             }
-          });
-
-          hls.startLevel = highestIndex;
-          hls.currentLevel = highestIndex;
-          hls.loadLevel = highestIndex;
-          setLevel(highestIndex);
-          const topLevel = hls.levels[highestIndex];
-          if (topLevel) {
-            setPlayingHeight(topLevel.height || 0);
-            setPlayingWidth(topLevel.width || 0);
+          }
+          if (top) {
+            setPlayingHeight(top.height || 0);
+            setPlayingWidth(top.width || 0);
           }
         }
         startPlayback();
@@ -1172,13 +1169,14 @@ export function NativePlayer({
                   onSelect: () => applyLevel(-1),
                 },
                 ...[...levels]
+                  .filter((item) => item.height > 0 || (item.width && item.width > 0))
                   .sort((a, b) => {
                     const scoreA = (a.width || 0) * (a.height || 0) || a.height * 1000;
                     const scoreB = (b.width || 0) * (b.height || 0) || b.height * 1000;
                     return scoreB - scoreA;
                   })
                   .map((item) => {
-                    let label = `${item.height}p`;
+                    let label = item.height > 0 ? `${item.height}p` : "Standard";
                     let sublabel: string | undefined = undefined;
 
                     if (is4KSource({ height: item.height, width: item.width })) {
@@ -1193,7 +1191,7 @@ export function NativePlayer({
                     } else if (item.height >= 480) {
                       label = "480p";
                       sublabel = "SD";
-                    } else {
+                    } else if (item.height > 0) {
                       label = `${item.height}p`;
                     }
 
