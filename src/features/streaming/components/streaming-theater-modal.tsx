@@ -21,7 +21,7 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { STREAMING_SERVERS } from "@/lib/streaming/stream-resolver";
+import { STREAMING_SERVERS, buildStreamUrl } from "@/lib/streaming/stream-resolver";
 
 import {
   NativePlayer,
@@ -337,6 +337,7 @@ export function StreamingTheaterModal({
     identity?.posterPath ?? null
   );
   const [canonicalTitle, setCanonicalTitle] = React.useState<string>(title);
+  const [resolvedImdbId, setResolvedImdbId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open || !tmdbId) return;
@@ -349,6 +350,7 @@ export function StreamingTheaterModal({
         if (data.tagline) setResolvedTagline(data.tagline);
         if (data.posterPath) setResolvedPosterPath(data.posterPath);
         if (data.title && (title.includes(",") || title.length > 35)) setCanonicalTitle(data.title);
+        if ((data as any).imdbId) setResolvedImdbId((data as any).imdbId);
       })
       .catch(() => {});
     return () => {
@@ -545,6 +547,8 @@ export function StreamingTheaterModal({
     if (!open) return;
     let cancelled = false;
     const query = new URLSearchParams({ id: tmdbId });
+    if (resolvedImdbId) query.set("imdb", resolvedImdbId);
+    if (title) query.set("title", title);
     if (mediaType === "tv") {
       query.set("season", String(activeSeason));
       query.set("episode", String(activeEpisode));
@@ -556,9 +560,16 @@ export function StreamingTheaterModal({
         const tracks = data.tracks ?? [];
         if (tracks.length) {
           setExternalSubtitles((current) => {
-            const seen = new Set(current.map((c) => c.url));
-            const merged = [...current];
+            const seen = new Set<string>();
+            const merged: ExternalSubtitle[] = [];
+            // Prioritize rich tracks from /api/stream/subs
             for (const item of tracks) {
+              if (!seen.has(item.url)) {
+                seen.add(item.url);
+                merged.push(item);
+              }
+            }
+            for (const item of current) {
               if (!seen.has(item.url)) {
                 seen.add(item.url);
                 merged.push(item);
@@ -574,7 +585,7 @@ export function StreamingTheaterModal({
     return () => {
       cancelled = true;
     };
-  }, [open, mediaType, tmdbId, activeSeason, activeEpisode]);
+  }, [open, mediaType, tmdbId, activeSeason, activeEpisode, resolvedImdbId, title]);
 
   const persistProgress = React.useCallback(
     (seconds: number, duration: number | null) => {
@@ -917,7 +928,8 @@ export function StreamingTheaterModal({
             ref={containerRef}
             className="relative flex h-full w-full flex-col overflow-hidden bg-black select-none"
           >
-            {!directSrc && (
+            {/* Loading spinner while probing direct stream */}
+            {!directSrc && !directTried && (
               <div className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-3 bg-black">
                 <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-4 py-3 sm:px-6">
                   <button
@@ -928,7 +940,6 @@ export function StreamingTheaterModal({
                   >
                     <ArrowLeft className="h-5 w-5" />
                   </button>
-
                 </div>
                 <div className="flex h-12 w-12 items-center justify-center">
                   <div className="h-8 w-8 animate-spin rounded-full border-[2px] border-white/15 border-t-white" />
@@ -939,6 +950,74 @@ export function StreamingTheaterModal({
               </div>
             )}
 
+            {/* Cloud stream embed fallback when direct stream is not available or rejected */}
+            {open && !directSrc && directTried ? (
+              <div className="relative h-full w-full bg-black">
+                <iframe
+                  key={`${playerKey}-${selectedServerId}-${key}`}
+                  src={buildStreamUrl(selectedServerId, {
+                    type: mediaType,
+                    tmdbId,
+                    season: activeSeason,
+                    episode: activeEpisode,
+                    isAnime,
+                    startAtSeconds: startAt,
+                  })}
+                  className="h-full w-full border-0 bg-black"
+                  allowFullScreen
+                  allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                />
+
+                {/* Floating Top Header bar overlay */}
+                <div
+                  className={cn(
+                    "absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 py-3 sm:px-6",
+                    "bg-gradient-to-b from-black/80 via-black/40 to-transparent transition-opacity duration-300 pointer-events-auto",
+                    showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => onOpenChange(false)}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                      title="Back (Esc)"
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </button>
+                    <div>
+                      <h2 className="text-sm font-semibold text-white truncate max-w-[200px] sm:max-w-xs">
+                        {title}
+                      </h2>
+                      {mediaType === "tv" && (
+                        <p className="text-xs text-white/60">
+                          S{activeSeason}:E{activeEpisode}
+                          {currentEpisodeData?.name ? ` · ${currentEpisodeData.name}` : ""}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {topRightControls}
+                    <button
+                      type="button"
+                      onClick={toggleFullscreen}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                      title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                    >
+                      {isFullscreen ? (
+                        <Minimize2 className="h-4 w-4" />
+                      ) : (
+                        <Maximize2 className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Native player for direct HLS/MP4 streams */}
             {open && directSrc ? (
               <NativePlayer
                 key={playerKey}

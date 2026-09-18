@@ -17,12 +17,16 @@ import {
   Play,
   RotateCcw,
   RotateCw,
+  Search,
   Settings2,
   SkipForward,
+  Sliders,
   Subtitles,
   Tv2,
+  Upload,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 
 import { logoUrl } from "@/lib/media/image";
@@ -30,6 +34,9 @@ import { formatTimecode } from "@/lib/streaming/playback-progress";
 import {
   cuesAtTime,
   parseSubtitleCues,
+  NORM_LANG,
+  LANG_NAMES,
+  LANG_FLAGS,
   type SubtitleCue,
 } from "@/lib/streaming/subtitles";
 import { cn } from "@/lib/utils";
@@ -74,6 +81,8 @@ export interface ExternalSubtitle {
   label: string;
   language: string;
   url: string;
+  isExternal?: boolean;
+  hearingImpaired?: boolean;
 }
 
 export interface NativePlayerProps {
@@ -169,6 +178,11 @@ export function NativePlayer({
 
   const [subId, setSubId] = React.useState<string>("off");
   const [cueText, setCueText] = React.useState("");
+  const [subOffset, setSubOffset] = React.useState<number>(0);
+  const [customSubtitles, setCustomSubtitles] = React.useState<ExternalSubtitle[]>([]);
+  const allSubtitles = React.useMemo(() => {
+    return [...customSubtitles, ...externalSubtitles];
+  }, [customSubtitles, externalSubtitles]);
   const [buffering, setBuffering] = React.useState(false);
   const [showControls, setShowControls] = React.useState(true);
   const [showPauseOverlay, setShowPauseOverlay] = React.useState(false);
@@ -414,7 +428,7 @@ export function NativePlayer({
       setCurrent(video.currentTime);
       setDuration(video.duration || 0);
       setPaused(video.paused);
-      setCueText(cuesAtTime(cuesRef.current, video.currentTime));
+      setCueText(cuesAtTime(cuesRef.current, video.currentTime - subOffset));
       onProgress?.(video.currentTime, video.duration || 0);
       if (video.videoHeight > 0 && playingHeight === 0) {
         setPlayingHeight(video.videoHeight);
@@ -461,13 +475,19 @@ export function NativePlayer({
   }, [src]);
 
   React.useEffect(() => {
-    if (didAutoSub.current || externalSubtitles.length === 0) return;
-    const index = externalSubtitles.findIndex(
+    if (videoRef.current) {
+      setCueText(cuesAtTime(cuesRef.current, videoRef.current.currentTime - subOffset));
+    }
+  }, [subOffset]);
+
+  React.useEffect(() => {
+    if (didAutoSub.current || allSubtitles.length === 0) return;
+    const index = allSubtitles.findIndex(
       (sub) => sub.language === "en" || /^english/i.test(sub.label),
     );
     didAutoSub.current = true;
     setSubId(`ext-${index >= 0 ? index : 0}`);
-  }, [externalSubtitles]);
+  }, [allSubtitles]);
 
   // Default audio track to English if available across all movies and shows
   React.useEffect(() => {
@@ -502,8 +522,19 @@ export function NativePlayer({
       return;
     }
     const index = Number(subId.replace("ext-", ""));
-    const selected = externalSubtitles[index];
-    if (!selected?.url) {
+    const selected = allSubtitles[index];
+    if (!selected) {
+      cuesRef.current = [];
+      setCueText("");
+      return;
+    }
+    // If local uploaded file, cues are already in cuesRef
+    if (selected.url === "" && cuesRef.current.length > 0) {
+      const seconds = (videoRef.current?.currentTime ?? 0) - subOffset;
+      setCueText(cuesAtTime(cuesRef.current, seconds));
+      return;
+    }
+    if (!selected.url) {
       cuesRef.current = [];
       setCueText("");
       return;
@@ -518,18 +549,19 @@ export function NativePlayer({
       .then((text) => {
         if (cancelled) return;
         cuesRef.current = parseSubtitleCues(text);
-        const seconds = videoRef.current?.currentTime ?? 0;
+        const seconds = (videoRef.current?.currentTime ?? 0) - subOffset;
         setCueText(cuesAtTime(cuesRef.current, seconds));
       })
       .catch(() => {
-        if (cancelled) return;
-        cuesRef.current = [];
-        setCueText("");
+        if (!cancelled) {
+          cuesRef.current = [];
+          setCueText("");
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [subId, externalSubtitles]);
+  }, [subId, allSubtitles, subOffset]);
 
   React.useEffect(() => {
     const onMove = () => revealControls();
@@ -557,18 +589,18 @@ export function NativePlayer({
         video.muted = !video.muted;
         setMuted(video.muted);
       } else if (event.key === "c") {
-        if (externalSubtitles.length === 0) return;
+        if (allSubtitles.length === 0) return;
         setSubId((currentId) => {
           if (currentId === "off") return "ext-0";
           const index = Number(currentId.replace("ext-", ""));
-          return index + 1 >= externalSubtitles.length ? "off" : `ext-${index + 1}`;
+          return index + 1 >= allSubtitles.length ? "off" : `ext-${index + 1}`;
         });
       }
       revealControls();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [externalSubtitles.length, revealControls]);
+  }, [allSubtitles.length, revealControls]);
 
   React.useEffect(() => {
     return () => {
@@ -592,13 +624,11 @@ export function NativePlayer({
         if (w > 0 && h > 0 && w * h >= 5_500_000) return true;
         return false;
       }
-      if (dims?.url && (dims.url.includes("2160") || dims.url.includes("4k") || dims.url.includes("4K"))) return true;
-      if (activeSrc && (activeSrc.includes("2160") || activeSrc.includes("4k") || activeSrc.includes("4K") || activeSrc.includes("cdn1"))) return true;
-      if (is4KHint) return true;
-      if (serverId === "lisbon" || serverId === "athens") return true;
+      if (dims?.url && (dims.url.includes("2160") || dims.url.includes("/4k") || dims.url.includes("_4k"))) return true;
+      if (activeSrc && (activeSrc.includes("2160") || activeSrc.includes("/4k") || activeSrc.includes("_4k"))) return true;
       return false;
     },
-    [activeSrc, is4KHint, serverId],
+    [activeSrc],
   );
 
   const is1080pSource = React.useCallback(
@@ -656,8 +686,21 @@ export function NativePlayer({
           applyLevel(levels[idx]?.index ?? 0);
           return;
         }
+        // If no explicit 4K level found, select highest available resolution/bitrate tier
+        let bestIdx = -1;
+        let maxScore = -1;
+        levels.forEach((l, i) => {
+          const score = (l.width || 0) * (l.height || 0) || (l.height || 0) * 1000 || (l.bitrate || 0);
+          if (score > maxScore) {
+            maxScore = score;
+            bestIdx = l.index ?? i;
+          }
+        });
+        if (bestIdx >= 0) {
+          applyLevel(bestIdx);
+          return;
+        }
       }
-      applyLevel(0);
       return;
     }
 
@@ -681,6 +724,16 @@ export function NativePlayer({
         targetIndex = levels.findIndex(
           (l) => is1080pSource(l) || (l.height >= 950 && l.height < 1440),
         );
+        if (targetIndex < 0) {
+          let maxScore = -1;
+          levels.forEach((l, i) => {
+            const score = (l.width || 0) * (l.height || 0) || (l.height || 0);
+            if (score > maxScore) {
+              maxScore = score;
+              targetIndex = l.index ?? i;
+            }
+          });
+        }
       } else if (tier === "720p") {
         targetIndex = levels.findIndex((l) => l.height >= 650 && l.height < 950);
       } else if (tier === "480p") {
@@ -692,9 +745,20 @@ export function NativePlayer({
         applyLevel(levels[targetIndex]?.index ?? 0);
         return;
       }
+      // If requested tier not matched, find closest tier rather than potato level 0
+      let fallbackIdx = 0;
+      let minDiff = Infinity;
+      const targetHeight = tier === "720p" ? 720 : tier === "480p" ? 480 : 360;
+      levels.forEach((l, i) => {
+        const diff = Math.abs((l.height || 0) - targetHeight);
+        if (diff < minDiff) {
+          minDiff = diff;
+          fallbackIdx = l.index ?? i;
+        }
+      });
+      applyLevel(fallbackIdx);
+      return;
     }
-
-    applyLevel(0);
   };
 
   const applyAudio = (index: number) => {
@@ -725,7 +789,7 @@ export function NativePlayer({
         return "Auto (1080p)";
       }
       if (playingHeight > 0) return `Auto (${playingHeight}p)`;
-      if (is4KHint || serverId === "lisbon" || serverId === "athens") return "Auto (4K)";
+      if (is4KHint) return "Auto (4K)";
       return "Auto";
     }
 
@@ -735,22 +799,22 @@ export function NativePlayer({
     if (selectedQualityTier === "480p") return "480p";
     if (selectedQualityTier === "360p") return "360p";
     return "Auto";
-  }, [selectedQualityTier, level, levels, playingHeight, playingWidth, is4KSource, is1080pSource, is4KHint, serverId]);
+  }, [selectedQualityTier, level, levels, playingHeight, playingWidth, is4KSource, is1080pSource, is4KHint]);
 
   const activeLevel = level >= 0 ? levels[level] : undefined;
   const currentQualityDims = activeLevel
     ? { height: activeLevel.height, width: activeLevel.width }
     : { height: playingHeight, width: playingWidth };
   const lisbon4k =
-    (serverId === "lisbon" || serverId === "athens" || is4KHint) &&
+    is4KHint &&
+    (playingHeight >= 2000 || playingWidth >= 3500) &&
     (is4KSource(currentQualityDims) ||
-      levels.some((lvl) => is4KSource({ height: lvl.height, width: lvl.width, url: (lvl as { url?: string })?.url })) ||
-      is4KHint);
+      levels.some((lvl) => is4KSource({ height: lvl.height, width: lvl.width, url: (lvl as { url?: string })?.url })));
 
   const activeSub =
     subId === "off"
       ? "Off"
-      : externalSubtitles[Number(subId.replace("ext-", ""))]?.label || "On";
+      : allSubtitles[Number(subId.replace("ext-", ""))]?.label || "On";
 
   const isControlsActive = showControls || panel !== "none" || isExternalMenuOpen || paused;
 
@@ -775,18 +839,7 @@ export function NativePlayer({
       }}
     >
       {/* Video Surface */}
-      <div
-        className="absolute inset-0 z-0"
-        style={
-          lisbon4k
-            ? {
-                filter: "brightness(1.42)",
-                WebkitFilter: "brightness(1.42)",
-                isolation: "isolate",
-              }
-            : undefined
-        }
-      >
+      <div className="absolute inset-0 z-0">
         <video
           ref={videoRef}
           className="pointer-events-none h-full w-full bg-black object-contain"
@@ -1150,8 +1203,8 @@ export function NativePlayer({
                   onClick={() => {
                     if (subId !== "off") {
                       setSubId("off");
-                    } else if (externalSubtitles.length > 0) {
-                      const idx = externalSubtitles.findIndex((s) => s.language === "en" || /english/i.test(s.label));
+                    } else if (allSubtitles.length > 0) {
+                      const idx = allSubtitles.findIndex((s) => s.language === "en" || /english/i.test(s.label));
                       setSubId(`ext-${idx >= 0 ? idx : 0}`);
                     }
                   }}
@@ -1279,7 +1332,7 @@ export function NativePlayer({
                         : is1080pSource({ height: playingHeight, width: playingWidth })
                           ? "1080p Full HD · Current"
                           : `${playingHeight}p · Current`
-                      : (is4KHint || serverId === "lisbon" || serverId === "athens")
+                      : is4KHint
                         ? "4K (2160p) · Ultra HD"
                         : "Optimal",
                   active: selectedQualityTier === "auto",
@@ -1325,29 +1378,37 @@ export function NativePlayer({
           ) : null}
 
           {panel === "subs" ? (
-            <ChoiceList
-              title="Subtitles"
+            <SubtitlesPanel
+              subId={subId}
+              onSelectSub={(id) => {
+                setSubId(id);
+              }}
+              onClose={() => setPanel("none")}
               onBack={() => setPanel("settings")}
-              items={[
-                {
-                  key: "off",
-                  label: "Off",
-                  active: subId === "off",
-                  onSelect: () => {
-                    setSubId("off");
-                    setPanel("none");
-                  },
-                },
-                ...externalSubtitles.map((sub, index) => ({
-                  key: `${sub.language}-${index}`,
-                  label: sub.label,
-                  active: subId === `ext-${index}`,
-                  onSelect: () => {
-                    setSubId(`ext-${index}`);
-                    setPanel("none");
-                  },
-                })),
-              ]}
+              externalSubtitles={allSubtitles}
+              subOffset={subOffset}
+              onChangeOffset={(delta) => setSubOffset((prev) => Math.round((prev + delta) * 10) / 10)}
+              onResetOffset={() => setSubOffset(0)}
+              onUploadFile={(file) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const text = reader.result as string;
+                  if (!text) return;
+                  const cues = parseSubtitleCues(text);
+                  cuesRef.current = cues;
+                  const seconds = (videoRef.current?.currentTime ?? 0) - subOffset;
+                  setCueText(cuesAtTime(cues, seconds));
+                  const newCustom: ExternalSubtitle = {
+                    label: file.name.replace(/\.(srt|vtt|ass|sub)$/i, ""),
+                    language: "en",
+                    url: "",
+                    isExternal: true,
+                  };
+                  setCustomSubtitles((prev) => [newCustom, ...prev]);
+                  setSubId("ext-0");
+                };
+                reader.readAsText(file);
+              }}
             />
           ) : null}
         </div>
@@ -1402,6 +1463,460 @@ function MenuRow({
       <span>{label}</span>
       <span className="text-[12px] text-white/40">{value}</span>
     </button>
+  );
+}
+
+
+interface SubtitlesPanelProps {
+  subId: string;
+  onSelectSub: (id: string) => void;
+  onClose: () => void;
+  onBack?: () => void;
+  externalSubtitles: ExternalSubtitle[];
+  subOffset: number;
+  onChangeOffset: (delta: number) => void;
+  onResetOffset: () => void;
+  onUploadFile: (file: File) => void;
+}
+
+function SubtitlesPanel({
+  subId,
+  onSelectSub,
+  onClose,
+  onBack,
+  externalSubtitles,
+  subOffset,
+  onChangeOffset,
+  onResetOffset,
+  onUploadFile,
+}: SubtitlesPanelProps) {
+  const [drillLang, setDrillLang] = React.useState<string | null>(null);
+  const [timingOpen, setTimingOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Group subtitles by language
+  const groups = React.useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        langCode: string;
+        langName: string;
+        flag: string;
+        items: { sub: ExternalSubtitle; globalIndex: number }[];
+      }
+    >();
+
+    externalSubtitles.forEach((sub, index) => {
+      const rawLang = (sub.language || "").toLowerCase();
+      const norm = NORM_LANG[rawLang] || rawLang || "en";
+      const langName = LANG_NAMES[norm] || sub.language || "Unknown";
+      const flag = LANG_FLAGS[norm] || "🌐";
+
+      if (!map.has(norm)) {
+        map.set(norm, {
+          langCode: norm,
+          langName,
+          flag,
+          items: [],
+        });
+      }
+      map.get(norm)!.items.push({ sub, globalIndex: index });
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.langCode === "en") return -1;
+      if (b.langCode === "en") return 1;
+      return a.langName.localeCompare(b.langName);
+    });
+  }, [externalSubtitles]);
+
+  // View 1: Timing / Audio Sync adjustment
+  if (timingOpen) {
+    return (
+      <div className="flex max-h-[60vh] sm:max-h-[500px] w-80 sm:w-96 flex-col select-none">
+        <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setTimingOpen(false)}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <p className="text-xs font-bold tracking-wider uppercase text-white/90">
+              Sync Subtitle to Audio
+            </p>
+          </div>
+          <span className="text-[11px] font-mono text-white/40">Timing</span>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="flex flex-col items-center justify-center py-4 bg-white/[0.04] rounded-2xl border border-white/[0.08]">
+            <span className="text-3xl font-mono font-bold tracking-tight text-white">
+              {subOffset > 0 ? `+${subOffset.toFixed(1)}s` : `${subOffset.toFixed(1)}s`}
+            </span>
+            <span className="text-xs text-white/50 mt-1">
+              {subOffset === 0
+                ? "Subtitles in default sync"
+                : subOffset > 0
+                ? "Subtitles appear earlier (+)"
+                : "Subtitles appear later (-)"}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-1.5">
+              <button
+                type="button"
+                onClick={() => onChangeOffset(-1)}
+                className="flex-1 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 py-2 text-xs font-mono font-semibold text-white transition-all border border-white/[0.06]"
+              >
+                -1.0s
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeOffset(-0.5)}
+                className="flex-1 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 py-2 text-xs font-mono font-semibold text-white transition-all border border-white/[0.06]"
+              >
+                -0.5s
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeOffset(-0.1)}
+                className="flex-1 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 py-2 text-xs font-mono font-semibold text-white transition-all border border-white/[0.06]"
+              >
+                -0.1s
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeOffset(0.1)}
+                className="flex-1 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 py-2 text-xs font-mono font-semibold text-white transition-all border border-white/[0.06]"
+              >
+                +0.1s
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeOffset(0.5)}
+                className="flex-1 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 py-2 text-xs font-mono font-semibold text-white transition-all border border-white/[0.06]"
+              >
+                +0.5s
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeOffset(1)}
+                className="flex-1 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 py-2 text-xs font-mono font-semibold text-white transition-all border border-white/[0.06]"
+              >
+                +1.0s
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onResetOffset}
+              disabled={subOffset === 0}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] disabled:opacity-40 disabled:pointer-events-none py-2 text-xs font-medium text-white/80 transition-all border border-white/[0.06]"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Reset to 0.0s</span>
+            </button>
+          </div>
+
+          <p className="text-[11px] text-white/40 text-center leading-relaxed">
+            Adjust subtitle offset to match dialogue if the track starts earlier or later.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // View 2: Drilled into a specific language (e.g. English, Portuguese, etc.)
+  if (drillLang) {
+    const group = groups.find((g) => g.langCode === drillLang);
+    const rawItems = group?.items || [];
+    const q = search.trim().toLowerCase();
+    const filteredItems = q
+      ? rawItems.filter(
+          (item) =>
+            item.sub.label.toLowerCase().includes(q) ||
+            item.sub.language.toLowerCase().includes(q),
+        )
+      : rawItems;
+
+    return (
+      <div className="flex max-h-[60vh] sm:max-h-[500px] w-80 sm:w-96 flex-col select-none">
+        <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => {
+                setDrillLang(null);
+                setSearch("");
+              }}
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-base shrink-0">{group?.flag}</span>
+            <p className="text-xs font-bold tracking-wider uppercase text-white/90 truncate">
+              {group?.langName || "Language"}
+            </p>
+          </div>
+          <span className="text-[11px] font-mono text-white/40 shrink-0 ml-2">
+            {rawItems.length} options
+          </span>
+        </div>
+
+        {rawItems.length > 5 && (
+          <div className="p-2 border-b border-white/[0.06]">
+            <div className="relative flex items-center">
+              <Search className="absolute left-3 h-3.5 w-3.5 text-white/40" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search releases (1080p, IMAX, YIFY...)"
+                className="w-full rounded-xl bg-white/[0.06] border border-white/[0.08] pl-8 pr-7 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20 focus:bg-white/[0.08]"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-2.5 text-white/40 hover:text-white"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="overflow-y-auto py-1.5 px-2 space-y-1 scrollbar-thin">
+          {filteredItems.map((item) => {
+            const active = subId === `ext-${item.globalIndex}`;
+            return (
+              <button
+                key={item.globalIndex}
+                type="button"
+                className={cn(
+                  "group flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-all duration-150",
+                  active
+                    ? "bg-white/[0.12] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] border border-white/[0.1]"
+                    : "text-white/80 hover:bg-white/[0.06] hover:text-white border border-transparent active:scale-[0.98]",
+                )}
+                onClick={() => {
+                  onSelectSub(`ext-${item.globalIndex}`);
+                }}
+              >
+                <div className="flex flex-col items-start min-w-0 pr-2">
+                  <span className="text-xs font-medium tracking-wide text-white truncate max-w-[210px] sm:max-w-[250px]" title={item.sub.label}>
+                    {item.sub.label}
+                  </span>
+                  {item.sub.isExternal ? (
+                    <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded bg-white/[0.08] text-[9px] font-mono tracking-wider text-white/50 uppercase border border-white/[0.06]">
+                      EXTERNAL
+                    </span>
+                  ) : null}
+                </div>
+                {active ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400 fill-emerald-400/20 shrink-0 ml-1.5" />
+                ) : null}
+              </button>
+            );
+          })}
+          {filteredItems.length === 0 && (
+            <p className="py-6 text-center text-xs text-white/40">No releases found matching "{search}"</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // View 3: Main Subtitles menu (Matches Cinejoy Screenshot 2)
+  const q = search.trim().toLowerCase();
+  const filteredGroups = q
+    ? groups.filter(
+        (g) =>
+          g.langName.toLowerCase().includes(q) ||
+          g.langCode.toLowerCase().includes(q) ||
+          g.items.some((i) => i.sub.label.toLowerCase().includes(q)),
+      )
+    : groups;
+
+  return (
+    <div className="flex max-h-[60vh] sm:max-h-[500px] w-80 sm:w-96 flex-col select-none">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".srt,.vtt,.ass,.sub"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onUploadFile(file);
+        }}
+      />
+
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5">
+        <div className="flex items-center gap-2">
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          ) : null}
+          <p className="text-xs font-bold tracking-wider uppercase text-white/90">Subtitles</p>
+        </div>
+        <span className="text-[11px] font-mono text-white/40">Options</span>
+      </div>
+
+      {/* Top Actions: Off, Upload, Sync */}
+      <div className="p-2 border-b border-white/[0.06] space-y-1">
+        {/* Off Option */}
+        <button
+          type="button"
+          onClick={() => {
+            onSelectSub("off");
+            onClose();
+          }}
+          className={cn(
+            "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-all duration-150",
+            subId === "off"
+              ? "bg-white/[0.12] text-white border border-white/[0.1]"
+              : "text-white/80 hover:bg-white/[0.06] hover:text-white border border-transparent active:scale-[0.98]",
+          )}
+        >
+          <span className="text-sm font-semibold tracking-wide text-white">Off</span>
+          {subId === "off" ? (
+            <CheckCircle2 className="h-4 w-4 text-emerald-400 fill-emerald-400/20 shrink-0" />
+          ) : null}
+        </button>
+
+        {/* Upload Subtitle File */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-white/80 hover:bg-white/[0.06] hover:text-white border border-transparent transition-all duration-150 active:scale-[0.98]"
+        >
+          <div className="flex items-center gap-2.5">
+            <Upload className="h-4 w-4 text-white/60" />
+            <span className="text-xs font-medium tracking-wide text-white/90">Upload subtitle file</span>
+          </div>
+          <span className="text-[10px] font-mono text-white/40 uppercase">SRT / VTT</span>
+        </button>
+
+        {/* Sync Subtitle to Audio */}
+        <button
+          type="button"
+          onClick={() => setTimingOpen(true)}
+          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-white/80 hover:bg-white/[0.06] hover:text-white border border-transparent transition-all duration-150 active:scale-[0.98]"
+        >
+          <div className="flex items-center gap-2.5">
+            <Sliders className="h-4 w-4 text-white/60" />
+            <span className="text-xs font-medium tracking-wide text-white/90">Sync subtitle to audio</span>
+          </div>
+          <div className="flex items-center gap-1">
+            {subOffset !== 0 ? (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold">
+                {subOffset > 0 ? `+${subOffset.toFixed(1)}s` : `${subOffset.toFixed(1)}s`}
+              </span>
+            ) : null}
+            <ChevronRight className="h-4 w-4 text-white/40" />
+          </div>
+        </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="p-2 border-b border-white/[0.06]">
+        <div className="relative flex items-center">
+          <Search className="absolute left-3 h-3.5 w-3.5 text-white/40" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search languages or releases..."
+            className="w-full rounded-xl bg-white/[0.06] border border-white/[0.08] pl-8 pr-7 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20 focus:bg-white/[0.08]"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 text-white/40 hover:text-white"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Grouped Languages List */}
+      <div className="overflow-y-auto py-1.5 px-2 space-y-1 scrollbar-thin">
+        {filteredGroups.map((group) => {
+          const count = group.items.length;
+          const hasMultiple = count > 1;
+          const isSingleActive =
+            !hasMultiple && subId === `ext-${group.items[0]?.globalIndex}`;
+          const isAnyInGroupActive = group.items.some(
+            (i) => subId === `ext-${i.globalIndex}`,
+          );
+
+          return (
+            <button
+              key={group.langCode}
+              type="button"
+              className={cn(
+                "group flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-all duration-150",
+                isSingleActive || isAnyInGroupActive
+                  ? "bg-white/[0.1] text-white border border-white/[0.1]"
+                  : "text-white/80 hover:bg-white/[0.06] hover:text-white border border-transparent active:scale-[0.98]",
+              )}
+              onClick={() => {
+                if (hasMultiple) {
+                  setDrillLang(group.langCode);
+                  setSearch("");
+                } else if (group.items[0]) {
+                  onSelectSub(`ext-${group.items[0].globalIndex}`);
+                }
+              }}
+            >
+              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                <span className="text-base shrink-0">{group.flag}</span>
+                <span className="text-xs font-semibold tracking-wide text-white truncate">
+                  {group.langName}
+                </span>
+                {!hasMultiple ? (
+                  <span className="px-1.5 py-0.2 rounded bg-white/[0.08] text-[9px] font-mono text-white/50 uppercase border border-white/[0.06]">
+                    EXTERNAL
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                {hasMultiple ? (
+                  <>
+                    <span className="text-xs font-mono font-medium text-white/70">
+                      {count}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-white/40 transition-transform group-hover:translate-x-0.5" />
+                  </>
+                ) : isSingleActive ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400 fill-emerald-400/20" />
+                ) : null}
+              </div>
+            </button>
+          );
+        })}
+        {filteredGroups.length === 0 && (
+          <p className="py-6 text-center text-xs text-white/40">No subtitles found matching "{search}"</p>
+        )}
+      </div>
+    </div>
   );
 }
 

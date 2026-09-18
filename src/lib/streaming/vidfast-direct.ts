@@ -9,14 +9,14 @@ const ENC_API = "https://enc-dec.app/api";
 export const VIDFAST_REFERER = "https://vidfast.vc/";
 
 const SERVER_PREFERENCES: Record<string, string[]> = {
-  lisbon: ["vFast", "vEdge", "vRapid", "Horizon", "vBlaze", "Cobra", "Bravo", "Cine"],
-  sakura: ["vRapid", "vEdge", "Cine", "vFast", "vBlaze", "Horizon"],
-  nebula: ["vEdge", "vFast", "vRapid", "Cobra", "Horizon"],
-  solara: ["Horizon", "vEdge", "vRapid", "vFast", "vBlaze"],
-  athens: ["vFast", "vEdge", "vRapid", "Horizon", "Cobra", "Bravo"],
-  joy: ["Bravo", "vEdge", "vRapid", "vFast", "Horizon"],
+  lisbon: ["vFast", "vEdge", "vRapid", "vBlaze", "Cobra", "Bravo", "Cine"],
+  sakura: ["Bravo", "vRapid", "vEdge", "Cine", "vFast", "vBlaze"],
+  nebula: ["vEdge", "vFast", "vRapid", "Cobra"],
+  solara: ["vEdge", "vRapid", "vFast", "vBlaze"],
+  athens: ["vFast", "vEdge", "vRapid", "Cobra", "Bravo"],
+  joy: ["Bravo", "vEdge", "vRapid", "vFast"],
   castle: ["vRapid", "vEdge", "vFast", "Cobra", "vBlaze"],
-  canaias: ["vEdge", "Horizon", "vRapid", "Bravo", "vFast"],
+  canaias: ["vEdge", "vRapid", "Bravo", "vFast"],
 };
 
 export interface VidfastDirectHit {
@@ -84,6 +84,28 @@ export function getAlternateTvCoordinates(
       add(1, episode + 24, "s1-cour24-absolute");
       add(1, episode + 25, "s1-cour25-absolute");
       add(1, episode + 26, "s1-cour26-absolute");
+      add(1, episode + 52, "s1-cour52-absolute");
+      add(2, episode + 52, "s2-tmdb52-absolute");
+      if (episode > 52) {
+        add(2, episode - 52, "s2-rel52-relative");
+        add(1, episode, "s1-absolute");
+      }
+    }
+    if (season === 3) {
+      add(1, episode + 104, "s1-cour104-absolute");
+      add(3, episode + 104, "s3-tmdb104-absolute");
+      if (episode > 104) {
+        add(3, episode - 104, "s3-rel104-relative");
+        add(1, episode, "s1-absolute");
+      }
+    }
+    if (season === 4) {
+      add(1, episode + 158, "s1-cour158-absolute");
+      add(4, episode + 158, "s4-tmdb158-absolute");
+      if (episode > 158) {
+        add(4, episode - 158, "s4-rel158-relative");
+        add(1, episode, "s1-absolute");
+      }
     }
     add(1, (season - 1) * 12 + episode, `s1-calc-12x${season - 1}`);
     add(1, (season - 1) * 13 + episode, `s1-calc-13x${season - 1}`);
@@ -196,13 +218,21 @@ async function resolveVidfastDirectStreamSingle(input: {
 
     const pushCandidate = (s: DecryptedServer) => {
       if (s.data && !addedNames.has(s.name)) {
+        if (s.name.toLowerCase() === "horizon") return;
         addedNames.add(s.name);
         orderedCandidates.push(s);
       }
     };
 
+    // Prioritize Bravo for known title collision placeholders (e.g. Demon Slayer Infinity Castle TMDB 1311031)
+    // where Peakstorm serves an unrelated live-action placeholder
+    if (cleanId === "1311031" || requestedServer === "sakura" || requestedServer === "joy") {
+      const bravo = serverList.find((s) => s.name.toLowerCase() === "bravo" && s.data);
+      if (bravo) pushCandidate(bravo);
+    }
+
     if (requestedServer === "lisbon" || requestedServer === "athens") {
-      const fourKOrder = ["vFast", "vEdge", "vRapid", "Horizon", "Cobra", "vBlaze", "Bravo", "Cine"];
+      const fourKOrder = ["vFast", "vEdge", "vRapid", "Cobra", "vBlaze", "Bravo", "Cine"];
       for (const name of fourKOrder) {
         const match = serverList.find(
           (s) => s.name.toLowerCase() === name.toLowerCase() && s.data,
@@ -296,16 +326,19 @@ async function resolveVidfastDirectStreamSingle(input: {
         const streamResult = decStreamJson.result;
         if (decStreamJson.status === 200 && streamResult?.url) {
           const finalUrl = streamResult.url;
+          if (finalUrl.includes("sun.peakstorm.top/r6") || candidate.name.toLowerCase() === "horizon") {
+            lastError = `${candidate.name}: 502 zombie rejected`;
+            continue;
+          }
           const is4K =
+            cleanId === "224372" ||
             candidate.name.toLowerCase() === "vfast" ||
             Boolean(candidate.description?.toLowerCase().includes("4k")) ||
             Boolean(candidate.image?.includes("4k")) ||
             finalUrl.includes("2160") ||
-            finalUrl.includes("4k") ||
-            finalUrl.includes("4K") ||
-            finalUrl.includes("cdn1") ||
-            requestedServer === "lisbon" ||
-            requestedServer === "athens";
+            finalUrl.includes("/4k") ||
+            finalUrl.includes("_4k") ||
+            finalUrl.includes("-4k");
 
           let hdUrl: string | undefined = undefined;
           let fourKUrl: string | undefined = undefined;
@@ -327,6 +360,7 @@ async function resolveVidfastDirectStreamSingle(input: {
                 const companionUrl = await resolveCandidateUrl(hdCandidate);
                 if (companionUrl) hdUrl = companionUrl;
               }
+              if (!hdUrl) hdUrl = finalUrl;
             } else {
               hdUrl = finalUrl;
               const fourKCandidate = serverList.find(

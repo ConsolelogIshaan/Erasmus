@@ -19,11 +19,26 @@ export async function GET(request: Request) {
           Referer: "https://cinejoy.to/",
         },
         redirect: "follow",
+        signal: AbortSignal.timeout(8000),
       });
       if (!response.ok) {
         return NextResponse.json({ error: "failed to fetch external subtitle" }, { status: 502 });
       }
-      const text = await response.text();
+
+      const buffer = await response.arrayBuffer();
+      if (!buffer || buffer.byteLength === 0) {
+        return NextResponse.json({ error: "empty subtitle" }, { status: 502 });
+      }
+
+      let text: string;
+      const bytes = new Uint8Array(buffer);
+      if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+        const { gunzipSync } = await import("node:zlib");
+        text = gunzipSync(Buffer.from(buffer)).toString("utf-8");
+      } else {
+        text = new TextDecoder("utf-8").decode(buffer);
+      }
+
       let vtt = text;
       if (isAssText(text)) {
         vtt = assToVtt(text);

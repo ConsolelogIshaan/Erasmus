@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
           tagline: movie?.tagline ?? null,
           overview: movie?.overview ?? null,
           title: movie?.title ?? null,
+          imdbId: movie?.imdbId ?? null,
         },
         {
           headers: {
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
           tagline: show?.tagline ?? null,
           overview: show?.overview ?? null,
           title: show?.title ?? null,
+          imdbId: show?.imdbId ?? null,
         },
         {
           headers: {
