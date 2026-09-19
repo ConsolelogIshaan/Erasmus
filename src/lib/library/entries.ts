@@ -337,6 +337,15 @@ export async function listLibrary(
   userId: string,
   filters: LibraryListFilters = {},
 ): Promise<LibraryListResult> {
+  if (userId.startsWith("local-user-")) {
+    return {
+      items: [],
+      total: 0,
+      page: filters.page ?? 1,
+      pageSize: filters.pageSize ?? 24,
+    };
+  }
+
   const supabase = await createClient();
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 24));
@@ -411,6 +420,10 @@ export async function getContinueWatching(
   userId: string,
   limit = 12,
 ): Promise<LibraryEntry[]> {
+  if (userId.startsWith("local-user-")) {
+    return [];
+  }
+
   const supabase = await createClient();
   const { data, error } = await table(supabase, "library_entries")
     .select("*")
@@ -438,6 +451,10 @@ export async function searchLibrary(
   tags: { id: string; name: string }[];
   collections: { id: string; name: string; description: string | null }[];
 }> {
+  if (userId.startsWith("local-user-")) {
+    return { entries: [], notes: [], reviews: [], tags: [], collections: [] };
+  }
+
   const supabase = await createClient();
   const term = q.trim();
   if (!term) {

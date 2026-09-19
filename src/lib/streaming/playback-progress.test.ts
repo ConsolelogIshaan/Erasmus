@@ -1,8 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
-  clearPlaybackProgress,
   clearRecentPlaybackItem,
-  clearTvShowResume,
   formatTimecode,
   getPlaybackProgress,
   getRecentPlayback,
@@ -11,8 +9,6 @@ import {
   progressKey,
   resumeSeconds,
   savePlaybackProgress,
-  saveRecentPlaybackItem,
-  saveTvShowResume,
   shouldResume,
   tvLastKey,
   type PlaybackProgress,

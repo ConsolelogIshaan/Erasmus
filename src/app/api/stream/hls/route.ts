@@ -103,6 +103,7 @@ function isDirectCdnSegment(rawUrl: string): boolean {
     if (
       host.includes("solarpanelcleaning") ||
       host.includes("shegu.st") ||
+      host.includes("keenanchor.top") ||
       host.includes("cloudflare") ||
       host.includes("cloudfront") ||
       host.includes("fastly") ||
@@ -206,6 +207,9 @@ export async function GET(request: Request) {
       headers: {
         "Content-Type": "application/vnd.apple.mpegurl; charset=utf-8",
         "Cache-Control": "no-cache",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
       },
     });
 
@@ -270,3 +274,15 @@ export async function GET(request: Request) {
     },
   });
 }
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+      "Access-Control-Allow-Headers": "*",
+    },
+  });
+}
+

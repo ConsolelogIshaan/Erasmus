@@ -35,6 +35,20 @@ export interface IntelligenceRawData {
 }
 
 export async function loadIntelligenceData(userId: string): Promise<IntelligenceRawData> {
+  if (userId.startsWith("local-user-")) {
+    return {
+      entries: [],
+      sessions: [],
+      reviews: [],
+      notes: [],
+      tags: [],
+      tagAssignments: [],
+      collections: [],
+      activity: [],
+      episodeProgress: [],
+    };
+  }
+
   const supabase = await createClient();
 
   const [

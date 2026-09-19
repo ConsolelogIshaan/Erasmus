@@ -14,6 +14,8 @@ export async function GET(request: Request) {
   const title = searchParams.get("title") || undefined;
   const year = searchParams.get("year") || undefined;
   const imdbId = searchParams.get("imdb") || undefined;
+  const anilistIdParam = searchParams.get("anilistId") || searchParams.get("anilist");
+  const anilistId = anilistIdParam ? Number(anilistIdParam) : undefined;
   if (!tmdbId) {
     return NextResponse.json({ ok: false, error: "missing id" }, { status: 400 });
   }
@@ -27,6 +29,7 @@ export async function GET(request: Request) {
     title,
     year,
     imdbId,
+    anilistId,
   });
   const status = result.ok ? 200 : 502;
   return NextResponse.json(result, { status });

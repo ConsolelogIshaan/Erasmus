@@ -43,9 +43,14 @@ export async function updateSession(request: NextRequest) {
   }
 
   const allCookies = request.cookies.getAll();
-  const hasAuthCookie = allCookies.some(
+  const hasLocalUserCookie = request.cookies.has("sb-local-auth-user");
+  const hasRemoteAuthCookie = allCookies.some(
     (c) => c.name.startsWith("sb-") && (c.name.includes("-auth-token") || c.name.endsWith("-token")),
   );
+
+  if (request.cookies.has("sb-local-auth-token")) {
+    supabaseResponse.cookies.delete("sb-local-auth-token");
+  }
 
   const isProtected = PROTECTED_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
@@ -54,9 +59,26 @@ export async function updateSession(request: NextRequest) {
     (route) => pathname === route || pathname.startsWith(`${route}/`),
   );
 
-  // If there is no auth cookie, the user is definitely unauthenticated.
+  // If a local user session is active and there is no real remote Supabase token,
+  // allow protected routes through and redirect auth routes to dashboard.
+  if (hasLocalUserCookie && !hasRemoteAuthCookie) {
+    if (isAuthRoute) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = ROUTES.dashboard;
+      redirectUrl.search = "";
+      return NextResponse.redirect(redirectUrl);
+    }
+    return supabaseResponse;
+  }
+
+  // If remote Supabase session is present, clean up local fallback cookie
+  if (hasRemoteAuthCookie && hasLocalUserCookie) {
+    supabaseResponse.cookies.delete("sb-local-auth-user");
+  }
+
+  // If there is no auth cookie at all, the user is definitely unauthenticated.
   // Avoid an unnecessary remote network round-trip on public or unauthenticated page loads.
-  if (!hasAuthCookie) {
+  if (!hasRemoteAuthCookie) {
     if (isProtected) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = ROUTES.login;

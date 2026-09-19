@@ -57,7 +57,7 @@ const LANG_DISPLAY: Record<string, string> = {
 export function formatCaptionLabel(label: string, language: string, url: string): string {
   const urlLower = url.toLowerCase();
   const langKey = (language || label).toLowerCase();
-  let name = LANG_DISPLAY[langKey] || label || language;
+  const name = LANG_DISPLAY[langKey] || label || language;
   if (langKey.startsWith("zh") || name === "Chinese") {
     if (urlLower.includes("traditional") || langKey === "zht") return "Chinese (Traditional)";
     if (urlLower.includes("simplified") || langKey === "zhs") return "Chinese (Simplified)";

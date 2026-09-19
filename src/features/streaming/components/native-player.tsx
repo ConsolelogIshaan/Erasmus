@@ -4,7 +4,6 @@ import * as React from "react";
 import Hls from "hls.js";
 import {
   ArrowLeft,
-  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -111,6 +110,7 @@ export interface NativePlayerProps {
   onNextEpisode?: () => void;
   topRightControls?: React.ReactNode;
   isExternalMenuOpen?: boolean;
+  onSelectServer?: (serverId: string) => void;
 }
 
 type Panel = "none" | "settings" | "subs" | "audio" | "quality" | "speed";
@@ -121,7 +121,7 @@ export function NativePlayer({
   src,
   startAt = 0,
   kind = "hls",
-  serverId,
+  serverId: _serverId,
   serverName,
   is4KHint = false,
   hdSrc,
@@ -142,6 +142,7 @@ export function NativePlayer({
   onNextEpisode,
   topRightControls,
   isExternalMenuOpen = false,
+  onSelectServer,
 }: NativePlayerProps) {
   const rootRef = React.useRef<HTMLDivElement>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
@@ -169,11 +170,17 @@ export function NativePlayer({
     "auto" | "4k" | "1080p" | "720p" | "480p" | "360p"
   >("auto");
   const switchTimeRef = React.useRef<number | null>(null);
+  const [isMutedAutoplay, setIsMutedAutoplay] = React.useState(false);
+  const [streamError, setStreamError] = React.useState<string | null>(null);
+  const fatalErrorsRef = React.useRef(0);
 
   React.useEffect(() => {
     setActiveSrc(src);
     setSelectedQualityTier("auto");
     switchTimeRef.current = null;
+    setIsMutedAutoplay(false);
+    setStreamError(null);
+    fatalErrorsRef.current = 0;
   }, [src]);
 
   const [subId, setSubId] = React.useState<string>("off");
@@ -190,6 +197,10 @@ export function NativePlayer({
   const pauseTimerRef = React.useRef<number | null>(null);
   const didAutoSub = React.useRef(false);
   const didAutoAudio = React.useRef(false);
+  const onNextEpisodeRef = React.useRef(onNextEpisode);
+  React.useEffect(() => {
+    onNextEpisodeRef.current = onNextEpisode;
+  }, [onNextEpisode]);
 
   React.useEffect(() => {
     setLogoFailed(false);
@@ -237,8 +248,39 @@ export function NativePlayer({
     const video = videoRef.current;
     if (!video || !activeSrc) return;
 
+    setLevels([]);
+    setPlayingHeight(0);
+    setPlayingWidth(0);
+    setSelectedQualityTier("auto");
+    setLevel(-1);
+
     const startPlayback = () => {
-      video.play().catch(() => {});
+      const p = video.play();
+      if (p !== undefined) {
+        p.then(() => {
+          setBuffering(false);
+          setPaused(false);
+          setStreamError(null);
+        }).catch((err) => {
+          // Autoplay was blocked by browser policy (common after async fetch or server switch)
+          // Fall back to muted playback so playback begins immediately without freezing
+          console.warn("[NativePlayer] Unmuted play blocked, attempting muted autoplay:", err);
+          video.muted = true;
+          video.play()
+            .then(() => {
+              setBuffering(false);
+              setPaused(false);
+              setIsMutedAutoplay(true);
+              setStreamError(null);
+            })
+            .catch(() => {
+              // Even muted autoplay was blocked; pause cleanly and clear buffering spinner
+              setBuffering(false);
+              setPaused(true);
+              setShowControls(true);
+            });
+        });
+      }
     };
 
     const initialPosition =
@@ -258,7 +300,7 @@ export function NativePlayer({
         capLevelToPlayerSize: false,
         startPosition: initialPosition,
         renderTextTracksNatively: false,
-        enableWebVTT: false,
+        enableWebVTT: true,
         startFragPrefetch: true,
         progressive: true,
         maxBufferLength: 60,
@@ -269,7 +311,7 @@ export function NativePlayer({
         nudgeOffset: 0.1,
         nudgeMaxRetry: 10,
         lowLatencyMode: false,
-        backBufferLength: 60,
+        backBufferLength: 90,
       });
       hlsRef.current = hls;
       hls.loadSource(activeSrc);
@@ -333,6 +375,27 @@ export function NativePlayer({
         setLevels(validLevels);
         syncAudio(hls.audioTracks);
 
+        // Pre-select English audio track synchronously before buffering starts
+        if (hls.audioTracks && hls.audioTracks.length > 1) {
+          const engIdx = hls.audioTracks.findIndex((t) => {
+            const lang = (t.lang || "").toLowerCase();
+            const name = (t.name || "").toLowerCase();
+            return (
+              lang === "en" ||
+              lang === "eng" ||
+              lang.startsWith("en-") ||
+              /(^|\b)(en|eng|english)($|\b)/i.test(name) ||
+              name.includes("english")
+            );
+          });
+          const target = engIdx >= 0 ? engIdx : 1;
+          if (target >= 0 && target < hls.audioTracks.length) {
+            hls.audioTrack = target;
+            setAudio(target);
+            didAutoAudio.current = true;
+          }
+        }
+
         // Start in Auto (-1) so ABR buffers smoothly without freezing, while tracking top level
         hls.currentLevel = -1;
         setLevel(-1);
@@ -370,6 +433,11 @@ export function NativePlayer({
           setPlayingWidth(lvl.width || 0);
         }
       });
+      hls.on(Hls.Events.FRAG_BUFFERED, () => {
+        if (!video.paused) {
+          setBuffering(false);
+        }
+      });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
           hls.startLoad();
@@ -379,21 +447,34 @@ export function NativePlayer({
           return;
         }
         if (!data.fatal) return;
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
-        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+        fatalErrorsRef.current += 1;
+        console.warn("[NativePlayer] Hls fatal error:", data.type, data.details, "attempt:", fatalErrorsRef.current);
+        if (fatalErrorsRef.current <= 2) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            hls.startLoad();
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls.recoverMediaError();
+          }
+        } else {
+          setBuffering(false);
+          setStreamError(`Stream interrupted on ${serverName || "this server"}. Please try another server.`);
+        }
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = activeSrc;
       video.addEventListener("loadedmetadata", () => {
-        const v = video as any;
+        type TrackItem = { language?: string; label?: string; enabled?: boolean };
+        const v = video as HTMLVideoElement & {
+          audioTracks?: ArrayLike<TrackItem>;
+        };
         if (v.audioTracks && v.audioTracks.length > 0) {
           const rawTracks = Array.from(v.audioTracks);
-          const hasExplicitEnglish = rawTracks.some((t: any) => {
+          const hasExplicitEnglish = rawTracks.some((t: TrackItem) => {
             const lang = (t.language || "").toLowerCase();
             const label = (t.label || "").toLowerCase();
             return lang === "en" || lang === "eng" || label.includes("english");
           });
-          const mapped = rawTracks.map((t: any, i: number) => {
+          const mapped = rawTracks.map((t: TrackItem, i: number) => {
             let name = t.label || `Track ${i + 1}`;
             if (!hasExplicitEnglish && rawTracks.length >= 2 && i === 1) {
               name = `English (${name})`;
@@ -411,7 +492,10 @@ export function NativePlayer({
           if (targetIndex < 0 && mapped.length >= 2) targetIndex = 1;
           const selected = targetIndex >= 0 ? targetIndex : 0;
           for (let i = 0; i < v.audioTracks.length; i++) {
-            v.audioTracks[i].enabled = i === selected;
+            const track = v.audioTracks[i];
+            if (track) {
+              track.enabled = i === selected;
+            }
           }
           setAudio(selected);
         }
@@ -425,66 +509,99 @@ export function NativePlayer({
       video.removeAttribute("src");
       video.load();
     };
-  }, [activeSrc, startAt, kind]);
+  }, [activeSrc, startAt, kind, serverName]);
 
   React.useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     const onDimensions = () => {
       if (video.videoHeight > 0) {
-        setPlayingHeight((prev) => (prev > 0 ? prev : video.videoHeight));
+        setPlayingHeight(video.videoHeight);
       }
       if (video.videoWidth > 0) {
-        setPlayingWidth((prev) => (prev > 0 ? prev : video.videoWidth));
+        setPlayingWidth(video.videoWidth);
       }
     };
     video.addEventListener("loadedmetadata", onDimensions);
     video.addEventListener("resize", onDimensions);
 
     const onTime = () => {
+      if (buffering && !video.paused) {
+        setBuffering(false);
+      }
       setCurrent(video.currentTime);
       setDuration(video.duration || 0);
       setPaused(video.paused);
       setCueText(cuesAtTime(cuesRef.current, video.currentTime - subOffset));
       onProgress?.(video.currentTime, video.duration || 0);
-      if (video.videoHeight > 0 && playingHeight === 0) {
+      if (video.videoHeight > 0) {
         setPlayingHeight(video.videoHeight);
       }
-      if (video.videoWidth > 0 && playingWidth === 0) {
+      if (video.videoWidth > 0) {
         setPlayingWidth(video.videoWidth);
       }
     };
-    const onWait = () => setBuffering(true);
+    const onWait = () => {
+      if (!video.paused) {
+        setBuffering(true);
+      }
+    };
     const onPlay = () => {
       setBuffering(false);
       setPaused(false);
       revealControls();
     };
     const onPause = () => {
+      setBuffering(false);
       setPaused(true);
       setShowControls(true);
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
     };
-    const onEnded = () => {
-      if (onNextEpisode) {
-        onNextEpisode();
+    const onCanPlay = () => {
+      setBuffering(false);
+    };
+    const onPlaying = () => {
+      setBuffering(false);
+      setPaused(false);
+    };
+    const onSeeking = () => {
+      setBuffering(true);
+    };
+    const onSeeked = () => {
+      if (video.readyState >= 2) {
+        setBuffering(false);
       }
     };
+    const onEnded = () => {
+      onNextEpisodeRef.current?.();
+    };
+
     video.addEventListener("timeupdate", onTime);
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("waiting", onWait);
-    video.addEventListener("playing", onPlay);
+    video.addEventListener("playing", onPlaying);
+    video.addEventListener("canplay", onCanPlay);
+    video.addEventListener("canplaythrough", onCanPlay);
+    video.addEventListener("seeking", onSeeking);
+    video.addEventListener("seeked", onSeeked);
     video.addEventListener("ended", onEnded);
+
     return () => {
+      video.removeEventListener("loadedmetadata", onDimensions);
+      video.removeEventListener("resize", onDimensions);
       video.removeEventListener("timeupdate", onTime);
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("waiting", onWait);
-      video.removeEventListener("playing", onPlay);
+      video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("canplay", onCanPlay);
+      video.removeEventListener("canplaythrough", onCanPlay);
+      video.removeEventListener("seeking", onSeeking);
+      video.removeEventListener("seeked", onSeeked);
       video.removeEventListener("ended", onEnded);
     };
-  }, [onProgress, revealControls]);
+  }, [onProgress, revealControls, buffering]);
 
   React.useEffect(() => {
     didAutoSub.current = false;
@@ -505,6 +622,23 @@ export function NativePlayer({
     didAutoSub.current = true;
     setSubId(`ext-${index >= 0 ? index : 0}`);
   }, [allSubtitles]);
+
+  const applyAudio = React.useCallback((index: number) => {
+    const hls = hlsRef.current;
+    const video = videoRef.current as HTMLVideoElement & {
+      audioTracks?: ArrayLike<{ enabled: boolean }>;
+    };
+    if (hls && hls.audioTracks && hls.audioTracks.length > index) {
+      hls.audioTrack = index;
+    } else if (video && video.audioTracks && video.audioTracks.length > index) {
+      for (let i = 0; i < video.audioTracks.length; i++) {
+        const track = video.audioTracks[i];
+        if (track) track.enabled = i === index;
+      }
+    }
+    setAudio(index);
+    setPanel("none");
+  }, []);
 
   // Default audio track to English if available across all movies and shows
   React.useEffect(() => {
@@ -530,7 +664,7 @@ export function NativePlayer({
     if (target !== audio) {
       applyAudio(target);
     }
-  }, [audioTracks, audio]);
+  }, [audioTracks, audio, applyAudio]);
 
   React.useEffect(() => {
     if (subId === "off") {
@@ -641,8 +775,8 @@ export function NativePlayer({
         if (w > 0 && h > 0 && w * h >= 5_500_000) return true;
         return false;
       }
-      if (dims?.url && (dims.url.includes("2160") || dims.url.includes("/4k") || dims.url.includes("_4k"))) return true;
-      if (activeSrc && (activeSrc.includes("2160") || activeSrc.includes("/4k") || activeSrc.includes("_4k"))) return true;
+      if (dims?.url && (dims.url.includes("2160") || /(^|[._\s/-])4k([._\s/-]|$)/i.test(dims.url))) return true;
+      if (activeSrc && (activeSrc.includes("2160") || /(^|[._\s/-])4k([._\s/-]|$)/i.test(activeSrc))) return true;
       return false;
     },
     [activeSrc],
@@ -653,14 +787,44 @@ export function NativePlayer({
       if (is4KSource(dims)) return false;
       const w = dims?.width || 0;
       const h = dims?.height || 0;
-      if (w >= 1800 || h >= 950) return true;
-      if (w > 0 && h > 0 && w * h >= 1_800_000) return true;
-      if (dims?.url && dims.url.includes("1080")) return true;
-      if (activeSrc && activeSrc.includes("1080")) return true;
+      if (w > 0 || h > 0) {
+        if (w >= 1800 || h >= 950) return true;
+        if (w > 0 && h > 0 && w * h >= 1_800_000) return true;
+        return false;
+      }
+      if (dims?.url && (dims.url.includes("1080") || /(^|[._\s/-])1080p?([._\s/-]|$)/i.test(dims.url))) return true;
+      if (activeSrc && (activeSrc.includes("1080") || /(^|[._\s/-])1080p?([._\s/-]|$)/i.test(activeSrc))) return true;
       return false;
     },
     [is4KSource, activeSrc],
   );
+
+  const has4KSupport = React.useMemo(() => {
+    // 1. If HLS manifest has parsed levels, check if ANY level satisfies 4K
+    if (levels.length > 0) {
+      return levels.some((lvl) => is4KSource(lvl));
+    }
+    // 2. If video element dimensions are known, check if current playing resolution is 4K
+    if (playingHeight > 0 || playingWidth > 0) {
+      return is4KSource({ height: playingHeight, width: playingWidth });
+    }
+    // 3. If fourKSrc is distinct from hdSrc and contains explicit 4K indicators
+    if (
+      fourKSrc &&
+      fourKSrc !== hdSrc &&
+      (fourKSrc.includes("2160") || /(^|[._\s/-])4k([._\s/-]|$)/i.test(fourKSrc))
+    ) {
+      return true;
+    }
+    // 4. If activeSrc itself contains explicit 4K indicators
+    if (
+      activeSrc &&
+      (activeSrc.includes("2160") || /(^|[._\s/-])4k([._\s/-]|$)/i.test(activeSrc))
+    ) {
+      return true;
+    }
+    return false;
+  }, [levels, is4KSource, playingHeight, playingWidth, fourKSrc, hdSrc, activeSrc]);
 
   const applyLevel = (index: number) => {
     const hls = hlsRef.current;
@@ -717,6 +881,9 @@ export function NativePlayer({
           applyLevel(bestIdx);
           return;
         }
+      }
+      if (has4KSupport) {
+        applyLevel(0);
       }
       return;
     }
@@ -778,20 +945,6 @@ export function NativePlayer({
     }
   };
 
-  const applyAudio = (index: number) => {
-    const hls = hlsRef.current;
-    const video = videoRef.current as any;
-    if (hls && hls.audioTracks && hls.audioTracks.length > index) {
-      hls.audioTrack = index;
-    } else if (video && video.audioTracks && video.audioTracks.length > index) {
-      for (let i = 0; i < video.audioTracks.length; i++) {
-        video.audioTracks[i].enabled = i === index;
-      }
-    }
-    setAudio(index);
-    setPanel("none");
-  };
-
   const qualityLabel = React.useMemo(() => {
     if (selectedQualityTier === "auto") {
       const activeLevel = level >= 0 ? levels[level] : undefined;
@@ -806,7 +959,7 @@ export function NativePlayer({
         return "Auto (1080p)";
       }
       if (playingHeight > 0) return `Auto (${playingHeight}p)`;
-      if (is4KHint) return "Auto (4K)";
+      if (has4KSupport || is4KHint) return "Auto (4K)";
       return "Auto";
     }
 
@@ -816,17 +969,7 @@ export function NativePlayer({
     if (selectedQualityTier === "480p") return "480p";
     if (selectedQualityTier === "360p") return "360p";
     return "Auto";
-  }, [selectedQualityTier, level, levels, playingHeight, playingWidth, is4KSource, is1080pSource, is4KHint]);
-
-  const activeLevel = level >= 0 ? levels[level] : undefined;
-  const currentQualityDims = activeLevel
-    ? { height: activeLevel.height, width: activeLevel.width }
-    : { height: playingHeight, width: playingWidth };
-  const lisbon4k =
-    is4KHint &&
-    (playingHeight >= 2000 || playingWidth >= 3500) &&
-    (is4KSource(currentQualityDims) ||
-      levels.some((lvl) => is4KSource({ height: lvl.height, width: lvl.width, url: (lvl as { url?: string })?.url })));
+  }, [selectedQualityTier, level, levels, playingHeight, playingWidth, is4KSource, is1080pSource, is4KHint, has4KSupport]);
 
   const activeSub =
     subId === "off"
@@ -851,6 +994,10 @@ export function NativePlayer({
         }
         const video = videoRef.current;
         if (!video) return;
+        if (isMutedAutoplay) {
+          video.muted = false;
+          setIsMutedAutoplay(false);
+        }
         if (video.paused) video.play().catch(() => {});
         else video.pause();
       }}
@@ -1003,10 +1150,81 @@ export function NativePlayer({
         </div>
       ) : null}
 
+
       {/* Buffering Spinner */}
-      {buffering ? (
+      {buffering && !paused && !streamError ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
-          <div className="h-9 w-9 animate-spin rounded-full border-[2px] border-white/15 border-t-white" />
+          <div className="h-10 w-10 animate-spin rounded-full border-[2.5px] border-white/15 border-t-white shadow-2xl" />
+        </div>
+      ) : null}
+
+      {/* Unmute notification banner if autoplay began in muted mode */}
+      {isMutedAutoplay && !paused ? (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const video = videoRef.current;
+              if (video) {
+                video.muted = false;
+                setIsMutedAutoplay(false);
+              }
+            }}
+            className="flex items-center gap-2 rounded-full bg-black/85 px-4 py-2 text-xs font-semibold text-white shadow-2xl backdrop-blur-xl border border-white/25 hover:bg-black/95 hover:border-white/40 transition-all cursor-pointer"
+          >
+            <VolumeX className="h-4 w-4 text-amber-400 animate-pulse" />
+            <span>Sound is muted — click anywhere to unmute</span>
+          </button>
+        </div>
+      ) : null}
+
+      {/* Stream Error Overlay */}
+      {streamError ? (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/90 p-6 text-center">
+          <p className="text-sm font-medium text-white/80">{streamError}</p>
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setStreamError(null);
+                fatalErrorsRef.current = 0;
+                const hls = hlsRef.current;
+                if (hls) {
+                  hls.loadSource(activeSrc);
+                  hls.startLoad();
+                }
+              }}
+              className="rounded-full bg-white/15 border border-white/25 px-4 py-1.5 text-xs font-semibold text-white hover:bg-white/25 transition-colors cursor-pointer"
+            >
+              Retry
+            </button>
+            {onSelectServer ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectServer("lisbon");
+                }}
+                className="rounded-full bg-white/25 border border-white/40 px-4 py-1.5 text-xs font-semibold text-white hover:bg-white/35 transition-colors cursor-pointer"
+              >
+                ⚡ Switch to Lisbon 4K
+              </button>
+            ) : null}
+            {onOpenServers ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenServers();
+                }}
+                className="rounded-full bg-white/10 px-4 py-1.5 text-xs font-medium text-white/70 hover:text-white transition-colors cursor-pointer"
+              >
+                Choose Server
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -1349,19 +1567,23 @@ export function NativePlayer({
                         : is1080pSource({ height: playingHeight, width: playingWidth })
                           ? "1080p Full HD · Current"
                           : `${playingHeight}p · Current`
-                      : is4KHint
+                      : has4KSupport || is4KHint
                         ? "4K (2160p) · Ultra HD"
                         : "Optimal",
                   active: selectedQualityTier === "auto",
                   onSelect: () => selectQualityTier("auto"),
                 },
-                {
-                  key: "4k",
-                  label: "4K",
-                  sublabel: "2160p Ultra HD",
-                  active: selectedQualityTier === "4k",
-                  onSelect: () => selectQualityTier("4k"),
-                },
+                ...(has4KSupport
+                  ? [
+                      {
+                        key: "4k" as const,
+                        label: "4K",
+                        sublabel: "2160p Ultra HD",
+                        active: selectedQualityTier === "4k",
+                        onSelect: () => selectQualityTier("4k"),
+                      },
+                    ]
+                  : []),
                 {
                   key: "1080p",
                   label: "1080p",
@@ -1462,28 +1684,6 @@ function IconButton({
   );
 }
 
-function MenuRow({
-  label,
-  value,
-  onClick,
-}: {
-  label: string;
-  value: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-[13px] text-white/90 transition-colors duration-150 hover:bg-white/[0.06]"
-      onClick={onClick}
-    >
-      <span>{label}</span>
-      <span className="text-[12px] text-white/40">{value}</span>
-    </button>
-  );
-}
-
-
 interface SubtitlesPanelProps {
   subId: string;
   onSelectSub: (id: string) => void;
@@ -1512,7 +1712,6 @@ function SubtitlesPanel({
   const [search, setSearch] = React.useState("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Group subtitles by language
   const groups = React.useMemo(() => {
     const map = new Map<
       string,
@@ -1548,7 +1747,6 @@ function SubtitlesPanel({
     });
   }, [externalSubtitles]);
 
-  // View 1: Timing / Audio Sync adjustment
   if (timingOpen) {
     return (
       <div className="flex max-h-[60vh] sm:max-h-[500px] w-80 sm:w-96 flex-col select-none">
@@ -1648,7 +1846,6 @@ function SubtitlesPanel({
     );
   }
 
-  // View 2: Drilled into a specific language (e.g. English, Portuguese, etc.)
   if (drillLang) {
     const group = groups.find((g) => g.langCode === drillLang);
     const rawItems = group?.items || [];
@@ -1744,14 +1941,13 @@ function SubtitlesPanel({
             );
           })}
           {filteredItems.length === 0 && (
-            <p className="py-6 text-center text-xs text-white/40">No releases found matching "{search}"</p>
+            <p className="py-6 text-center text-xs text-white/40">No releases found matching &ldquo;{search}&rdquo;</p>
           )}
         </div>
       </div>
     );
   }
 
-  // View 3: Main Subtitles menu (Matches Cinejoy Screenshot 2)
   const q = search.trim().toLowerCase();
   const filteredGroups = q
     ? groups.filter(
@@ -1775,7 +1971,6 @@ function SubtitlesPanel({
         }}
       />
 
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5">
         <div className="flex items-center gap-2">
           {onBack ? (
@@ -1793,9 +1988,7 @@ function SubtitlesPanel({
         <span className="text-[11px] font-mono text-white/40">Options</span>
       </div>
 
-      {/* Top Actions: Off, Upload, Sync */}
       <div className="p-2 border-b border-white/[0.06] space-y-1">
-        {/* Off Option */}
         <button
           type="button"
           onClick={() => {
@@ -1815,7 +2008,6 @@ function SubtitlesPanel({
           ) : null}
         </button>
 
-        {/* Upload Subtitle File */}
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
@@ -1828,7 +2020,6 @@ function SubtitlesPanel({
           <span className="text-[10px] font-mono text-white/40 uppercase">SRT / VTT</span>
         </button>
 
-        {/* Sync Subtitle to Audio */}
         <button
           type="button"
           onClick={() => setTimingOpen(true)}
@@ -1849,7 +2040,6 @@ function SubtitlesPanel({
         </button>
       </div>
 
-      {/* Search Bar */}
       <div className="p-2 border-b border-white/[0.06]">
         <div className="relative flex items-center">
           <Search className="absolute left-3 h-3.5 w-3.5 text-white/40" />
@@ -1872,7 +2062,6 @@ function SubtitlesPanel({
         </div>
       </div>
 
-      {/* Grouped Languages List */}
       <div className="overflow-y-auto py-1.5 px-2 space-y-1 scrollbar-thin">
         {filteredGroups.map((group) => {
           const count = group.items.length;
@@ -1930,12 +2119,13 @@ function SubtitlesPanel({
           );
         })}
         {filteredGroups.length === 0 && (
-          <p className="py-6 text-center text-xs text-white/40">No subtitles found matching "{search}"</p>
+          <p className="py-6 text-center text-xs text-white/40">No subtitles found matching &ldquo;{search}&rdquo;</p>
         )}
       </div>
     </div>
   );
 }
+
 
 function ChoiceList({
   title,

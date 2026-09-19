@@ -11,8 +11,6 @@ import {
   Maximize2,
   Minimize2,
   Play,
-  RotateCw,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,7 +19,11 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { STREAMING_SERVERS, buildStreamUrl } from "@/lib/streaming/stream-resolver";
+import {
+  TOTAL_STREAMING_SERVERS,
+  isEmbedServer,
+  buildStreamUrl,
+} from "@/lib/streaming/stream-resolver";
 
 import {
   NativePlayer,
@@ -34,7 +36,6 @@ import {
 import {
   formatTimecode,
   getPlaybackProgress,
-  getTvShowResume,
   parsePlaybackTime,
   resumeSeconds,
   savePlaybackProgress,
@@ -50,6 +51,7 @@ import { cn } from "@/lib/utils";
 import { stillUrl } from "@/lib/media/image";
 
 function relayUrl(url: string, referer?: string) {
+  if (url.startsWith("/api/stream/hls")) return url;
   const query = new URLSearchParams({ url });
   if (referer) query.set("referer", referer);
   return `/api/stream/hls?${query.toString()}`;
@@ -317,7 +319,7 @@ export function StreamingTheaterModal({
   currentEpisode = 1,  logoPath,
   tagline,
 
-  isAnime = false,
+  isAnime: _isAnime = false,
   onEpisodeChange,
 }: StreamingTheaterModalProps) {
   const [activeSeason, setActiveSeason] = React.useState(currentSeason);
@@ -344,30 +346,30 @@ export function StreamingTheaterModal({
     let cancelled = false;
     fetch(`/api/media/details?type=${mediaType}&id=${tmdbId}&_v=2`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { logoPath?: string | null; tagline?: string | null; posterPath?: string | null; title?: string | null } | null) => {
+      .then((data: { logoPath?: string | null; tagline?: string | null; posterPath?: string | null; title?: string | null; imdbId?: string | null } | null) => {
         if (cancelled || !data) return;
         if (data.logoPath) setResolvedLogoPath(data.logoPath);
         if (data.tagline) setResolvedTagline(data.tagline);
         if (data.posterPath) setResolvedPosterPath(data.posterPath);
         if (data.title && (title.includes(",") || title.length > 35)) setCanonicalTitle(data.title);
-        if ((data as any).imdbId) setResolvedImdbId((data as any).imdbId);
+        if (data.imdbId) setResolvedImdbId(data.imdbId);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [open, mediaType, tmdbId, title]);
-  const [key, setKey] = React.useState(0);
+  const [_key, setKey] = React.useState(0);
   const [extractNonce, setExtractNonce] = React.useState(0);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [directSrc, setDirectSrc] = React.useState<string | null>(null);
+  const [embedSrc, setEmbedSrc] = React.useState<string | null>(null);
   const [directKind, setDirectKind] = React.useState<"hls" | "file">("hls");
-  const [directTried, setDirectTried] = React.useState(false);
   const [directIs4K, setDirectIs4K] = React.useState(false);
   const [directHdSrc, setDirectHdSrc] = React.useState<string | null>(null);
   const [directFourKSrc, setDirectFourKSrc] = React.useState<string | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [selectedServerId, setSelectedServerId] = React.useState("lisbon");
+  const [selectedServerId, setSelectedServerId] = React.useState(() => readPreferredServer());
   const [serversOpen, setServersOpen] = React.useState(false);
   const [episodesOpen, setEpisodesOpen] = React.useState(false);
   const [seasonEpisodes, setSeasonEpisodes] = React.useState<TvEpisode[]>([]);
@@ -375,7 +377,6 @@ export function StreamingTheaterModal({
   const [externalSubtitles, setExternalSubtitles] = React.useState<
     ExternalSubtitle[]
   >([]);
-  const [showControls, setShowControls] = React.useState(true);
   const [startAt, setStartAt] = React.useState(() =>
     resumeSeconds(
       getPlaybackProgress({
@@ -387,7 +388,6 @@ export function StreamingTheaterModal({
     ),
   );
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const hideTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const lastKnownRef = React.useRef({
     seconds: startAt,
     duration: null as number | null,
@@ -398,8 +398,8 @@ export function StreamingTheaterModal({
   const lastLibrarySyncRef = React.useRef(0);
 
   const selectedServer =
-    STREAMING_SERVERS.find((server) => server.id === selectedServerId) ??
-    STREAMING_SERVERS[0]!;
+    TOTAL_STREAMING_SERVERS.find((server) => server.id === selectedServerId) ??
+    TOTAL_STREAMING_SERVERS[0]!;
 
   React.useEffect(() => {
     if (!open) return;
@@ -425,7 +425,7 @@ export function StreamingTheaterModal({
     hasPlayerTimeRef.current = false;
     wallStartRef.current = null;
     setDirectSrc(null);
-    setDirectTried(false);
+    setEmbedSrc(null);
     setLoadError(null);
     setKey((prev) => prev + 1);
     if (resume > 0 && !didResumeToastRef.current) {
@@ -440,14 +440,21 @@ export function StreamingTheaterModal({
   }, [open]);
 
   const effectiveIdentity: MediaIdentity = React.useMemo(() => {
-    if (identity) return identity;
+    if (identity) {
+      return {
+        ...identity,
+        title: canonicalTitle || identity.title || title,
+        posterPath: resolvedPosterPath ?? identity.posterPath ?? null,
+      };
+    }
     return {
       provider: "tmdb",
       mediaType,
       externalId: String(tmdbId),
-      title,
+      title: canonicalTitle || title,
+      posterPath: resolvedPosterPath,
     };
-  }, [identity, mediaType, tmdbId, title]);
+  }, [identity, mediaType, tmdbId, title, canonicalTitle, resolvedPosterPath]);
 
   const progressInput = React.useMemo(
     () => ({
@@ -459,18 +466,35 @@ export function StreamingTheaterModal({
       posterPath: resolvedPosterPath ?? effectiveIdentity.posterPath ?? null,
       backdropPath: effectiveIdentity.backdropPath ?? null,
     }),
-    [mediaType, tmdbId, activeSeason, activeEpisode, title, effectiveIdentity],
+    [mediaType, tmdbId, activeSeason, activeEpisode, title, canonicalTitle, resolvedPosterPath, effectiveIdentity],
   );
 
   React.useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setDirectTried(false);
     setDirectSrc(null);
+    setEmbedSrc(null);
     setDirectIs4K(false);
     setDirectHdSrc(null);
     setDirectFourKSrc(null);
     setLoadError(null);
+
+    // If an embed fallback server is selected, resolve immediately without direct stream API call
+    if (isEmbedServer(selectedServerId)) {
+      const url = buildStreamUrl(selectedServerId, {
+        type: mediaType,
+        tmdbId,
+        season: activeSeason,
+        episode: activeEpisode,
+        isAnime: _isAnime,
+        startAtSeconds: startAt,
+      });
+      setEmbedSrc(url);
+      wallStartRef.current = Date.now();
+      return;
+    }
+
+    const year = identity?.releaseDate ? identity.releaseDate.slice(0, 4) : undefined;
     const query = new URLSearchParams({
       type: mediaType,
       id: tmdbId,
@@ -479,6 +503,12 @@ export function StreamingTheaterModal({
       episode: String(activeEpisode),
       server: selectedServerId,
     });
+    if (year) {
+      query.set("year", year);
+    }
+    if (resolvedImdbId) {
+      query.set("imdb", resolvedImdbId);
+    }
     fetch(`/api/stream/direct?${query}`)
       .then((response) => response.json())
       .then(
@@ -492,11 +522,12 @@ export function StreamingTheaterModal({
           const hit = data.servers?.[0];
           if (data.ok && hit?.url) {
             setDirectKind(hit.kind === "file" ? "file" : "hls");
-            setDirectSrc(relayUrl(hit.url, data.referer));
+            const isDirect = Boolean((hit as { isDirectCors?: boolean })?.isDirectCors);
+            setDirectSrc(isDirect ? hit.url : relayUrl(hit.url, data.referer));
             setDirectIs4K(Boolean((hit as { is4K?: boolean })?.is4K));
             const rawHit = hit as { hdUrl?: string; fourKUrl?: string };
-            setDirectHdSrc(rawHit.hdUrl ? relayUrl(rawHit.hdUrl, data.referer) : null);
-            setDirectFourKSrc(rawHit.fourKUrl ? relayUrl(rawHit.fourKUrl, data.referer) : null);
+            setDirectHdSrc(rawHit.hdUrl ? (isDirect ? rawHit.hdUrl : relayUrl(rawHit.hdUrl, data.referer)) : null);
+            setDirectFourKSrc(rawHit.fourKUrl ? (isDirect ? rawHit.fourKUrl : relayUrl(rawHit.fourKUrl, data.referer)) : null);
             if (data.captions?.length) {
               const relayed = data.captions.map((c) => ({
                 ...c,
@@ -520,12 +551,10 @@ export function StreamingTheaterModal({
           } else {
             setLoadError("This server has no file. Pick another.");
           }
-          setDirectTried(true);
         },
       )
       .catch(() => {
         if (!cancelled) {
-          setDirectTried(true);
           setLoadError("This server has no file. Pick another.");
         }
       });
@@ -541,6 +570,10 @@ export function StreamingTheaterModal({
     selectedServerId,
     extractNonce,
     title,
+    identity?.releaseDate,
+    _isAnime,
+    startAt,
+    resolvedImdbId,
   ]);
 
   React.useEffect(() => {
@@ -724,32 +757,9 @@ export function StreamingTheaterModal({
     };
   }, [open, persistProgress, effectiveIdentity, mediaType, activeSeason, activeEpisode]);
 
-  const handleMouseMove = React.useCallback(() => {
-    setShowControls(true);
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current);
-    }
-    hideTimerRef.current = setTimeout(() => {
-      setShowControls(false);
-    }, 3500);
-  }, []);
-
-  React.useEffect(() => {
-    if (!open) return;
-    const onMove = () => handleMouseMove();
-    document.addEventListener("mousemove", onMove);
-    return () => document.removeEventListener("mousemove", onMove);
-  }, [open, handleMouseMove]);
-
-  React.useEffect(() => {
-    return () => {
-      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    };
-  }, []);
-
   const handleReload = () => {
     setDirectSrc(null);
-    setDirectTried(false);
+    setEmbedSrc(null);
     setLoadError(null);
     setExtractNonce((prev) => prev + 1);
     setKey((prev) => prev + 1);
@@ -759,7 +769,7 @@ export function StreamingTheaterModal({
   const handleSelectServer = (serverId: string) => {
     setSelectedServerId(serverId);
     setDirectSrc(null);
-    setDirectTried(false);
+    setEmbedSrc(null);
     setLoadError(null);
     setKey((prev) => prev + 1);
   };
@@ -784,6 +794,33 @@ export function StreamingTheaterModal({
     };
   }, [open, mediaType, tmdbId, pickerSeason]);
 
+  const handleSelectEpisode = React.useCallback(
+    (season: number, episode: number) => {
+      setActiveSeason(season);
+      setActiveEpisode(episode);
+      setPickerSeason(season);
+      setEpisodesOpen(false);
+      const resume = resumeSeconds(
+        getPlaybackProgress({
+          mediaType,
+          tmdbId,
+          season,
+          episode,
+        }),
+      );
+      setStartAt(resume);
+      lastKnownRef.current = { seconds: resume, duration: null };
+      hasPlayerTimeRef.current = false;
+      wallStartRef.current = Date.now();
+      setDirectSrc(null);
+      setEmbedSrc(null);
+      setLoadError(null);
+      setKey((prev) => prev + 1);
+      onEpisodeChange?.(season, episode);
+    },
+    [mediaType, tmdbId, onEpisodeChange],
+  );
+
   const handleNextEpisode = React.useCallback(() => {
     if (mediaType !== "tv") return;
     const nextEpNum = activeEpisode + 1;
@@ -793,31 +830,7 @@ export function StreamingTheaterModal({
     } else {
       handleSelectEpisode(activeSeason + 1, 1);
     }
-  }, [mediaType, activeSeason, activeEpisode, seasonEpisodes]);
-
-  const handleSelectEpisode = (season: number, episode: number) => {
-    setActiveSeason(season);
-    setActiveEpisode(episode);
-    setPickerSeason(season);
-    setEpisodesOpen(false);
-    const resume = resumeSeconds(
-      getPlaybackProgress({
-        mediaType,
-        tmdbId,
-        season,
-        episode,
-      }),
-    );
-    setStartAt(resume);
-    lastKnownRef.current = { seconds: resume, duration: null };
-    hasPlayerTimeRef.current = false;
-    wallStartRef.current = Date.now();
-    setDirectSrc(null);
-    setDirectTried(false);
-    setLoadError(null);
-    setKey((prev) => prev + 1);
-    onEpisodeChange?.(season, episode);
-  };
+  }, [mediaType, activeSeason, activeEpisode, seasonEpisodes, handleSelectEpisode]);
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) {
@@ -928,8 +941,7 @@ export function StreamingTheaterModal({
             ref={containerRef}
             className="relative flex h-full w-full flex-col overflow-hidden bg-black select-none"
           >
-            {/* Loading spinner while probing direct stream */}
-            {!directSrc && !directTried && (
+            {!directSrc && !embedSrc && (
               <div className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-3 bg-black">
                 <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-4 py-3 sm:px-6">
                   <button
@@ -947,80 +959,101 @@ export function StreamingTheaterModal({
                 <p className="text-[13px] text-white/50">
                   {loadError || "Starting playback"}
                 </p>
+                {loadError && (
+                  <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={handleReload}
+                      className="rounded-full bg-white/10 px-4 py-1.5 text-xs font-medium text-white hover:bg-white/20 transition-colors pointer-events-auto"
+                    >
+                      Retry
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectServer("lisbon")}
+                      className="rounded-full bg-white/20 border border-white/30 px-4 py-1.5 text-xs font-semibold text-white hover:bg-white/30 transition-colors pointer-events-auto"
+                    >
+                      ⚡ Switch to Lisbon 4K
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectServer("bastion")}
+                      className="rounded-full bg-white/10 border border-white/20 px-4 py-1.5 text-xs font-medium text-white hover:bg-white/20 transition-colors pointer-events-auto"
+                    >
+                      Switch to Bastion
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setServersOpen(true)}
+                      className="rounded-full bg-white/10 px-4 py-1.5 text-xs font-medium text-white/70 hover:text-white transition-colors pointer-events-auto"
+                    >
+                      Choose Server
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Cloud stream embed fallback when direct stream is not available or rejected */}
-            {open && !directSrc && directTried ? (
+            {open && embedSrc ? (
               <div className="relative h-full w-full bg-black">
-                <iframe
-                  key={`${playerKey}-${selectedServerId}-${key}`}
-                  src={buildStreamUrl(selectedServerId, {
-                    type: mediaType,
-                    tmdbId,
-                    season: activeSeason,
-                    episode: activeEpisode,
-                    isAnime,
-                    startAtSeconds: startAt,
-                  })}
-                  className="h-full w-full border-0 bg-black"
-                  allowFullScreen
-                  allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-                />
-
-                {/* Floating Top Header bar overlay */}
-                <div
-                  className={cn(
-                    "absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 py-3 sm:px-6",
-                    "bg-gradient-to-b from-black/80 via-black/40 to-transparent transition-opacity duration-300 pointer-events-auto",
-                    showControls ? "opacity-100" : "opacity-0 pointer-events-none"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
+                {/* Top overlay controls for embed player */}
+                <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between p-3 sm:p-4 bg-gradient-to-b from-black/85 via-black/45 to-transparent pointer-events-none">
+                  <div className="flex items-center gap-3 pointer-events-auto">
                     <button
                       type="button"
-                      onClick={() => onOpenChange(false)}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                      onClick={() => {
+                        if (document.fullscreenElement) {
+                          document.exitFullscreen?.().catch(() => {});
+                        }
+                        onOpenChange(false);
+                      }}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white/90 backdrop-blur-md transition hover:bg-black/80 hover:text-white ring-1 ring-white/10"
                       title="Back (Esc)"
                     >
                       <ArrowLeft className="h-5 w-5" />
                     </button>
-                    <div>
-                      <h2 className="text-sm font-semibold text-white truncate max-w-[200px] sm:max-w-xs">
-                        {title}
-                      </h2>
-                      {mediaType === "tv" && (
-                        <p className="text-xs text-white/60">
-                          S{activeSeason}:E{activeEpisode}
-                          {currentEpisodeData?.name ? ` · ${currentEpisodeData.name}` : ""}
-                        </p>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold text-white line-clamp-1 drop-shadow">
+                        {canonicalTitle || title}
+                      </span>
+                      {mediaType === "tv" ? (
+                        <span className="text-xs text-white/70 drop-shadow">
+                          Season {activeSeason}, Episode {activeEpisode}
+                          {currentEpisodeData?.name ? ` • ${currentEpisodeData.name}` : ""}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-white/60 drop-shadow">
+                          {selectedServer.name} Embed Player
+                        </span>
                       )}
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 pointer-events-auto">
                     {topRightControls}
                     <button
                       type="button"
                       onClick={toggleFullscreen}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white/90 backdrop-blur-md transition hover:bg-black/80 hover:text-white ring-1 ring-white/10"
                       title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                     >
-                      {isFullscreen ? (
-                        <Minimize2 className="h-4 w-4" />
-                      ) : (
-                        <Maximize2 className="h-4 w-4" />
-                      )}
+                      {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                     </button>
                   </div>
                 </div>
+
+                <iframe
+                  key={`${selectedServerId}-${_key}`}
+                  src={embedSrc}
+                  title={`${title} - ${selectedServer.name}`}
+                  className="h-full w-full border-0 bg-black"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                  allowFullScreen
+                />
               </div>
             ) : null}
-
-            {/* Native player for direct HLS/MP4 streams */}
             {open && directSrc ? (
               <NativePlayer
-                key={playerKey}
+                key={`${selectedServerId}-${playerKey}`}
                 src={directSrc}
                 kind={directKind}
                 startAt={startAt}
@@ -1049,8 +1082,10 @@ export function StreamingTheaterModal({
                   }
                   onOpenChange(false);
                 }}
+                onNextEpisode={mediaType === "tv" ? handleNextEpisode : undefined}
                 isExternalMenuOpen={episodesOpen || serversOpen}
                 topRightControls={topRightControls}
+                onSelectServer={handleSelectServer}
               />
             ) : null}
 
@@ -1077,6 +1112,7 @@ export function StreamingTheaterModal({
               onOpenChange={setServersOpen}
               activeServerId={selectedServerId}
               onSelectServer={handleSelectServer}
+              servers={TOTAL_STREAMING_SERVERS}
             />
           </div>
         </DialogContent>
