@@ -15,7 +15,6 @@ import { springSoft } from "@/animations/motion";
 import {
   getPlaybackProgress,
   getTvShowResume,
-  formatTimecode,
 } from "@/lib/streaming/playback-progress";
 import { StreamingTheaterModal } from "@/features/streaming/components/streaming-theater-modal";
 

@@ -5,7 +5,6 @@ import {
   CalendarDays,
   Compass,
   Gift,
-  Library,
   Lightbulb,
   Search,
   Sparkles,
@@ -13,7 +12,6 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/feedback/empty-state";
 import { PageHeaderMotion } from "@/components/motion/page-header-motion";
 import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { LibraryPosterCard } from "@/features/library/components/library-poster-card";

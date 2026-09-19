@@ -53,7 +53,16 @@ export function SignupForm() {
         if (result && !result.success) {
           toast.error(result.error);
         }
-      } catch {
+      } catch (err: unknown) {
+        if (
+          err &&
+          typeof err === "object" &&
+          "digest" in err &&
+          typeof (err as Record<string, unknown>).digest === "string" &&
+          ((err as Record<string, unknown>).digest as string).startsWith("NEXT_REDIRECT")
+        ) {
+          throw err;
+        }
         toast.error("Couldn't create your account. Please try again.");
       }
     });

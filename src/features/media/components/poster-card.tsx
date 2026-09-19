@@ -37,19 +37,15 @@ const sizeClass = {
   lg: "w-52 sm:w-60 lg:w-64",
 };
 
-const QUICK_STATUSES = [
-  "plan_to_watch",
-  "watching",
-  "completed",
-] as const satisfies readonly WatchStatus[];
+type QuickStatus = "plan_to_watch" | "watching" | "completed";
 
-const STATUS_TOAST: Record<(typeof QUICK_STATUSES)[number], (title: string) => string> = {
+const STATUS_TOAST: Record<QuickStatus, (title: string) => string> = {
   plan_to_watch: (title) => `Added “${title}” to Plan to Watch`,
   watching: (title) => `Added “${title}” to Watching`,
   completed: (title) => `Marked “${title}” as Completed`,
 };
 
-const STATUS_BADGE: Record<(typeof QUICK_STATUSES)[number], string> = {
+const STATUS_BADGE: Record<QuickStatus, string> = {
   plan_to_watch: "Plan",
   watching: "Watching",
   completed: "Done",
@@ -120,7 +116,7 @@ export function PosterCard({
         return;
       }
       setLastStatus(status);
-      const toastFor = STATUS_TOAST[status as (typeof QUICK_STATUSES)[number]];
+      const toastFor = STATUS_TOAST[status as QuickStatus];
       toast.success(toastFor ? toastFor(item.title) : `Updated “${item.title}”`);
       router.refresh();
     } catch (err) {
@@ -245,7 +241,7 @@ export function PosterCard({
               }}
               className="pointer-events-none absolute top-2 right-2 z-[1] rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
             >
-              {STATUS_BADGE[lastStatus as (typeof QUICK_STATUSES)[number]]}
+              {STATUS_BADGE[lastStatus as QuickStatus]}
             </motion.div>
           ) : null}
         </AnimatePresence>

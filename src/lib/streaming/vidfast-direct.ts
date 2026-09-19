@@ -9,14 +9,14 @@ const ENC_API = "https://enc-dec.app/api";
 export const VIDFAST_REFERER = "https://vidfast.vc/";
 
 const SERVER_PREFERENCES: Record<string, string[]> = {
-  lisbon: ["vFast", "vEdge", "vRapid", "vBlaze", "Cobra", "Bravo", "Cine"],
-  sakura: ["Bravo", "vRapid", "vEdge", "Cine", "vFast", "vBlaze"],
-  nebula: ["vEdge", "vFast", "vRapid", "Cobra"],
-  solara: ["vEdge", "vRapid", "vFast", "vBlaze"],
-  athens: ["vFast", "vEdge", "vRapid", "Cobra", "Bravo"],
-  joy: ["Bravo", "vEdge", "vRapid", "vFast"],
-  castle: ["vRapid", "vEdge", "vFast", "Cobra", "vBlaze"],
-  canaias: ["vEdge", "vRapid", "Bravo", "vFast"],
+  lisbon: ["vRapid", "vBlaze", "Cobra", "vEdge", "Cine", "vFast", "Bravo", "Horizon"],
+  sakura: ["vRapid", "vBlaze", "Cobra", "vEdge", "Cine", "Bravo", "Horizon", "vFast"],
+  nebula: ["vRapid", "vBlaze", "Cobra", "vEdge", "Bravo", "Horizon", "vFast"],
+  solara: ["vRapid", "vBlaze", "Cobra", "Bravo", "Horizon", "vEdge", "vFast"],
+  athens: ["vRapid", "vBlaze", "Cobra", "vEdge", "Cine", "vFast", "Bravo", "Horizon"],
+  joy: ["vRapid", "vBlaze", "Cobra", "vEdge", "vFast", "Bravo", "Horizon"],
+  castle: ["vRapid", "vBlaze", "Cobra", "vEdge", "Bravo", "vFast"],
+  canaias: ["vRapid", "vBlaze", "Cobra", "vEdge", "Bravo", "Horizon", "vFast"],
 };
 
 export interface VidfastDirectHit {
@@ -27,6 +27,7 @@ export interface VidfastDirectHit {
   is4K?: boolean;
   hdUrl?: string;
   fourKUrl?: string;
+  isDirectCors?: boolean;
 }
 
 interface DecryptedServer {
@@ -224,15 +225,8 @@ async function resolveVidfastDirectStreamSingle(input: {
       }
     };
 
-    // Prioritize Bravo for known title collision placeholders (e.g. Demon Slayer Infinity Castle TMDB 1311031)
-    // where Peakstorm serves an unrelated live-action placeholder
-    if (cleanId === "1311031" || requestedServer === "sakura" || requestedServer === "joy") {
-      const bravo = serverList.find((s) => s.name.toLowerCase() === "bravo" && s.data);
-      if (bravo) pushCandidate(bravo);
-    }
-
     if (requestedServer === "lisbon" || requestedServer === "athens") {
-      const fourKOrder = ["vFast", "vEdge", "vRapid", "Cobra", "vBlaze", "Bravo", "Cine"];
+      const fourKOrder = ["vRapid", "vBlaze", "Cobra", "vEdge", "Cine", "vFast", "Bravo", "Horizon"];
       for (const name of fourKOrder) {
         const match = serverList.find(
           (s) => s.name.toLowerCase() === name.toLowerCase() && s.data,
@@ -275,7 +269,7 @@ async function resolveVidfastDirectStreamSingle(input: {
         const sRes = await fetch(sUrl, {
           method: "POST",
           headers,
-          signal: AbortSignal.timeout(2500),
+          signal: AbortSignal.timeout(2000),
         });
         const sEnc = await sRes.text();
         if (!sEnc) return null;
@@ -283,7 +277,7 @@ async function resolveVidfastDirectStreamSingle(input: {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: sEnc }),
-          signal: AbortSignal.timeout(2500),
+          signal: AbortSignal.timeout(2000),
         });
         const dJson = (await dRes.json()) as { status?: number; result?: { url?: string } };
         return dJson.status === 200 && dJson.result?.url ? dJson.result.url : null;
@@ -294,13 +288,14 @@ async function resolveVidfastDirectStreamSingle(input: {
 
     let lastError = "";
     let consecutiveEmpty = 0;
+    let fallbackHit: VidfastDirectHit | null = null;
     for (const candidate of orderedCandidates.slice(0, 8)) {
       try {
         const streamUrl = `${stream}/${candidate.data}`;
         const streamRes = await fetch(streamUrl, {
           method: "POST",
           headers,
-          signal: AbortSignal.timeout(3500),
+          signal: AbortSignal.timeout(2200),
         });
         const streamEncText = await streamRes.text();
         if (!streamEncText) {
@@ -317,7 +312,7 @@ async function resolveVidfastDirectStreamSingle(input: {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: streamEncText }),
-          signal: AbortSignal.timeout(3500),
+          signal: AbortSignal.timeout(2200),
         });
         const decStreamJson = (await decStreamRes.json()) as {
           status?: number;
@@ -326,22 +321,35 @@ async function resolveVidfastDirectStreamSingle(input: {
         const streamResult = decStreamJson.result;
         if (decStreamJson.status === 200 && streamResult?.url) {
           const finalUrl = streamResult.url;
-          if (finalUrl.includes("sun.peakstorm.top/r6") || candidate.name.toLowerCase() === "horizon") {
-            lastError = `${candidate.name}: 502 zombie rejected`;
-            continue;
-          }
+          // Reject known dead / hanging CDN clusters:
+          // 1. /r2/cdn1/ and /r2/cdn2/ (paperzebra.top and plainorbit.top stall indefinitely on segment requests)
+          // 2. sun.peakstorm.top (Horizon returns 502 Bad Gateway)
+          const isBrokenCluster =
+            finalUrl.includes("/r2/") ||
+            finalUrl.includes("sun.peakstorm.top") ||
+            finalUrl.includes("paperzebra.top") ||
+            finalUrl.includes("plainorbit.top") ||
+            finalUrl.includes("mendx437sim.com") ||
+            candidate.name.toLowerCase() === "horizon";
+
           const is4K =
             cleanId === "224372" ||
             candidate.name.toLowerCase() === "vfast" ||
-            Boolean(candidate.description?.toLowerCase().includes("4k")) ||
-            Boolean(candidate.image?.includes("4k")) ||
+            Boolean(candidate.description && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(candidate.description)) ||
+            Boolean(candidate.image && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(candidate.image)) ||
             finalUrl.includes("2160") ||
-            finalUrl.includes("/4k") ||
-            finalUrl.includes("_4k") ||
-            finalUrl.includes("-4k");
+            /(^|[._\s/-])4k([._\s/-]|$)/i.test(finalUrl);
 
-          let hdUrl: string | undefined = undefined;
-          let fourKUrl: string | undefined = undefined;
+          // If the CDN returns a specific single-quality playlist (like index-s2160p-v1-a1.m3u8),
+          // the master playlist containing all tiers (4K, 1080p, 720p, 480p) is available at /master.m3u8.
+          // Using master.m3u8 gives Hls.js full adaptive bitrate (ABR) for smooth, buffer-free playback.
+          let masterUrl = finalUrl;
+          if (finalUrl.includes("/index-") && finalUrl.endsWith(".m3u8")) {
+            masterUrl = finalUrl.replace(/\/index-[^/]+\.m3u8$/, "/master.m3u8");
+          }
+
+          let hdUrl: string | undefined;
+          let fourKUrl: string | undefined;
 
           // Only perform companion lookup for non-fallback queries to keep fallback fast
           if (!input.isFallback) {
@@ -378,22 +386,39 @@ async function resolveVidfastDirectStreamSingle(input: {
             }
           }
 
+          const candidateHit: VidfastDirectHit = {
+            url: masterUrl,
+            kind: finalUrl.includes(".mp4") ? "file" : "hls",
+            referer: VIDFAST_REFERER,
+            serverName: candidate.name,
+            is4K,
+            hdUrl: hdUrl || masterUrl,
+            fourKUrl: fourKUrl || (is4K ? finalUrl : undefined),
+            isDirectCors: false,
+          };
+
+          if (isBrokenCluster) {
+            if (!fallbackHit && !finalUrl.includes("mendx437sim.com")) {
+              fallbackHit = candidateHit;
+            }
+            lastError = `${candidate.name}: skipped hanging/broken cluster (${finalUrl})`;
+            continue;
+          }
+
           return {
-            hit: {
-              url: finalUrl,
-              kind: finalUrl.includes(".mp4") ? "file" : "hls",
-              referer: VIDFAST_REFERER,
-              serverName: candidate.name,
-              is4K,
-              hdUrl,
-              fourKUrl,
-            },
+            hit: candidateHit,
           };
         }
         lastError = `${candidate.name}: returned status ${decStreamJson.status}`;
       } catch (candErr) {
         lastError = `${candidate.name}: ${candErr instanceof Error ? candErr.message : String(candErr)}`;
       }
+    }
+
+    if (fallbackHit) {
+      return {
+        hit: fallbackHit,
+      };
     }
 
     return {

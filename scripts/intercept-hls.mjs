@@ -1,9 +1,6 @@
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
-import { createRequire } from "node:module";
 
-const require = createRequire(import.meta.url);
-const puppeteerCore = require("puppeteer-core");
 puppeteer.use(StealthPlugin());
 
 const chrome =
