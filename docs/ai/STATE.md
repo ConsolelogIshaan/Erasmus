@@ -7,7 +7,18 @@ Git: clean, branch `main` (tracking `origin/main`)
 Streaming architecture and playback reliability. Reduce Vercel bandwidth from HLS proxying without iframe embeds and without breaking the working player.
 
 ## Working
-- Web app (Erasmus, Next.js 16 / React 19): catalog, social, recommendations, ratings, ambient lighting, library, Continue Watching.
+- Web app (Erasmus, Next.js 16 / React 19): catalog, social, recommendations, ratings, ambient lighting, Continue Watching.
+- Dashboard & Library Integration:
+  - Merged Library page into the Home page (`/dashboard`) with an integrated Library explorer section supporting status, type, and sort filters with direct poster grid.
+  - Clicking "Continue watching", "Your Library", "Recently completed", "Dropped", or "Recently rated" (including header arrows) navigates directly to `/library`.
+  - Removed Library and Stats links from the main sidebar navigation.
+- Dedicated Anime Hub (`/anime`):
+  - Created `/anime` page with Series, Top Rated, and Films shelves, dynamic anime sub-genres (Action, Fantasy, Sci-Fi, Adventure, Romance, etc.), and pagination.
+  - Added `discoverAnime` and `getAnimeGenres` in `src/lib/media/anime.ts` querying TMDB with genre 16 and original language `ja`.
+  - Added Anime to sidebar navigation immediately below "TV Shows", with shortcut `g a`.
+- Cleaned Navigation & Stats Page Removal:
+  - Sidebar order: Home → Discover → For You → Movies → TV Shows → Anime → Watchlist → Favorites → Friends.
+  - Stats page (`/stats`) redirects cleanly to `/dashboard`; updated header buttons and links in wrapped/profile to dashboard and insights.
 - Clean Native Streaming Identity:
   - Removed third-party external subscription links ("Available on Netflix/Prime", "Where to watch") across movies, series, and anime hero and details sections, solidifying Erasmus as a self-contained streaming platform.
 - Full-viewport Browser Theater Player (`streaming-theater-modal.tsx` & `native-player.tsx`):
@@ -23,7 +34,7 @@ Streaming architecture and playback reliability. Reduce Vercel bandwidth from HL
 - Split-cour anime/TV episode mapping (`getAlternateTvCoordinates`) with Bravo fallback for continuous split-cour series (e.g., Solo Leveling).
 - HLS relay proxy (`/api/stream/hls`): Anycast DNS override, header spoofing, playlist rewriting, English audio default (`enrichAudioTracks`), direct-CDN passthrough for permissive CDNs including `keenanchor.top` (`isDirectCdnSegment`), open CORS (`Access-Control-Allow-Origin: *`), and preflight `OPTIONS` support.
 - Android TV app (Cinejoy): WebView, local DNS proxy, D-pad spatial navigation, OSD scrub HUD. Release APK built.
-- Verification: Zero lint errors (`npm run lint`), zero build errors (`npm run build`), zero TypeScript errors (`npm run typecheck`), all streaming vitest tests passing.
+- Verification: Zero lint errors (`npm run lint`), zero build errors (`npm run build` across 41/41 routes), zero TypeScript errors (`npm run typecheck`), all 19 streaming test suites (209 vitest tests) passing.
 
 ## Broken / Risky
 - Full video traffic still passes through Vercel via `/api/stream/hls` for non-passthrough CDNs (bandwidth problem).

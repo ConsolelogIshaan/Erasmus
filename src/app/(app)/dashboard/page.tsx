@@ -1,10 +1,11 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  BarChart3,
   CalendarDays,
   Compass,
   Gift,
+  Library,
   Lightbulb,
   Search,
   Sparkles,
@@ -15,7 +16,10 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeaderMotion } from "@/components/motion/page-header-motion";
 import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { LibraryPosterCard } from "@/features/library/components/library-poster-card";
+import { LibraryFilters } from "@/features/library/components/library-filters";
 import { ContinueWatchingRail } from "@/features/library/components/continue-watching-rail";
+import { listLibrary } from "@/lib/library/entries";
+import type { LibraryListFilters } from "@/types/library";
 import { MediaRow } from "@/features/media/components/media-row";
 import { PosterCard } from "@/features/media/components/poster-card";
 import { StatCounter } from "@/features/intelligence/components/stat-counter";
@@ -38,10 +42,14 @@ export const metadata: Metadata = {
   description: "Your watch history, habits, and what to watch next",
 };
 
+interface PageProps {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}
+
 /**
- * Premium intelligence dashboard — personal home for Erasmus.
+ * Premium intelligence dashboard — personal home for Erasmus with integrated library.
  */
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: PageProps) {
   const { user, profile } = await getSessionContext();
   const name = formatDisplayName({
     displayName: profile?.display_name,
@@ -51,7 +59,26 @@ export default async function DashboardPage() {
 
   if (!user) return null;
 
-  const dash = await getDashboardPayload(user.id);
+  const params = searchParams ? await searchParams : {};
+  const getParam = (k: string) => {
+    const v = params[k];
+    return Array.isArray(v) ? v[0] : v;
+  };
+
+  const libraryFilters: LibraryListFilters = {
+    status: (getParam("status") as LibraryListFilters["status"]) ?? "all",
+    mediaType: (getParam("type") as "movie" | "tv" | "all") ?? "all",
+    q: getParam("q"),
+    sort: (getParam("sort") as LibraryListFilters["sort"]) ?? "last_watched",
+    page: 1,
+    pageSize: 18,
+  };
+
+  const [dash, libraryData] = await Promise.all([
+    getDashboardPayload(user.id),
+    listLibrary(user.id, libraryFilters),
+  ]);
+
   const { stats, insights } = dash;
   const year = new Date().getFullYear();
 
@@ -60,10 +87,16 @@ export default async function DashboardPage() {
       <PageHeaderMotion
         eyebrow="Welcome back"
         title={name}
-        description="Where you left off, what you have finished, and what to watch next."
+        description="Where you left off, your personal library, and what to watch next."
         actions={
           <>
             <Button asChild size="sm">
+              <Link href={ROUTES.library}>
+                <Library className="h-4 w-4" />
+                Library
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
               <Link href={ROUTES.librarySearch}>
                 <Search className="h-4 w-4" />
                 Quick search
@@ -73,12 +106,6 @@ export default async function DashboardPage() {
               <Link href={ROUTES.discover}>
                 <Compass className="h-4 w-4" />
                 Discover
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href={ROUTES.stats}>
-                <BarChart3 className="h-4 w-4" />
-                Stats
               </Link>
             </Button>
             <Button asChild variant="secondary" size="sm">
@@ -139,7 +166,7 @@ export default async function DashboardPage() {
             <ContinueWatchingRail initialEntries={dash.continueWatching} />
           </DashboardSection>
 
-          <DashboardSection title="Recently completed" href={ROUTES.history}>
+          <DashboardSection title="Recently completed" href={ROUTES.library}>
             {dash.recentlyWatched.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Finish a title to see it here.
@@ -205,6 +232,44 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Your Library Section */}
+      <DashboardSection
+        title="Your Library"
+        href={ROUTES.library}
+        description="Filter and browse your tracked collection directly from Home"
+      >
+        <div className="space-y-4">
+          <Suspense fallback={null}>
+            <LibraryFilters showSearch={false} />
+          </Suspense>
+
+          {libraryData.items.length === 0 ? (
+            <p className="text-sm text-muted-foreground pt-2">
+              No titles in your library matching this filter.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                {libraryData.items.slice(0, 12).map((entry) => (
+                  <LibraryPosterCard key={entry.id} entry={entry} />
+                ))}
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-xs text-muted-foreground">
+                  Showing {Math.min(12, libraryData.items.length)} of {libraryData.total} titles
+                </span>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={ROUTES.library}>
+                    Go to full library
+                    <Library className="ml-1.5 h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </DashboardSection>
 
       {/* Watchlist + rated */}
       <div className="grid gap-8 lg:grid-cols-2">
@@ -316,7 +381,7 @@ export default async function DashboardPage() {
 
       {/* Favorite genres chips */}
       {stats.favorites.genres.length > 0 ? (
-        <DashboardSection title="Favorite genres" href={ROUTES.stats}>
+        <DashboardSection title="Favorite genres" href={ROUTES.genres}>
           <div className="flex flex-wrap gap-2">
             {stats.favorites.genres.map((g) => (
               <Badge

@@ -96,7 +96,7 @@ export default async function ProfilePage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild size="sm" variant="outline">
-              <Link href={ROUTES.stats}>Stats</Link>
+              <Link href={ROUTES.insights}>Insights</Link>
             </Button>
             <Button asChild size="sm">
               <Link href={ROUTES.wrapped(year)}>Wrapped</Link>

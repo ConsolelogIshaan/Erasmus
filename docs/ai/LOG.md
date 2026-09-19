@@ -76,4 +76,11 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Result: Verified on `main` branch. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run build` compiled 40/40 routes cleanly, all streaming vitest tests passing.
 - Next: Push changes to `origin/main` and `origin/Bingr`.
 
+## 2026-09-19 | Paarth | Gemini
+- Changed: Merged the Library page into the Home page (`/dashboard`), featuring an embedded library explorer with status, type, and sort filters and a direct poster card grid. Linked "Continue watching", "Your Library", "Recently completed", "Dropped", and "Recently rated" section titles and chevron arrows directly to `/library`. Removed Library and Stats from the sidebar navigation. Reordered sidebar navigation to place "Movies" and "TV Shows" directly below "For You". Created a dedicated Anime browse page (`/anime`) with Series, Top Rated, and Films shelves, dynamic anime sub-genres, and TMDB Japanese animation query integration (`src/lib/media/anime.ts`). Added Anime to the sidebar directly below TV Shows with `Sparkles` icon and `g a` shortcut. Removed the Stats page, redirecting `/stats` directly to `/dashboard`.
+- Files: `src/app/(app)/dashboard/page.tsx`, `src/constants/navigation.ts`, `src/constants/routes.ts`, `src/constants/shortcuts.ts`, `src/lib/media/anime.ts`, `src/app/(app)/anime/page.tsx`, `src/app/(app)/stats/page.tsx`, `src/app/(app)/profile/page.tsx`, `src/app/(app)/wrapped/page.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified on `main` branch. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run test` passed (19/19 files, 209 tests), `npm run build` compiled all 41 routes with zero errors.
+- Next: Push latest changes to `origin/main` and `origin/Bingr`.
+
+
 

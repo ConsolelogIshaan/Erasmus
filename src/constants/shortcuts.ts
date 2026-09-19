@@ -57,11 +57,11 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     href: ROUTES.discover,
   },
   {
-    id: "stats",
-    keys: ["G", "S"],
-    description: "Go to Statistics",
-    sequence: ["g", "s"],
-    href: ROUTES.stats,
+    id: "anime",
+    keys: ["G", "A"],
+    description: "Go to Anime",
+    sequence: ["g", "a"],
+    href: ROUTES.anime,
   },
   {
     id: "settings",

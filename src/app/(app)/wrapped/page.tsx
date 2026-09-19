@@ -49,7 +49,7 @@ export default async function WrappedPage({ searchParams }: PageProps) {
               <Link href={`${ROUTES.wrapped()}?year=${year - 1}`}>{year - 1}</Link>
             </Button>
             <Button asChild size="sm">
-              <Link href={ROUTES.stats}>Full stats</Link>
+              <Link href={ROUTES.dashboard}>Dashboard</Link>
             </Button>
           </div>
         </div>
