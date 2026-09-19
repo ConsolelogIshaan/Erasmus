@@ -70,3 +70,10 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Result: Verified on `main` branch. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run build` passed (40/40 routes generated), streaming vitest tests passing.
 - Next: Push latest changes to `main` and deploy to production.
 
+## 2026-09-19 | Paarth | Gemini
+- Changed: Removed third-party external "Available on" / "Where to watch" provider sections across all movie, series, and anime pages. Since Erasmus is a self-contained direct streaming platform, showing external provider recommendations (Netflix, Prime Video, etc.) was redundant and conflicting. Disabled `StreamingProviders` component (rendered `null`), removed from `detail-hero.tsx`, `tv/[id]/page.tsx`, and `movie/[id]/page.tsx`, and adjusted marketing copy in `capabilities-section.tsx` to highlight seamless direct streaming.
+- Files: `src/features/media/components/detail-hero.tsx`, `src/app/(app)/movie/[id]/page.tsx`, `src/app/(app)/tv/[id]/page.tsx`, `src/features/media/components/streaming-providers.tsx`, `src/features/marketing/components/capabilities-section.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified on `main` branch. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run build` compiled 40/40 routes cleanly, all streaming vitest tests passing.
+- Next: Push changes to `origin/main` and `origin/Bingr`.
+
+

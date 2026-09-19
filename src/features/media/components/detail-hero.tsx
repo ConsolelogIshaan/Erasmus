@@ -18,7 +18,6 @@ import type {
   StreamingAvailability,
 } from "@/types/media";
 import { heroContainer, heroItem } from "@/animations/variants";
-import { StreamingProviders } from "@/features/media/components/streaming-providers";
 
 interface DetailHeroProps {
   title: string;
@@ -60,7 +59,7 @@ export function DetailHero({
   genres = [],
   ratings = [],
   videos = [],
-  streaming,
+  streaming: _streaming,
   children,
 }: DetailHeroProps) {
   const reduceMotion = useReducedMotion();
@@ -167,12 +166,6 @@ export function DetailHero({
               {ratings.length ? (
                 <motion.div variants={reduceMotion ? undefined : heroItem}>
                   <RatingsDisplay ratings={ratings} />
-                </motion.div>
-              ) : null}
-
-              {streaming?.providers?.length ? (
-                <motion.div variants={reduceMotion ? undefined : heroItem}>
-                  <StreamingProviders availability={streaming} compact />
                 </motion.div>
               ) : null}
 

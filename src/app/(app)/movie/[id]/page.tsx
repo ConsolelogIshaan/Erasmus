@@ -10,7 +10,6 @@ import { StreamButton } from "@/features/streaming/components/stream-button";
 import { MediaMeta } from "@/features/media/components/media-meta";
 import { CastRow } from "@/features/media/components/cast-row";
 import { MediaRow } from "@/features/media/components/media-row";
-import { StreamingProviders } from "@/features/media/components/streaming-providers";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { CatalogConfigBanner } from "@/features/media/components/catalog-config-banner";
@@ -253,8 +252,6 @@ export default async function MovieDetailPage({ params }: PageProps) {
               </div>
             </div>
           ) : null}
-
-          <StreamingProviders availability={movie.streaming} />
 
           <div className="rounded-3xl border-0 bg-muted/40 dark:bg-white/[0.05] bg-muted/30 dark:bg-white/[0.04] p-5">
             <h2 className="text-sm font-semibold">Awards</h2>

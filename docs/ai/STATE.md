@@ -8,6 +8,8 @@ Streaming architecture and playback reliability. Reduce Vercel bandwidth from HL
 
 ## Working
 - Web app (Erasmus, Next.js 16 / React 19): catalog, social, recommendations, ratings, ambient lighting, library, Continue Watching.
+- Clean Native Streaming Identity:
+  - Removed third-party external subscription links ("Available on Netflix/Prime", "Where to watch") across movies, series, and anime hero and details sections, solidifying Erasmus as a self-contained streaming platform.
 - Full-viewport Browser Theater Player (`streaming-theater-modal.tsx` & `native-player.tsx`):
   - On clicking Play: opens edge-to-edge windowed fullscreen within browser viewport (`100vw` × `100vh`, `fixed inset-0`, zero margins, zero rounded corners, backdrop completely covered).
   - On clicking Fullscreen button (or pressing `f`): enters native OS/browser fullscreen (`requestFullscreen()`), button toggles to `Minimize2` exit icon.
