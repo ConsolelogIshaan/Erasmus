@@ -159,78 +159,104 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         </DashboardSection>
       ) : null}
 
-      {/* Continue + charts */}
-      <div className="grid gap-8 xl:grid-cols-5">
-        <div className="space-y-8 xl:col-span-3">
-          <DashboardSection title="Continue watching" href={ROUTES.library}>
-            <ContinueWatchingRail initialEntries={dash.continueWatching} />
-          </DashboardSection>
+      {/* Continue watching — full width sleek rail */}
+      <DashboardSection title="Continue watching" href={ROUTES.library}>
+        <ContinueWatchingRail initialEntries={dash.continueWatching} />
+      </DashboardSection>
 
-          <DashboardSection title="Recently completed" href={ROUTES.library}>
-            {dash.recentlyWatched.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Finish a title to see it here.
-              </p>
-            ) : (
-              <div className="grid grid-cols-3 gap-3 pt-4 sm:grid-cols-4">
-                {dash.recentlyWatched.map((e) => (
-                  <LibraryPosterCard key={e.id} entry={e} />
-                ))}
-              </div>
-            )}
-          </DashboardSection>
-
-          <DashboardSection title="Plan to watch" href={ROUTES.watchlist}>
-            {dash.planToWatch.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Queue something from Discover.
-              </p>
-            ) : (
-              <div className="grid grid-cols-3 gap-3 pt-4 sm:grid-cols-4">
-                {dash.planToWatch.map((e) => (
-                  <LibraryPosterCard key={e.id} entry={e} showProgress={false} />
-                ))}
-              </div>
-            )}
-          </DashboardSection>
-
-          <DashboardSection title="Dropped" href={ROUTES.library}>
-            {dash.dropped.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No dropped titles.</p>
-            ) : (
-              <div className="grid grid-cols-3 gap-3 pt-4 sm:grid-cols-4">
-                {dash.dropped.map((e) => (
-                  <LibraryPosterCard key={e.id} entry={e} showProgress={false} />
-                ))}
-              </div>
-            )}
-          </DashboardSection>
-        </div>
-
-        <div className="space-y-4 xl:col-span-2">
-          <ActivityAreaChart data={stats.distributions.months} />
-          <GenrePieChart data={stats.distributions.genres} />
-          <div className="flex flex-wrap gap-2">
+      {/* Viewing Activity & Breakdown Charts — balanced 2-column analytics row */}
+      <section className="space-y-4" aria-label="Viewing activity and breakdown">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-section-title">Activity & Habits</h2>
+            <p className="text-meta text-muted-foreground">
+              Your viewing rhythm across months and favorite genres.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <Button asChild variant="outline" size="sm">
               <Link href={ROUTES.calendar}>
-                <CalendarDays className="h-4 w-4" />
+                <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
                 Calendar
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link href={ROUTES.timeline}>
-                <Sparkles className="h-4 w-4" />
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
                 Timeline
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link href={ROUTES.insights}>
-                <Lightbulb className="h-4 w-4" />
+                <Lightbulb className="mr-1.5 h-3.5 w-3.5" />
                 All insights
               </Link>
             </Button>
           </div>
         </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <ActivityAreaChart data={stats.distributions.months} />
+          <GenrePieChart data={stats.distributions.genres} />
+        </div>
+      </section>
+
+      {/* Recently completed + Plan to watch — balanced pairs */}
+      <div className="grid gap-8 lg:grid-cols-2">
+        <DashboardSection title="Recently completed" href={ROUTES.library}>
+          {dash.recentlyWatched.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Finish a title to see it here.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 pt-4 sm:grid-cols-3 md:grid-cols-4">
+              {dash.recentlyWatched.map((e) => (
+                <LibraryPosterCard key={e.id} entry={e} />
+              ))}
+            </div>
+          )}
+        </DashboardSection>
+
+        <DashboardSection title="Plan to watch" href={ROUTES.watchlist}>
+          {dash.planToWatch.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Queue something from Discover.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 pt-4 sm:grid-cols-3 md:grid-cols-4">
+              {dash.planToWatch.map((e) => (
+                <LibraryPosterCard key={e.id} entry={e} showProgress={false} />
+              ))}
+            </div>
+          )}
+        </DashboardSection>
+      </div>
+
+      {/* Recently rated + Dropped — balanced pairs */}
+      <div className="grid gap-8 lg:grid-cols-2">
+        <DashboardSection title="Recently rated" href={ROUTES.library}>
+          {dash.recentlyRated.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Rate a title to see it here.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 pt-4 sm:grid-cols-3 md:grid-cols-4">
+              {dash.recentlyRated.slice(0, 8).map((e) => (
+                <LibraryPosterCard key={e.id} entry={e} />
+              ))}
+            </div>
+          )}
+        </DashboardSection>
+
+        <DashboardSection title="Dropped" href={ROUTES.library}>
+          {dash.dropped.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No dropped titles.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 pt-4 sm:grid-cols-3 md:grid-cols-4">
+              {dash.dropped.map((e) => (
+                <LibraryPosterCard key={e.id} entry={e} showProgress={false} />
+              ))}
+            </div>
+          )}
+        </DashboardSection>
       </div>
 
       {/* Your Library Section */}
@@ -270,33 +296,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           )}
         </div>
       </DashboardSection>
-
-      {/* Watchlist + rated */}
-      <div className="grid gap-8 lg:grid-cols-2">
-        <DashboardSection title="Watchlist highlights" href={ROUTES.watchlist}>
-          {dash.watchlist.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Your plan-to-watch list is empty.</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-3 pt-4 sm:grid-cols-4">
-              {dash.watchlist.slice(0, 4).map((e) => (
-                <LibraryPosterCard key={e.id} entry={e} showProgress={false} />
-              ))}
-            </div>
-          )}
-        </DashboardSection>
-
-        <DashboardSection title="Recently rated" href={ROUTES.library}>
-          {dash.recentlyRated.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Rate a title to see it here.</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-3 pt-4 sm:grid-cols-4">
-              {dash.recentlyRated.slice(0, 4).map((e) => (
-                <LibraryPosterCard key={e.id} entry={e} />
-              ))}
-            </div>
-          )}
-        </DashboardSection>
-      </div>
 
       {/* Recommendations */}
       {dash.recommendations.length > 0 ? (

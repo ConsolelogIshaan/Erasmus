@@ -10,13 +10,14 @@ import { cn } from "@/lib/utils";
 interface GenreChipsProps {
   genres: Genre[];
   className?: string;
+  basePath?: string;
 }
 
 /**
  * Horizontally scrollable genre chips.
  * Extra vertical padding keeps hover lift from clipping.
  */
-export function GenreChips({ genres, className }: GenreChipsProps) {
+export function GenreChips({ genres, className, basePath }: GenreChipsProps) {
   if (!genres.length) return null;
 
   return (
@@ -24,7 +25,7 @@ export function GenreChips({ genres, className }: GenreChipsProps) {
       <div className="flex items-end justify-between gap-3 px-2 sm:px-3">
         <h2 className="text-section-title">Browse by Genre</h2>
         <Link
-          href="/genres"
+          href={basePath ? `${basePath}?explore=true` : "/genres"}
           className="text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           View all
@@ -37,7 +38,7 @@ export function GenreChips({ genres, className }: GenreChipsProps) {
         {genres.map((g) => (
           <Link
             key={g.id}
-            href={mediaHref("genre", g.id)}
+            href={basePath ? `${basePath}?genre=${g.id}` : mediaHref("genre", g.id)}
             className="shrink-0 transition-transform duration-200 ease-out hover:-translate-y-0.5 active:scale-[0.98]"
           >
             <Badge

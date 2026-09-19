@@ -1,3 +1,4 @@
+import type * as React from "react";
 import {
   Bookmark,
   Compass,
@@ -6,7 +7,6 @@ import {
   Home,
   LayoutDashboard,
   Settings,
-  Sparkles,
   Target,
   Tv,
   User,
@@ -14,12 +14,17 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { AnimeIcon } from "@/components/layout/anime-icon";
 import { ROUTES } from "./routes";
+
+export type NavIcon =
+  | LucideIcon
+  | React.ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
 
 export interface NavItem {
   title: string;
   href: string;
-  icon: LucideIcon;
+  icon: NavIcon;
   comingSoon?: boolean;
   description?: string;
 }
@@ -58,7 +63,7 @@ export const MAIN_NAV: readonly NavItem[] = [
   {
     title: "Anime",
     href: ROUTES.anime,
-    icon: Sparkles,
+    icon: AnimeIcon,
     description: "Browse anime",
   },
   {

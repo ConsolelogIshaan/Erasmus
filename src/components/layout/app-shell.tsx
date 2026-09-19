@@ -20,15 +20,18 @@ interface AppShellProps {
 
 /**
  * Resizable sidebar + content.
- * Detail pages with cinematic hero backdrops (/tv/[id], /movie/[id]) and Discover (/discover)
- * render full-bleed, with the persistent AmbientBackground flowing seamlessly underneath
- * the translucent frosted glass header, sidebar, and all scrollable page sections.
+ * Detail pages with cinematic hero backdrops (/tv/[id], /movie/[id]) and discovery showcase pages
+ * (/discover, /movies, /tv, /anime) render full-bleed, with the persistent AmbientBackground
+ * flowing seamlessly underneath the translucent frosted glass header, sidebar, and all scrollable page sections.
  */
 export function AppShell({ user, children }: AppShellProps) {
   const pathname = usePathname();
   const { sidebarCollapsed } = useUI();
   const isFullBleed = Boolean(
-    pathname && (/^\/(tv|movie)\/[^/]+$/.test(pathname) || /^\/discover\/?$/.test(pathname))
+    pathname && (
+      /^\/(tv|movie)\/[^/]+$/.test(pathname) ||
+      /^\/(discover|movies|tv|anime)\/?$/.test(pathname)
+    )
   );
 
   const sidebarWidth = sidebarCollapsed

@@ -1,24 +1,32 @@
 # STATE
 
 Updated: 2026-09-19
-Git: clean, branch `main` (tracking `origin/main`)
+Git: local branch `main`
 
 ## Priority
 Streaming architecture and playback reliability. Reduce Vercel bandwidth from HLS proxying without iframe embeds and without breaking the working player.
 
 ## Working
 - Web app (Erasmus, Next.js 16 / React 19): catalog, social, recommendations, ratings, ambient lighting, Continue Watching.
-- Dashboard & Library Integration:
+- Full Discover-Style Architecture Across Movies, TV Shows, and Anime:
+  - Redesigned **Movies** (`/movies`), **TV Shows** (`/tv`), and **Anime** (`/anime`) pages to mirror the exact Discover page structure.
+  - Resolved layout misalignment and side/top margins by enabling `isFullBleed` in `AppShell` (`src/components/layout/app-shell.tsx`) for `/movies`, `/tv`, and `/anime`. The pages now render 100% full-bleed and edge-to-edge behind the floating frosted sidebar and transparent header with zero unwanted wrapper padding.
+  - Immersive full-bleed **HeroBanner** on top of each page with rotating featured titles, pre-enriched official logos and taglines, ambient color palettes, Ken Burns crossfades, ratings, synopsis, and direct Play / More Info actions.
+  - Interactive **GenreChips** tailored to each media category (Movie genres, TV genres, and Anime sub-genres).
+  - Curated horizontal **`MediaRow`** shelves across all three pages with smooth carousel scrolling, right arrow navigation, and dedicated catalog links.
+  - Full catalog explorer grid with `FilterBar` and `PaginationControls` supporting deep filtering and pagination when exploring the full library. Clicking "Browse All Movies / TV Shows / Anime" (or selecting filters) immediately loads the direct explore view without a hero banner, starting seamlessly below the header with the category title, filters, and poster grid.
+- Uncapped Anime Catalog (11,400+ Titles):
+  - Fixed the 4-page anime limitation by removing the default vote-count floor (`voteCountGte: 500`) in `anime.ts`, unlocking all 272+ pages of anime series (5,400+ shows) and 301+ pages of anime films (6,000+ films) from the TMDB API.
+- Dashboard Layout & Library Integration:
   - Merged Library page into the Home page (`/dashboard`) with an integrated Library explorer section supporting status, type, and sort filters with direct poster grid.
+  - Rebalanced dashboard layout to eliminate wasted vertical whitespace: `Continue watching` is a full-width horizontal rail, `ActivityAreaChart` and `GenrePieChart` are paired side-by-side in a dedicated `md:grid-cols-2` analytics row with quick-link actions, `Recently completed` is paired with `Plan to watch` in a symmetric `lg:grid-cols-2` grid, and `Recently rated` is paired with `Dropped` in a symmetric `lg:grid-cols-2` grid.
   - Clicking "Continue watching", "Your Library", "Recently completed", "Dropped", or "Recently rated" (including header arrows) navigates directly to `/library`.
   - Removed Library and Stats links from the main sidebar navigation.
-- Dedicated Anime Hub (`/anime`):
-  - Created `/anime` page with Series, Top Rated, and Films shelves, dynamic anime sub-genres (Action, Fantasy, Sci-Fi, Adventure, Romance, etc.), and pagination.
-  - Added `discoverAnime` and `getAnimeGenres` in `src/lib/media/anime.ts` querying TMDB with genre 16 and original language `ja`.
-  - Added Anime to sidebar navigation immediately below "TV Shows", with shortcut `g a`.
-- Cleaned Navigation & Stats Page Removal:
+  - Stats page (`/stats`) redirects cleanly to `/dashboard`.
+- Cleaned Navigation & Sidebar Design:
+  - Removed the vertical blue bar inside the active sidebar selector, preserving the clean frosted liquid glass pill capsule, borders, and glowing active icon.
   - Sidebar order: Home → Discover → For You → Movies → TV Shows → Anime → Watchlist → Favorites → Friends.
-  - Stats page (`/stats`) redirects cleanly to `/dashboard`; updated header buttons and links in wrapped/profile to dashboard and insights.
+  - Anime sidebar entry uses the exact user-provided custom icon (`public/icons/anime.png`), rendered through `AnimeIcon` via CSS mask to inherit dynamic sidebar states (idle muted, hover white, active glowing blue).
 - Clean Native Streaming Identity:
   - Removed third-party external subscription links ("Available on Netflix/Prime", "Where to watch") across movies, series, and anime hero and details sections, solidifying Erasmus as a self-contained streaming platform.
 - Full-viewport Browser Theater Player (`streaming-theater-modal.tsx` & `native-player.tsx`):
@@ -46,9 +54,9 @@ Streaming architecture and playback reliability. Reduce Vercel bandwidth from HL
 - Evaluating direct client-side playback on whitelisted open-CORS edge CDNs (`keenanchor.top`) to reduce Vercel proxy bandwidth.
 
 ## Next
-1. Verify browser-window and OS fullscreen transitions on staging and mobile/desktop clients.
-2. Monitor Vercel bandwidth impact from whitelisting `keenanchor.top` direct CDN segments.
-3. Keep profile/backend changes paused until playback stability is verified on production.
+1. Confirm user approval for committing and pushing the redesigned Movies, TV Shows, and Anime showcase pages.
+2. Verify browser-window and OS fullscreen transitions on staging and mobile/desktop clients.
+3. Monitor Vercel bandwidth impact from whitelisting `keenanchor.top` direct CDN segments.
 
 ## Key locations
 - Web repo: `/Users/paarthsharma/Developer/GitHub/Erasmus` (branch: `main`)

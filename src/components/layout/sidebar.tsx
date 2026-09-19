@@ -50,12 +50,6 @@ function NavRow({ item, active, collapsed }: NavRowProps) {
             comingSoon && "cursor-not-allowed opacity-50",
           )}
         >
-          {active ? (
-            <span
-              className="absolute left-1 top-2 bottom-2 w-1 rounded-full bg-gradient-to-b from-primary via-primary to-blue-400 shadow-[0_0_10px_hsl(var(--primary)),0_0_3px_#fff]"
-              aria-hidden
-            />
-          ) : null}
           <span className="grid w-10 shrink-0 place-items-center">
             <Icon
               className={cn(

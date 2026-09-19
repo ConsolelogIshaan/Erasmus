@@ -363,3 +363,371 @@ export async function safeGetDiscoveryHome() {
     };
   }
 }
+
+/**
+ * Assembles the Movies discovery homepage sections mirroring the Discover page.
+ */
+export async function getMoviesDiscoveryHome(): Promise<{
+  hero: MediaSummary | null;
+  heroItems: MediaSummary[];
+  sections: DiscoverySection[];
+  genres: Genre[];
+}> {
+  const provider = getMediaProvider();
+
+  const [
+    trending,
+    popular,
+    nowPlaying,
+    upcoming,
+    topRated,
+    action,
+    scifi,
+    comedy,
+    horror,
+    recent,
+    genres,
+  ] = await Promise.all([
+    settledPage(provider.getTrending("movie", "day"), "trending-movies"),
+    settledPage(provider.getPopularMovies(), "popular-movies"),
+    settledPage(provider.getNowPlayingMovies(), "now-playing-movies"),
+    settledPage(provider.getUpcomingMovies(), "upcoming-movies"),
+    settledPage(provider.getTopRatedMovies(), "top-rated-movies"),
+    settledPage(
+      provider.discoverMovies({ genreIds: ["28"], sortBy: "popularity.desc" }),
+      "action-movies",
+    ),
+    settledPage(
+      provider.discoverMovies({ genreIds: ["878"], sortBy: "popularity.desc" }),
+      "scifi-movies",
+    ),
+    settledPage(
+      provider.discoverMovies({ genreIds: ["35"], sortBy: "popularity.desc" }),
+      "comedy-movies",
+    ),
+    settledPage(
+      provider.discoverMovies({ genreIds: ["27"], sortBy: "popularity.desc" }),
+      "horror-movies",
+    ),
+    settledPage(
+      provider.discoverMovies({
+        sortBy: "release_date.desc",
+        yearGte: new Date().getFullYear() - 1,
+        voteAverageGte: 6,
+      }),
+      "recent-movies",
+    ),
+    settledGenres(provider.getMovieGenres(), "movie-genres"),
+  ]);
+
+  const heroPool = [
+    ...popular.results.slice(0, 5),
+    ...trending.results.slice(0, 4),
+    ...nowPlaying.results.slice(0, 3),
+  ];
+
+  const seen = new Set<string>();
+  const heroItemsRaw = heroPool.filter((item) => {
+    const key = `movie:${item.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return Boolean(item.backdropPath || item.posterPath);
+  }).slice(0, 10);
+
+  const heroItems = await Promise.all(
+    heroItemsRaw.map(async (item) => {
+      try {
+        const m = await provider.getMovie(item.id);
+        return {
+          ...item,
+          logoPath: m?.logoPath ?? null,
+          tagline: m?.tagline ?? null,
+        };
+      } catch {
+        return item;
+      }
+    }),
+  );
+
+  const hero = heroItems[0] ?? popular.results[0] ?? null;
+
+  const sections: DiscoverySection[] = [
+    {
+      id: "trending-movies",
+      title: "Trending Movies",
+      href: "/movies?sort=popularity.desc",
+      items: trending.results.slice(0, 18),
+    },
+    {
+      id: "now-playing",
+      title: "Now Playing in Theaters",
+      href: "/movies?section=now_playing",
+      items: nowPlaying.results.slice(0, 18),
+    },
+    {
+      id: "popular-movies",
+      title: "Popular Movies",
+      href: "/movies?sort=popularity.desc",
+      items: popular.results.slice(0, 18),
+    },
+    {
+      id: "top-rated-movies",
+      title: "Top Rated Films",
+      href: "/movies?section=top_rated",
+      items: topRated.results.slice(0, 18),
+    },
+    {
+      id: "upcoming-movies",
+      title: "Upcoming Blockbusters",
+      href: "/movies?section=upcoming",
+      items: upcoming.results.slice(0, 18),
+    },
+    {
+      id: "action-movies",
+      title: "Action & Adventure",
+      href: "/movies?genre=28",
+      items: action.results.slice(0, 18),
+    },
+    {
+      id: "scifi-movies",
+      title: "Sci-Fi & Fantasy",
+      href: "/movies?genre=878",
+      items: scifi.results.slice(0, 18),
+    },
+    {
+      id: "comedy-movies",
+      title: "Comedy Hits",
+      href: "/movies?genre=35",
+      items: comedy.results.slice(0, 18),
+    },
+    {
+      id: "horror-movies",
+      title: "Horror & Suspense",
+      href: "/movies?genre=27",
+      items: horror.results.slice(0, 18),
+    },
+    {
+      id: "recent-movies",
+      title: "Recently Released",
+      href: "/movies?sort=release_date.desc",
+      items: recent.results.slice(0, 18),
+    },
+  ];
+
+  const filled = sections.filter((s) => s.items.length > 0);
+
+  return {
+    hero,
+    heroItems,
+    sections: filled,
+    genres,
+  };
+}
+
+export async function safeGetMoviesDiscoveryHome() {
+  if (!isCatalogConfigured()) {
+    return {
+      hero: null as MediaSummary | null,
+      heroItems: [] as MediaSummary[],
+      sections: [] as DiscoverySection[],
+      genres: [] as Genre[],
+      configured: false,
+    };
+  }
+  try {
+    const data = await getMoviesDiscoveryHome();
+    return { ...data, configured: true };
+  } catch (error) {
+    console.error("[catalog] movies discovery home failed", error);
+    return {
+      hero: null as MediaSummary | null,
+      heroItems: [] as MediaSummary[],
+      sections: [] as DiscoverySection[],
+      genres: [] as Genre[],
+      configured: true,
+      error: error instanceof Error ? error.message : "Failed to load movies",
+    };
+  }
+}
+
+/**
+ * Assembles the TV discovery homepage sections mirroring the Discover page.
+ */
+export async function getTvDiscoveryHome(): Promise<{
+  hero: MediaSummary | null;
+  heroItems: MediaSummary[];
+  sections: DiscoverySection[];
+  genres: Genre[];
+}> {
+  const provider = getMediaProvider();
+
+  const [
+    trending,
+    popular,
+    topRated,
+    scifi,
+    drama,
+    action,
+    crime,
+    comedy,
+    recent,
+    genres,
+  ] = await Promise.all([
+    settledPage(provider.getTrending("tv", "day"), "trending-tv"),
+    settledPage(provider.getPopularTv(), "popular-tv"),
+    settledPage(provider.getTopRatedTv(), "top-rated-tv"),
+    settledPage(
+      provider.discoverTv({ genreIds: ["10765"], sortBy: "popularity.desc" }),
+      "scifi-tv",
+    ),
+    settledPage(
+      provider.discoverTv({ genreIds: ["18"], sortBy: "popularity.desc" }),
+      "drama-tv",
+    ),
+    settledPage(
+      provider.discoverTv({ genreIds: ["10759"], sortBy: "popularity.desc" }),
+      "action-tv",
+    ),
+    settledPage(
+      provider.discoverTv({ genreIds: ["80"], sortBy: "popularity.desc" }),
+      "crime-tv",
+    ),
+    settledPage(
+      provider.discoverTv({ genreIds: ["35"], sortBy: "popularity.desc" }),
+      "comedy-tv",
+    ),
+    settledPage(
+      provider.discoverTv({
+        sortBy: "release_date.desc",
+        yearGte: new Date().getFullYear() - 1,
+        voteAverageGte: 6,
+      }),
+      "recent-tv",
+    ),
+    settledGenres(provider.getTvGenres(), "tv-genres"),
+  ]);
+
+  const heroPool = [
+    ...popular.results.slice(0, 5),
+    ...trending.results.slice(0, 4),
+    ...topRated.results.slice(0, 3),
+  ];
+
+  const seen = new Set<string>();
+  const heroItemsRaw = heroPool.filter((item) => {
+    const key = `tv:${item.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return Boolean(item.backdropPath || item.posterPath);
+  }).slice(0, 10);
+
+  const heroItems = await Promise.all(
+    heroItemsRaw.map(async (item) => {
+      try {
+        const t = await provider.getTvShow(item.id);
+        return {
+          ...item,
+          logoPath: t?.logoPath ?? null,
+          tagline: t?.tagline ?? null,
+        };
+      } catch {
+        return item;
+      }
+    }),
+  );
+
+  const hero = heroItems[0] ?? popular.results[0] ?? null;
+
+  const sections: DiscoverySection[] = [
+    {
+      id: "trending-tv",
+      title: "Trending Series",
+      href: "/tv?sort=popularity.desc",
+      items: trending.results.slice(0, 18),
+    },
+    {
+      id: "popular-tv",
+      title: "Popular TV Shows",
+      href: "/tv?sort=popularity.desc",
+      items: popular.results.slice(0, 18),
+    },
+    {
+      id: "top-rated-tv",
+      title: "Top Rated Series",
+      href: "/tv?section=top_rated",
+      items: topRated.results.slice(0, 18),
+    },
+    {
+      id: "scifi-tv",
+      title: "Sci-Fi & Fantasy Epics",
+      href: "/tv?genre=10765",
+      items: scifi.results.slice(0, 18),
+    },
+    {
+      id: "drama-tv",
+      title: "Drama Masterpieces",
+      href: "/tv?genre=18",
+      items: drama.results.slice(0, 18),
+    },
+    {
+      id: "action-tv",
+      title: "Action & Adventure",
+      href: "/tv?genre=10759",
+      items: action.results.slice(0, 18),
+    },
+    {
+      id: "crime-tv",
+      title: "Crime & Mystery",
+      href: "/tv?genre=80",
+      items: crime.results.slice(0, 18),
+    },
+    {
+      id: "comedy-tv",
+      title: "Comedy Series",
+      href: "/tv?genre=35",
+      items: comedy.results.slice(0, 18),
+    },
+    {
+      id: "recent-tv",
+      title: "Recently Aired",
+      href: "/tv?sort=release_date.desc",
+      items: recent.results.slice(0, 18),
+    },
+  ];
+
+  const filled = sections.filter((s) => s.items.length > 0);
+
+  return {
+    hero,
+    heroItems,
+    sections: filled,
+    genres,
+  };
+}
+
+export async function safeGetTvDiscoveryHome() {
+  if (!isCatalogConfigured()) {
+    return {
+      hero: null as MediaSummary | null,
+      heroItems: [] as MediaSummary[],
+      sections: [] as DiscoverySection[],
+      genres: [] as Genre[],
+      configured: false,
+    };
+  }
+  try {
+    const data = await getTvDiscoveryHome();
+    return { ...data, configured: true };
+  } catch (error) {
+    console.error("[catalog] tv discovery home failed", error);
+    return {
+      hero: null as MediaSummary | null,
+      heroItems: [] as MediaSummary[],
+      sections: [] as DiscoverySection[],
+      genres: [] as Genre[],
+      configured: true,
+      error: error instanceof Error ? error.message : "Failed to load TV shows",
+    };
+  }
+}
+

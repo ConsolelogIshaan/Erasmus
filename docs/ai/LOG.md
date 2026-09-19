@@ -82,5 +82,20 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Result: Verified on `main` branch. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run test` passed (19/19 files, 209 tests), `npm run build` compiled all 41 routes with zero errors.
 - Next: Push latest changes to `origin/main` and `origin/Bingr`.
 
+## 2026-09-19 | Paarth | Gemini
+- Changed: Fixed layout misalignment and excessive side/top padding on the Movies (`/movies`), TV Shows (`/tv`), and Anime (`/anime`) pages. In `src/components/layout/app-shell.tsx`, the `isFullBleed` route matcher previously only included `/discover` and `/tv/[id]`, `/movie/[id]`. Consequently, `/movies`, `/tv`, and `/anime` were erroneously wrapped in the constrained `<div className="content-container min-w-0 py-6 sm:py-8 lg:py-10">` with sticky non-floating headers, causing huge black gutters, constrained hero width, and misaligned hero banners. Updated `isFullBleed` in `app-shell.tsx` to match `/^\/(discover|movies|tv|anime)\/?$/`, allowing the hero banner and shelves on Movies, TV Shows, and Anime to render 100% full bleed, edge-to-edge behind the floating frosted glass sidebar and transparent header, exactly matching the Discover page.
+- Files: `src/components/layout/app-shell.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified locally on `main` branch. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run test` passed (19/19 test files, 209 tests passed), `npm run build` compiled all 41 routes cleanly. No git push performed.
+## 2026-09-19 | Paarth | Gemini
+- Changed: Removed the vertical blue bar indicator from the sidebar active selector in `src/components/layout/sidebar.tsx` while preserving the frosted liquid glass active capsule and glow. Reorganized the Home dashboard (`src/app/(app)/dashboard/page.tsx`) to eliminate the massive empty space beneath the charts: converted `Continue watching` to a full-width horizontal rail, placed `ActivityAreaChart` and `GenrePieChart` side-by-side in a dedicated 2-column analytics row (`md:grid-cols-2`) with top-right quick links, paired `Recently completed` with `Plan to watch` in a symmetric 2-column grid (`lg:grid-cols-2`), and paired `Recently rated` with `Dropped` in a 2-column grid.
+- Files: `src/components/layout/sidebar.tsx`, `src/app/(app)/dashboard/page.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified locally on `main` branch. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run build` compiled all 41 routes cleanly. No git push performed.
+- Next: Await user review and confirmation.
+
+
+
+
+
+
 
 
