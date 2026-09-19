@@ -28,6 +28,7 @@ interface LibraryPosterCardProps {
   showProgress?: boolean;
   orientation?: "portrait" | "landscape";
   onRemove?: (entry: LibraryEntry) => void;
+  onCardClick?: (entry: LibraryEntry) => void;
 }
 
 /**
@@ -40,6 +41,7 @@ export function LibraryPosterCard({
   showProgress = true,
   orientation = "portrait",
   onRemove,
+  onCardClick,
 }: LibraryPosterCardProps) {
   const reduceMotion = useReducedMotion();
   const [localProgress, setLocalProgress] = React.useState<number | null>(null);
@@ -191,6 +193,14 @@ export function LibraryPosterCard({
         <Link
           href={href}
           prefetch
+          onClick={(e) => {
+            if (onCardClick) {
+              if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                e.preventDefault();
+                onCardClick(entry);
+              }
+            }
+          }}
           className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-label={entry.title}
         >

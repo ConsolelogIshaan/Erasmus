@@ -23,7 +23,6 @@ import { MediaRow } from "@/features/media/components/media-row";
 import { PosterCard } from "@/features/media/components/poster-card";
 import { StatCounter } from "@/features/intelligence/components/stat-counter";
 import { SeriesStatsTabs } from "@/features/intelligence/components/series-stats-tabs";
-import { InsightCards } from "@/features/intelligence/components/insight-cards";
 import { DashboardSection } from "@/features/intelligence/components/dashboard-section";
 import {
   ActivityAreaChart,
@@ -44,7 +43,6 @@ import { formatDate } from "@/lib/media/format";
 import { ROUTES } from "@/constants/routes";
 import { getDashboardPayload } from "@/lib/intelligence/dashboard";
 import { formatWatchHours } from "@/lib/intelligence/stats-engine";
-import { formatRelativeDate } from "@/lib/utils";
 import type { Profile } from "@/types";
 
 export const metadata: Metadata = {
@@ -106,7 +104,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     listLibrary(user.id, libraryFilters),
   ]);
 
-  const { stats, insights } = dash;
+  const { stats } = dash;
   const year = new Date().getFullYear();
 
   return (
@@ -196,16 +194,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         </section>
       </ScrollReveal>
 
-      {/* Insights strip */}
-      {insights.length > 0 ? (
-        <DashboardSection
-          title="Insights"
-          href={ROUTES.insights}
-          description="What your watch history says about you"
-        >
-          <InsightCards insights={insights.slice(0, 3)} />
-        </DashboardSection>
-      ) : null}
 
       {/* Continue watching — full width sleek rail */}
       <DashboardSection title="Continue watching" href={ROUTES.library}>
@@ -444,26 +432,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         </DashboardSection>
       ) : null}
 
-      {/* Activity timeline preview */}
-      <DashboardSection title="Activity" href={ROUTES.timeline}>
-        {dash.activity.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Your feed will fill as you journal.</p>
-        ) : (
-          <ul className="space-y-2">
-            {dash.activity.map((a) => (
-              <li
-                key={a.id}
-                className="flex items-start justify-between gap-3 rounded-xl border-0 bg-muted/40 px-3 py-2 text-sm dark:bg-white/[0.05]"
-              >
-                <span>{a.summary}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {formatRelativeDate(a.created_at)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </DashboardSection>
 
       {/* Profile options & settings */}
       <section className="pt-2">

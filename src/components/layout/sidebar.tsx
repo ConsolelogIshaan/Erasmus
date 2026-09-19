@@ -43,14 +43,17 @@ function NavRow({ item, active, collapsed }: NavRowProps) {
             if (comingSoon) event.preventDefault();
           }}
           className={cn(
-            "group/row relative flex h-9 w-full items-center overflow-hidden rounded-lg border text-sm font-medium transition-all duration-200",
+            "group/row relative flex border text-sm font-medium transition-all duration-200",
+            collapsed
+              ? "h-10 w-10 items-center justify-center rounded-xl p-0 mx-auto"
+              : "h-9 w-full items-center overflow-hidden rounded-lg",
             active
               ? "border-white/[0.18] bg-gradient-to-r from-white/[0.14] to-white/[0.06] text-white shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.25),inset_0_0_12px_rgba(255,255,255,0.03),0_4px_16px_rgba(0,0,0,0.4)] backdrop-blur-xl"
               : "border-transparent text-muted-foreground/90 hover:border-white/[0.09] hover:bg-white/[0.07] hover:text-white hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]",
             comingSoon && "cursor-not-allowed opacity-50",
           )}
         >
-          <span className="grid w-10 shrink-0 place-items-center">
+          <span className={cn("grid place-items-center", collapsed ? "h-full w-full" : "w-10 shrink-0")}>
             <Icon
               className={cn(
                 "size-[1.05rem] transition-all duration-200 group-hover/row:scale-110",
@@ -67,8 +70,10 @@ function NavRow({ item, active, collapsed }: NavRowProps) {
               active ? "font-medium text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" : "",
               "transition-opacity delay-[90ms] duration-[120ms] ease-[var(--ease-out)]",
               "group-data-[collapsed]/rail:opacity-0",
+              "group-data-[collapsed]/rail:hidden",
               "group-data-[collapsed]/rail:delay-0",
               "group-data-[collapsed]/rail:duration-[80ms]",
+              collapsed && "hidden",
               "motion-reduce:delay-0",
             )}
           >
@@ -95,7 +100,7 @@ function NavList({
   pathname: string;
 }) {
   return (
-    <nav className="flex flex-col gap-1" aria-label={label}>
+    <nav className={cn("flex flex-col gap-1", collapsed && "w-full items-center")} aria-label={label}>
       {items.map((item) => (
         <NavRow
           key={item.href}
@@ -170,7 +175,12 @@ export function Sidebar({ isFullBleed }: { isFullBleed?: boolean }) {
         aria-hidden
       />
 
-      <div className="relative z-10 flex h-[var(--header-height)] shrink-0 items-center px-3">
+      <div
+        className={cn(
+          "relative z-10 flex h-[var(--header-height)] shrink-0 items-center",
+          sidebarCollapsed ? "justify-center px-0" : "px-3"
+        )}
+      >
         <span className="grid w-10 place-items-center">
           <Button
             type="button"
@@ -194,7 +204,12 @@ export function Sidebar({ isFullBleed }: { isFullBleed?: boolean }) {
         </span>
       </div>
 
-      <div className="no-scrollbar relative z-10 flex-1 overflow-y-auto px-3 pb-4">
+      <div
+        className={cn(
+          "no-scrollbar relative z-10 flex-1 overflow-y-auto pb-4",
+          sidebarCollapsed ? "px-0 flex flex-col items-center" : "px-3"
+        )}
+      >
         <NavList
           items={MAIN_NAV}
           label="Primary"
@@ -202,7 +217,13 @@ export function Sidebar({ isFullBleed }: { isFullBleed?: boolean }) {
           pathname={pathname}
         />
 
-        <div className="my-3 h-px w-full bg-gradient-to-r from-transparent via-white/[0.14] to-transparent" aria-hidden />
+        <div
+          className={cn(
+            "my-3 h-px bg-gradient-to-r from-transparent via-white/[0.14] to-transparent",
+            sidebarCollapsed ? "w-8 mx-auto" : "w-full"
+          )}
+          aria-hidden
+        />
 
         <NavList
           items={SECONDARY_NAV}

@@ -8,8 +8,10 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { LibraryPosterCard } from "@/features/library/components/library-poster-card";
 import { Button } from "@/components/ui/button";
+import { StreamingTheaterModal } from "@/features/streaming/components/streaming-theater-modal";
 import {
   getRecentPlayback,
+  getTvShowResume,
   clearRecentPlaybackItem,
   clearTvShowResume,
 } from "@/lib/streaming/playback-progress";
@@ -95,6 +97,19 @@ export function ContinueWatchingRail({
       return [];
     }
   });
+
+  const [theaterEntry, setTheaterEntry] = React.useState<LibraryEntry | null>(null);
+
+  const handleCardClick = React.useCallback((entry: LibraryEntry) => {
+    setTheaterEntry(entry);
+  }, []);
+
+  const tvResume =
+    theaterEntry && theaterEntry.media_type === "tv"
+      ? getTvShowResume(theaterEntry.external_id)
+      : null;
+  const activeSeason = tvResume?.season ?? theaterEntry?.current_season ?? 1;
+  const activeEpisode = tvResume?.episode ?? theaterEntry?.current_episode ?? 1;
 
   const scrollerRef = React.useRef<HTMLDivElement>(null);
 
@@ -336,86 +351,121 @@ export function ContinueWatchingRail({
     );
   }
 
+  const theaterModal = theaterEntry ? (
+    <StreamingTheaterModal
+      key={`${theaterEntry.media_type}-${theaterEntry.external_id}`}
+      open={Boolean(theaterEntry)}
+      onOpenChange={(open) => {
+        if (!open) setTheaterEntry(null);
+      }}
+      title={theaterEntry.title}
+      tmdbId={theaterEntry.external_id}
+      mediaType={theaterEntry.media_type as "movie" | "tv"}
+      currentSeason={theaterEntry.media_type === "tv" ? activeSeason : undefined}
+      currentEpisode={theaterEntry.media_type === "tv" ? activeEpisode : undefined}
+      identity={{
+        provider: theaterEntry.provider ?? "tmdb",
+        mediaType: theaterEntry.media_type,
+        externalId: theaterEntry.external_id,
+        title: theaterEntry.title,
+        posterPath: theaterEntry.poster_path ?? undefined,
+        releaseDate: theaterEntry.release_date ?? undefined,
+      }}
+    />
+  ) : null;
+
   if (variant === "row") {
     return (
-      <section className={cn("min-w-0 max-w-full space-y-3", className)} aria-label={title}>
-        <div className="flex items-end justify-between gap-3 px-2 sm:px-3">
-          <div>
-            {href ? (
-              <Link
-                href={href}
-                className="group inline-flex items-center gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-              >
-                <h2 className="text-section-title transition-colors duration-300 group-hover:text-primary">
-                  {title}
-                </h2>
-                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1 group-hover:text-primary" />
-              </Link>
-            ) : (
-              <h2 className="text-section-title">{title}</h2>
-            )}
-          </div>
-          <div className="hidden items-center gap-1.5 sm:flex">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              className="rounded-xl"
-              onClick={() => scroll(-1)}
-              aria-label={`Scroll ${title} left`}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              className="rounded-xl"
-              onClick={() => scroll(1)}
-              aria-label={`Scroll ${title} right`}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div
-          ref={scrollerRef}
-          className={cn(
-            "scrollbar-thin flex gap-4 sm:gap-5 overflow-x-auto scroll-smooth px-2 sm:px-3 snap-x snap-mandatory scroll-px-2 sm:scroll-px-3",
-            effectiveOrientation === "landscape" ? "py-5 sm:py-6" : "py-12"
-          )}
-          tabIndex={0}
-          role="list"
-        >
-          {entries.slice(0, 16).map((entry) => (
-            <div
-              key={entry.id}
-              className={cn(
-                "shrink-0 snap-start",
-                effectiveOrientation === "landscape"
-                  ? "w-64 sm:w-72 md:w-80 lg:w-[22rem]"
-                  : "w-44 sm:w-48 lg:w-52 xl:w-56"
+      <>
+        <section className={cn("min-w-0 max-w-full space-y-3", className)} aria-label={title}>
+          <div className="flex items-end justify-between gap-3 px-2 sm:px-3">
+            <div>
+              {href ? (
+                <Link
+                  href={href}
+                  className="group inline-flex items-center gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  <h2 className="text-section-title transition-colors duration-300 group-hover:text-primary">
+                    {title}
+                  </h2>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1 group-hover:text-primary" />
+                </Link>
+              ) : (
+                <h2 className="text-section-title">{title}</h2>
               )}
-              role="listitem"
-            >
-              <LibraryPosterCard
-                entry={entry}
-                orientation={effectiveOrientation}
-                onRemove={handleRemove}
-              />
             </div>
-          ))}
-        </div>
-      </section>
+            <div className="hidden items-center gap-1.5 sm:flex">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="rounded-xl"
+                onClick={() => scroll(-1)}
+                aria-label={`Scroll ${title} left`}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="rounded-xl"
+                onClick={() => scroll(1)}
+                aria-label={`Scroll ${title} right`}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div
+            ref={scrollerRef}
+            className={cn(
+              "scrollbar-thin flex gap-4 sm:gap-5 overflow-x-auto scroll-smooth px-2 sm:px-3 snap-x snap-mandatory scroll-px-2 sm:scroll-px-3",
+              effectiveOrientation === "landscape" ? "py-5 sm:py-6" : "py-12"
+            )}
+            tabIndex={0}
+            role="list"
+          >
+            {entries.slice(0, 16).map((entry) => (
+              <div
+                key={entry.id}
+                className={cn(
+                  "shrink-0 snap-start",
+                  effectiveOrientation === "landscape"
+                    ? "w-64 sm:w-72 md:w-80 lg:w-[22rem]"
+                    : "w-44 sm:w-48 lg:w-52 xl:w-56"
+                )}
+                role="listitem"
+              >
+                <LibraryPosterCard
+                  entry={entry}
+                  orientation={effectiveOrientation}
+                  onRemove={handleRemove}
+                  onCardClick={handleCardClick}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+        {theaterModal}
+      </>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4 pt-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-      {entries.slice(0, 12).map((e) => (
-        <LibraryPosterCard key={e.id} entry={e} onRemove={handleRemove} />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-2 gap-4 pt-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        {entries.slice(0, 12).map((e) => (
+          <LibraryPosterCard
+            key={e.id}
+            entry={e}
+            onRemove={handleRemove}
+            onCardClick={handleCardClick}
+          />
+        ))}
+      </div>
+      {theaterModal}
+    </>
   );
 }

@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Bookmark, Check, Loader2, Play, Star } from "lucide-react";
+import { Bookmark, Loader2, Play, Star } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -13,6 +13,8 @@ import { posterUrl } from "@/lib/media/image";
 import { formatNumber, formatVote, formatYear } from "@/lib/media/format";
 import { mediaHref } from "@/lib/media/routes";
 import { actionUpsertAndSetStatus } from "@/features/library/actions/library-actions";
+import { StreamingTheaterModal } from "@/features/streaming/components/streaming-theater-modal";
+import { getTvShowResume } from "@/lib/streaming/playback-progress";
 import type { MediaSummary } from "@/types/media";
 import type { MediaIdentity, WatchStatus } from "@/types/library";
 
@@ -51,9 +53,9 @@ const STATUS_BADGE: Record<QuickStatus, string> = {
   completed: "Done",
 };
 
-/** ~66% of previous h-9 (36px) → ~24px */
+/** Height and styling for hover action buttons */
 const actionBtnClass =
-  "inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg text-[11px] font-semibold shadow-sm backdrop-blur-md transition disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+  "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-xs font-semibold backdrop-blur-xl transition-all duration-200 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50";
 
 /** Smooth settle — no snappy bounce that fights the layout. */
 const popTransition = {
@@ -97,6 +99,11 @@ export function PosterCard({
   const [hovered, setHovered] = React.useState(false);
   const [pending, setPending] = React.useState<WatchStatus | null>(null);
   const [lastStatus, setLastStatus] = React.useState<WatchStatus | null>(null);
+  const [theaterOpen, setTheaterOpen] = React.useState(false);
+
+  const tvResume = item.mediaType === "tv" ? getTvShowResume(String(item.id)) : null;
+  const playSeason = tvResume?.season ?? 1;
+  const playEpisode = tvResume?.episode ?? 1;
 
   const href = mediaHref(item.mediaType, item.id);
   const src = posterUrl(item.posterPath, "w500");
@@ -254,58 +261,41 @@ export function PosterCard({
               animate={{ opacity: 1, y: 0 }}
               exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 4 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-1 p-2"
+              className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-1.5 p-2.5"
             >
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void actionUpsertAndSetStatus(toIdentity(item), "watching").catch(() => {});
+                  setTheaterOpen(true);
+                }}
+                className={cn(
+                  actionBtnClass,
+                  "bg-white/75 text-black border border-white/60 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_1px_rgba(255,255,255,0.85)] hover:bg-white/90 active:scale-[0.97]",
+                )}
+                aria-label={`Play ${item.title}`}
+              >
+                <Play className="h-3.5 w-3.5 fill-black text-black ml-0.5" />
+                Play
+              </button>
               <button
                 type="button"
                 disabled={pending != null}
                 onClick={(e) => void setStatus("plan_to_watch", e)}
                 className={cn(
                   actionBtnClass,
-                  "bg-black/55 text-white ring-1 ring-white/10 hover:bg-black/70",
+                  "bg-black/50 text-white border border-white/20 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_1px_rgba(255,255,255,0.15)] hover:bg-black/70 active:scale-[0.97]",
                 )}
                 aria-label={`Add ${item.title} to plan to watch`}
               >
                 {pending === "plan_to_watch" ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Bookmark className="h-3 w-3" />
+                  <Bookmark className="h-3.5 w-3.5" />
                 )}
                 Plan to Watch
-              </button>
-              <button
-                type="button"
-                disabled={pending != null}
-                onClick={(e) => void setStatus("watching", e)}
-                className={cn(
-                  actionBtnClass,
-                  "bg-white/35 text-white ring-1 ring-white/35 hover:bg-white/50",
-                )}
-                aria-label={`Add ${item.title} to watching`}
-              >
-                {pending === "watching" ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Play className="h-3 w-3 fill-current" />
-                )}
-                Watching
-              </button>
-              <button
-                type="button"
-                disabled={pending != null}
-                onClick={(e) => void setStatus("completed", e)}
-                className={cn(
-                  actionBtnClass,
-                  "bg-primary/45 ring-primary/40 hover:bg-primary/60 text-white ring-1",
-                )}
-                aria-label={`Mark ${item.title} as completed`}
-              >
-                {pending === "completed" ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Check className="h-3 w-3" />
-                )}
-                Completed
               </button>
             </motion.div>
           ) : null}
@@ -326,6 +316,19 @@ export function PosterCard({
               : "Movie"}
         </p>
       </Link>
+
+      {theaterOpen ? (
+        <StreamingTheaterModal
+          open={theaterOpen}
+          onOpenChange={setTheaterOpen}
+          title={item.title}
+          tmdbId={String(item.id)}
+          mediaType={item.mediaType}
+          identity={toIdentity(item)}
+          currentSeason={item.mediaType === "tv" ? playSeason : undefined}
+          currentEpisode={item.mediaType === "tv" ? playEpisode : undefined}
+        />
+      ) : null}
     </motion.div>
   );
 }

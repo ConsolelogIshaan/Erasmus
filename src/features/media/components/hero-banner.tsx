@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { backdropUrl, logoUrl } from "@/lib/media/image";
 import { formatVote, formatYear } from "@/lib/media/format";
 import { mediaHref } from "@/lib/media/routes";
+import { StreamingTheaterModal } from "@/features/streaming/components/streaming-theater-modal";
+import { getTvShowResume } from "@/lib/streaming/playback-progress";
 import type { MediaSummary } from "@/types/media";
 import { useAmbient } from "@/providers/ambient-provider";
 import type { AmbientPalette } from "@/lib/media/ambient-palette-types";
@@ -54,6 +56,7 @@ export function HeroBanner({
   const [detailsCache, setDetailsCache] = React.useState<
     Record<string, { logoPath: string | null; tagline: string | null }>
   >({});
+  const [theaterOpen, setTheaterOpen] = React.useState(false);
 
   const go = React.useCallback(
     (dir: -1 | 1) => {
@@ -201,6 +204,10 @@ export function HeroBanner({
     backdropUrl(active.backdropPath ?? active.posterPath, "original") ??
     backdropUrl(active.backdropPath ?? active.posterPath, "w1280");
   const year = formatYear(active.releaseDate);
+
+  const tvResume = active.mediaType === "tv" ? getTvShowResume(String(active.id)) : null;
+  const playSeason = tvResume?.season ?? 1;
+  const playEpisode = tvResume?.episode ?? 1;
 
   return (
     <section
@@ -376,14 +383,14 @@ export function HeroBanner({
             {/* Action Buttons & Badges Row */}
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 sm:gap-3.5 pt-2">
               {/* Circular White Play Button */}
-              <Link
-                href={href}
-                prefetch
-                className="flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-full bg-white text-black shadow-xl shadow-black/50 transition-all duration-200 hover:bg-white/90 hover:scale-105 active:scale-95 shrink-0"
+              <button
+                type="button"
+                onClick={() => setTheaterOpen(true)}
+                className="flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-full bg-white text-black shadow-xl shadow-black/50 transition-all duration-200 hover:bg-white/90 hover:scale-105 active:scale-95 shrink-0 cursor-pointer"
                 aria-label={`Play ${active.title}`}
               >
                 <Play className="h-5 w-5 fill-black text-black ml-0.5" />
-              </Link>
+              </button>
 
               {/* Pill See More Button */}
               <Link
@@ -481,6 +488,28 @@ export function HeroBanner({
           ) : null}
         </div>
       </div>
+
+      {theaterOpen ? (
+        <StreamingTheaterModal
+          open={theaterOpen}
+          onOpenChange={setTheaterOpen}
+          title={active.title}
+          tmdbId={String(active.id)}
+          mediaType={active.mediaType}
+          identity={{
+            provider: "tmdb",
+            mediaType: active.mediaType,
+            externalId: String(active.id),
+            title: active.title,
+            posterPath: active.posterPath ?? undefined,
+            releaseDate: active.releaseDate ?? undefined,
+          }}
+          currentSeason={active.mediaType === "tv" ? playSeason : undefined}
+          currentEpisode={active.mediaType === "tv" ? playEpisode : undefined}
+          logoPath={activeLogoPath}
+          tagline={activeTagline}
+        />
+      ) : null}
     </section>
   );
 }

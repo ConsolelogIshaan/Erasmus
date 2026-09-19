@@ -159,3 +159,30 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Files: `src/features/media/components/hero-banner.tsx`, `src/app/globals.css`, `src/components/layout/sidebar.tsx`, `src/features/streaming/components/stream-button.tsx`, `src/features/marketing/showcase.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 - Result: Verified locally on `main` branch. `npm run lint` passed (0 errors, 9 warnings), `npm run build` passed (41/41 routes compiled). No git push performed.
 
+## 2026-09-20 | Paarth | Gemini
+- Changed: Streamlined poster card hover quick actions (`src/features/media/components/poster-card.tsx`):
+  1. Removed the redundant "Watching" and "Completed" buttons from the hover action overlay.
+  2. Kept exactly two buttons:
+     - Top button: prominent white **Play** button (`bg-white text-black hover:bg-white/90 shadow-md active:scale-[0.97]`) with a solid black play icon (`<Play className="fill-black text-black ml-0.5" />`). Directly navigates to media page while recording status.
+     - Bottom button: dark **Plan to Watch** button (`bg-black/80 text-white ring-1 ring-white/15 hover:bg-black/95 active:scale-[0.97]`) with bookmark icon.
+- Files: `src/features/media/components/poster-card.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified locally on `main` branch. `npm run lint` passed (0 errors, 9 warnings), `npm run build` passed (41/41 routes compiled). No git push performed.
+
+## 2026-09-20 | Paarth | Gemini
+- Changed: Translucent frosted glass buttons, Continue Watching direct resume, Profile page cleanup, and centered sidebar icons:
+  1. Translucent Frosted Glass Quick Action Buttons: Updated `actionBtnClass` and hover buttons in `src/features/media/components/poster-card.tsx` with `backdrop-blur-xl`, `bg-white/75`, `bg-black/50`, specular borders, and inset box shadows for a frosty glass look.
+  2. Direct Playback Resume on Continue Watching: Added `onCardClick` prop to `LibraryPosterCard` in `src/features/library/components/library-poster-card.tsx`, and connected it in `src/features/library/components/continue-watching-rail.tsx` to directly open `StreamingTheaterModal` with the media's resume progress.
+  3. Profile Page Cleanup: Removed "Insights" and "Activity" sections and their unused dependencies (`InsightCards`, `formatRelativeDate`) from `src/app/(app)/dashboard/page.tsx`.
+  4. Centered Sidebar Icons: In `src/components/layout/sidebar.tsx`, updated `NavRow` to render a 40x40px (`w-10 h-10`) centered square button when collapsed, strictly hiding label text and centering icons and container horizontally on the 64px rail.
+- Files: `src/features/media/components/poster-card.tsx`, `src/features/library/components/library-poster-card.tsx`, `src/features/library/components/continue-watching-rail.tsx`, `src/app/(app)/dashboard/page.tsx`, `src/components/layout/sidebar.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified locally on `main` branch. `npm run lint` passed (0 errors, 9 warnings), `npm run build` passed (41/41 routes compiled).
+
+## 2026-09-20 | Paarth | Gemini
+- Changed: Enabled direct playback on Poster Card hover Play button and Hero Banner circular Play button:
+  1. Poster Card (`src/features/media/components/poster-card.tsx`): Updated the hover Play button to directly launch `StreamingTheaterModal` with the media's resume timestamp (episode/season for TV, minute progress for film) and automatically set library status to "watching", eliminating the detour to the details page.
+  2. Hero Banner (`src/features/media/components/hero-banner.tsx`): Updated the circular white Play button to directly trigger `StreamingTheaterModal` with resume progress, while keeping the "See More" button for navigating to the title's details page.
+- Files: `src/features/media/components/poster-card.tsx`, `src/features/media/components/hero-banner.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified locally on `main` branch. `npm run lint` passed (0 errors, 9 warnings), `npm run build` passed (41/41 routes compiled).
+
+
+
