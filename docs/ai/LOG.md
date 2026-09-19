@@ -63,3 +63,10 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Files: `src/lib/streaming/bingr-stream.ts`, `src/lib/streaming/stream-resolver.ts`, `src/lib/streaming/stream-resolver.test.ts`, `src/features/streaming/components/native-player.tsx`, `src/features/streaming/components/servers-modal.tsx`, `src/features/streaming/components/streaming-theater-modal.tsx`, `src/app/api/stream/hls/route.ts`, `src/lib/streaming/vidfast-direct.ts`, `src/lib/streaming/direct-stream.ts`, `src/app/api/stream/subs/route.ts`, `src/lib/streaming/wyzie.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 - Result: Branch `Bingr` committed (`3f6993c`) and pushed to `origin/Bingr`. `npm run build` passed cleanly (40/40 routes generated), `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), all 42 streaming tests passed.
 - Next: Review `Bingr` branch playback on staging and prepare PR to `main`.
+
+## 2026-09-19 | Paarth | Gemini
+- Changed: Merged `Bingr` branch into `main` and pushed to `origin/main`. Replaced the centered/padded dialog container in `streaming-theater-modal.tsx` with an edge-to-edge full-viewport browser player (`fixed inset-0 w-screen h-screen rounded-none border-0`), eliminating the empty background backdrop and blurred space behind the player upon clicking Play. Enhanced native and embed player fullscreen handling so clicking the Fullscreen button (or pressing `f`) activates the native OS/browser Fullscreen API (`requestFullscreen()`), toggling the icon between `Maximize2` and `Minimize2`.
+- Files: `src/features/streaming/components/streaming-theater-modal.tsx`, `src/features/streaming/components/native-player.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified on `main` branch. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run build` passed (40/40 routes generated), streaming vitest tests passing.
+- Next: Push latest changes to `main` and deploy to production.
+

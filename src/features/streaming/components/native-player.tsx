@@ -10,6 +10,7 @@ import {
   Gauge,
   Layers,
   Maximize2,
+  Minimize2,
   Music,
   Pause,
   PictureInPicture2,
@@ -95,6 +96,7 @@ export interface NativePlayerProps {
   fourKSrc?: string;
   onOpenServers?: () => void;
   externalSubtitles?: ExternalSubtitle[];
+  isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
   onProgress?: (seconds: number, duration: number) => void;
   // Cinematic metadata & contextual overlay
@@ -128,6 +130,7 @@ export function NativePlayer({
   fourKSrc,
   onOpenServers,
   externalSubtitles = [],
+  isFullscreen = false,
   onToggleFullscreen,
   onProgress,
   title,
@@ -746,12 +749,15 @@ export function NativePlayer({
           const index = Number(currentId.replace("ext-", ""));
           return index + 1 >= allSubtitles.length ? "off" : `ext-${index + 1}`;
         });
+      } else if (event.key === "f" || event.key === "F") {
+        event.preventDefault();
+        onToggleFullscreen?.();
       }
       revealControls();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [allSubtitles.length, revealControls]);
+  }, [allSubtitles.length, onToggleFullscreen, revealControls]);
 
   React.useEffect(() => {
     return () => {
@@ -1346,8 +1352,15 @@ export function NativePlayer({
           >
             <PictureInPicture2 className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
           </IconButton>
-          <IconButton title="Fullscreen" onClick={() => onToggleFullscreen?.()}>
-            <Maximize2 className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
+          <IconButton
+            title={isFullscreen ? "Exit Fullscreen (f)" : "Fullscreen (f)"}
+            onClick={() => onToggleFullscreen?.()}
+          >
+            {isFullscreen ? (
+              <Minimize2 className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
+            ) : (
+              <Maximize2 className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
+            )}
           </IconButton>
         </div>
       </div>

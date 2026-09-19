@@ -838,6 +838,8 @@ export function StreamingTheaterModal({
       setIsFullscreen(false);
       return;
     }
+    const container = containerRef.current || document.documentElement;
+    container.requestFullscreen?.().catch(() => {});
     setIsFullscreen(true);
   };
 
@@ -848,14 +850,6 @@ export function StreamingTheaterModal({
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
-
-  React.useEffect(() => {
-    if (!isFullscreen || document.fullscreenElement) return;
-    const frame = window.requestAnimationFrame(() => {
-      containerRef.current?.requestFullscreen?.().catch(() => {});
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [isFullscreen]);
 
   const currentEpisodeData = React.useMemo(() => {
     if (mediaType !== "tv") return null;
@@ -919,22 +913,20 @@ export function StreamingTheaterModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           className={cn(
-            "p-0 border-white/10 bg-black text-white shadow-2xl flex flex-col",
-            "w-[98vw] max-w-[98rem] h-[95vh] max-h-[64rem] sm:rounded-2xl overflow-hidden",
-            isFullscreen && "w-screen h-screen max-w-none max-h-none rounded-none border-0",
+            "fixed inset-0 z-50 p-0 m-0 border-0 bg-black text-white shadow-none flex flex-col",
+            "w-screen h-screen max-w-none max-h-none rounded-none overflow-hidden",
+            "[&>button:last-child]:hidden",
           )}
-          style={
-            isFullscreen
-              ? {
-                  transform: "none",
-                  left: 0,
-                  top: 0,
-                  width: "100vw",
-                  height: "100vh",
-                  maxWidth: "none",
-                }
-              : undefined
-          }
+          style={{
+            position: "fixed",
+            left: 0,
+            top: 0,
+            transform: "none",
+            width: "100vw",
+            height: "100vh",
+            maxWidth: "none",
+            maxHeight: "none",
+          }}
         >
           <DialogTitle className="sr-only">{title}</DialogTitle>
           <div
@@ -1064,6 +1056,7 @@ export function StreamingTheaterModal({
                 fourKSrc={directFourKSrc ?? undefined}
                 onOpenServers={() => setServersOpen(true)}
                 externalSubtitles={externalSubtitles}
+                isFullscreen={isFullscreen}
                 onToggleFullscreen={toggleFullscreen}
                 onProgress={(seconds, duration) => {
                   persistProgress(seconds, duration);
