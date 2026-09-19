@@ -281,7 +281,7 @@ export async function loadWyzieList(input: {
   imdbId?: string | null;
   title?: string | null;
   bypassCache?: boolean;
-}): Promise<{ tracks: WyzieTrack[]; cookies: string; debug?: any }> {
+}): Promise<{ tracks: WyzieTrack[]; cookies: string; debug?: unknown }> {
   const key = cacheKey(input.id, input.season, input.episode);
   const cached = listCache.get(key);
   // Only use cache if it has rich external tracks (> 30) and not bypassed

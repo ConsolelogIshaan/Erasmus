@@ -43,7 +43,7 @@ export async function GET(request: Request) {
       tracks: publicTracks({ id: tmdbId, season, episode }, res.tracks),
       debug: res.debug,
     });
-  } catch (err: any) {
-    return NextResponse.json({ tracks: [], error: err?.message });
+  } catch (err: unknown) {
+    return NextResponse.json({ tracks: [], error: (err as Error)?.message });
   }
 }

@@ -1,78 +1,47 @@
-# Frame — Agent notes
+# AGENTS.md
 
-## Product
+Instructions for every AI tool working in this repo (Codex, Cursor, Copilot, Claude, Gemini, etc.).
+Tools that need their own filename (`CLAUDE.md`, `GEMINI.md`, `.cursorrules`) should contain only: `See AGENTS.md`.
 
-Frame is a premium personal entertainment tracking app.
+## Project
+- **Erasmus** (originally **Argus**, renamed 2026-09-15): web streaming/tracking app. Next.js 16 (Turbopack), React 19, TypeScript, Tailwind, Supabase, TMDB + OMDb.
+- **Cinejoy**: Android TV / Google TV app (`to.cinejoy.tv`, Java/Gradle, WebView + D-pad navigation). Separate workspace; also referred to as "Erasmus TV".
+- Both use the same Supabase backend. Long-term goal: shared profiles, watch history, watchlists, and provider/source changes.
+- Two developers: Paarth Sharma and Ishaan Jangid. Each uses different AI tools, so all shared context lives in this repo.
 
-**Phase 1** — foundation  
-**Phase 2** — catalog/discovery  
-**Phase 3** — personal library  
-**Phase 4** — intelligence  
-**Phase 5** — polish / PWA / shortcuts / tests / docs
+## Current priority
+Streaming architecture and playback reliability. Do not risk working playback.
 
-Do **not** implement AI assistants, social features, or public sharing until explicitly requested.
+## Streaming architecture (summary)
+- Resolver: `src/lib/streaming/direct-stream.ts` dispatches VidFast Direct (primary, `vidfast-direct.ts`) then Cinejoy/Shegu (secondary, `cinejoy-stream.ts`). Subtitles: `subtitles.ts` (Stremio fallback, ASS/SSA to WebVTT).
+- Flow: `/api/stream/direct` → `/api/stream/hls` (relay proxy) → upstream CDN.
+- Player: `src/features/streaming/components/native-player.tsx` (HLS.js).
+- Known problem: full video traffic passes through Vercel via `/api/stream/hls`. Goal is direct media playback where technically possible, proxying only when necessary. Details in `docs/ai/ARCHITECTURE.md` if present.
 
-## Stack
+## Rules
 
-Next.js App Router, React 19, TypeScript strict, Tailwind v4, Radix/shadcn-style UI, Framer Motion, Supabase Auth + Postgres, Zod, RHF, TanStack Query, Vercel.
+### Always
+- Keep Erasmus's own player/UI.
+- Run `npm run build` and `npm run lint` before finishing any code change.
+- Keep the verified streaming files working. Backups are in `c:/Users/Administrator/Documents/BACKUP/stream_fix_backups/`.
+- Update `docs/ai/STATE.md` and append to `docs/ai/LOG.md` before finishing.
 
-## Conventions
+### Ask first
+- Any change to Supabase schema, `watch_profiles`, or profile/backend logic. An earlier profile integration broke playback and was reverted.
+- Changing provider order or server prioritization (VidFast primary, Cinejoy secondary). An earlier unapproved change caused latency regressions.
+- Changes to `/api/stream/hls`, `/api/stream/direct`, `vidfast-direct.ts`, `cinejoy-stream.ts`, `direct-stream.ts`, `native-player.tsx`, or `streaming-theater-modal.tsx`.
+- Adding paid services or new dependencies (project goal: zero paid infrastructure).
 
-- Server Components by default; Client Components only for interactivity
-- Feature code lives in `src/features/*`; shared UI in `src/components/*`
-- Mutations via Server Actions with Zod validation
-- Data access via `src/lib/services` and `src/lib/supabase`
-- Route constants in `src/constants/routes.ts`
-- Design tokens in `src/app/globals.css` (CSS variables)
-- Auth session proxy: `src/proxy.ts`
+### Never
+- Add iframe embeds (ad/redirect behavior).
+- Commit secrets or `.env` files.
+- Force-push or rewrite shared history.
 
-## Commands
+## Session workflow
+1. Read `docs/ai/STATE.md` and the last 10 entries of `docs/ai/LOG.md`.
+2. Work on a branch per task where possible.
+3. Finish: update `docs/ai/STATE.md` (overwrite), append an entry to `docs/ai/LOG.md`
 
-```bash
-npm run dev
-npm run typecheck
-npm run lint
-npm test
-npm run build
-npm run validate
-```
-
-## Media catalog
-
-- Domain types: `src/types/media.ts`
-- Provider interface: `src/lib/media/providers/types.ts`
-- TMDB adapter: `src/lib/media/providers/tmdb/`
-- Facade: `src/lib/media/catalog.ts`
-- UI must not import TMDB raw types
-
-## Personal library
-
-- Types: `src/types/library.ts`
-- Services: `src/lib/library/*`
-- Actions: `src/features/library/actions/library-actions.ts`
-- Detail UI: `PersonalMediaPanel` on movie/TV pages
-- Docs: `docs/library.md`
-
-## Intelligence
-
-- Types: `src/types/intelligence.ts`
-- Services: `src/lib/intelligence/*`
-- UI: `src/features/intelligence/components/*`
-- Docs: `docs/intelligence.md`
-
-## Recommendations
-
-Separate subsystem from the intelligence layer. Deterministic, no AI, no new tables.
-
-- Types: `src/types/recommendations.ts`
-- Engine: `src/lib/recommendations/*` (pure layers + `tmdb-catalog.ts` adapter)
-- Entry point: `getRecommendationsForCurrentUser()` in `src/lib/recommendations/service.ts`
-- UI: `src/features/recommendations/components/*`, route `/recommendations`
-- Docs: `docs/recommendations.md`
-
-`src/lib/intelligence/recommendations.ts` and `decision-score.ts` are a different,
-still-live feature (dashboard rail + detail-page score). Do not merge them.
-
-## Database
-
-Apply migrations in order under `database/migrations/` (001 → 002 → 003).
+## Key docs
+- `docs/ai/STATE.md`: current status (overwritten each session)
+- `docs/ai/LOG.md`: append-only history
