@@ -420,12 +420,17 @@ export function mapMovieDetails(raw: TmdbMovieDetails): MovieDetails {
 
   const logo =
     raw.images?.logos?.find((l) => l.iso_639_1 === "en") ?? raw.images?.logos?.[0];
+  const enBackdrops = (raw.images?.backdrops ?? [])
+    .filter((b) => b.iso_639_1 === "en")
+    .sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0) || (b.vote_count ?? 0) - (a.vote_count ?? 0));
+  const enBackdrop = enBackdrops[0];
 
   const summary = mapMediaSummary(raw, "movie");
 
   return {
     ...summary,
     mediaType: "movie",
+    backdropPath: enBackdrop?.file_path ?? raw.backdrop_path ?? null,
     tagline: raw.tagline ?? null,
     runtime: raw.runtime ?? null,
     status: raw.status ?? null,
@@ -475,6 +480,8 @@ export function mapMovieDetails(raw: TmdbMovieDetails): MovieDetails {
     ratings: buildModularRatings(raw.vote_average, raw.vote_count),
     streaming: mapWatchProviders(raw["watch/providers"]),
     logoPath: logo?.file_path ?? null,
+    enBackdropPath: enBackdrop?.file_path ?? null,
+    logoBackdropPath: enBackdrop?.file_path ?? null,
   };
 }
 
@@ -486,6 +493,10 @@ export function mapTvDetails(raw: TmdbTvDetails): TvDetails {
   ];
   const logo =
     raw.images?.logos?.find((l) => l.iso_639_1 === "en") ?? raw.images?.logos?.[0];
+  const enBackdrops = (raw.images?.backdrops ?? [])
+    .filter((b) => b.iso_639_1 === "en")
+    .sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0) || (b.vote_count ?? 0) - (a.vote_count ?? 0));
+  const enBackdrop = enBackdrops[0];
 
   return {
     id: String(raw.id),
@@ -494,7 +505,7 @@ export function mapTvDetails(raw: TmdbTvDetails): TvDetails {
     originalTitle: raw.original_name ?? null,
     overview: raw.overview ?? null,
     posterPath: raw.poster_path,
-    backdropPath: raw.backdrop_path,
+    backdropPath: enBackdrop?.file_path ?? raw.backdrop_path ?? null,
     releaseDate: raw.first_air_date ?? null,
     firstAirDate: raw.first_air_date ?? null,
     lastAirDate: raw.last_air_date ?? null,
@@ -570,6 +581,8 @@ export function mapTvDetails(raw: TmdbTvDetails): TvDetails {
     ratings: buildModularRatings(raw.vote_average, raw.vote_count),
     streaming: mapWatchProviders(raw["watch/providers"]),
     logoPath: logo?.file_path ?? null,
+    enBackdropPath: enBackdrop?.file_path ?? null,
+    logoBackdropPath: enBackdrop?.file_path ?? null,
   };
 }
 

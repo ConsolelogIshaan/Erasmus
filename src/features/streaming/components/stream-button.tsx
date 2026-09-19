@@ -118,14 +118,14 @@ export function StreamButton({
           onClick={openTheater}
           className={cn(
             "relative group h-12 px-6 rounded-xl font-semibold text-sm tracking-wide transition-all duration-300",
-            "bg-primary hover:bg-primary/90 text-white",
-            "shadow-[0_0_20px_rgba(29,144,245,0.35)] hover:shadow-[0_0_30px_rgba(29,144,245,0.55)]",
-            "border border-primary/40 hover:scale-[1.02] active:scale-[0.98]",
+            "bg-white hover:bg-white/90 text-black",
+            "shadow-[0_0_20px_rgba(255,255,255,0.25)] hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]",
+            "border border-white/40 hover:scale-[1.02] active:scale-[0.98]",
             className,
           )}
         >
           <span className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-primary group-hover:scale-110 transition-transform">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-white group-hover:scale-110 transition-transform">
               <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
             </span>
             <span>{heroLabel}</span>
@@ -140,8 +140,8 @@ export function StreamButton({
           onClick={openTheater}
           className={cn(
             "w-full h-9 rounded-xl font-medium text-xs tracking-wide transition-all",
-            "bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30",
-            "hover:shadow-[0_0_15px_rgba(29,144,245,0.25)]",
+            "bg-white/10 hover:bg-white/20 text-white border border-white/20",
+            "hover:shadow-[0_0_15px_rgba(255,255,255,0.15)]",
             className,
           )}
         >
@@ -157,7 +157,7 @@ export function StreamButton({
           size="sm"
           onClick={openTheater}
           className={cn(
-            "h-8 gap-1.5 border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 hover:text-white text-xs",
+            "h-8 gap-1.5 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white text-xs",
             className,
           )}
         >
@@ -173,7 +173,7 @@ export function StreamButton({
           size="sm"
           onClick={openTheater}
           className={cn(
-            "h-7 w-7 p-0 rounded-full text-primary hover:bg-primary/20 hover:text-white transition-colors",
+            "h-7 w-7 p-0 rounded-full text-white hover:bg-white/20 hover:text-white transition-colors",
             className,
           )}
           title={`Play S${playSeason} E${playEpisode}`}

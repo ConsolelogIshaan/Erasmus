@@ -73,11 +73,11 @@
   --popover: 0 0% 5%;
   --popover-foreground: 0 0% 98%;
 
-  /* Sole accent — vivid blue */
-  --primary: 210 100% 56%;
-  --primary-foreground: 0 0% 100%;
-  /* Same hue as primary, deeper for selected nav so white labels stay crisp. */
-  --nav-active: 210 92% 42%;
+  /* Sole accent — crisp monochrome white */
+  --primary: 0 0% 98%;
+  --primary-foreground: 0 0% 5%;
+  /* Selected nav: subtle neutral elevation */
+  --nav-active: 0 0% 20%;
   --nav-active-foreground: 0 0% 100%;
 
   --secondary: 0 0% 8%;
@@ -86,35 +86,35 @@
   --muted: 0 0% 7%;
   --muted-foreground: 0 0% 58%;
 
-  --accent: 210 40% 12%;
+  --accent: 0 0% 13%;
   --accent-foreground: 0 0% 98%;
 
   --destructive: 0 72% 52%;
   --destructive-foreground: 0 0% 100%;
 
-  --success: 210 80% 52%;
+  --success: 142 70% 45%;
   --success-foreground: 0 0% 100%;
 
-  --warning: 210 70% 58%;
+  --warning: 38 92% 50%;
   --warning-foreground: 0 0% 100%;
 
   --border: 0 0% 12%;
   --input: 0 0% 12%;
-  --ring: 210 100% 56%;
+  --ring: 0 0% 90%;
 
-  /* Charts stay in the blue family */
-  --chart-1: 210 100% 56%;
-  --chart-2: 200 90% 50%;
-  --chart-3: 220 85% 62%;
-  --chart-4: 195 80% 48%;
-  --chart-5: 230 70% 58%;
+  /* Neutral monochrome charts */
+  --chart-1: 0 0% 95%;
+  --chart-2: 0 0% 75%;
+  --chart-3: 0 0% 55%;
+  --chart-4: 0 0% 40%;
+  --chart-5: 0 0% 25%;
 
   --sidebar: 0 0% 0%;
   --sidebar-foreground: 0 0% 92%;
   --sidebar-border: 0 0% 10%;
-  --sidebar-accent: 210 40% 10%;
+  --sidebar-accent: 0 0% 12%;
   --sidebar-accent-foreground: 0 0% 98%;
-  --sidebar-ring: 210 100% 56%;
+  --sidebar-ring: 0 0% 90%;
 
   --surface: 0 0% 4%;
   --surface-2: 0 0% 6%;
@@ -128,8 +128,8 @@
   --shadow-lg: 0 16px 40px -10px rgb(0 0 0 / 0.8);
   --shadow-xl: 0 28px 56px -14px rgb(0 0 0 / 0.85);
   --shadow-glow:
-    0 0 0 1px hsl(210 100% 56% / 0.25), 0 10px 32px -8px hsl(210 100% 56% / 0.35);
-  --shadow-glow-soft: 0 12px 36px -10px hsl(210 100% 56% / 0.28);
+    0 0 0 1px rgba(255, 255, 255, 0.15), 0 10px 32px -8px rgba(0, 0, 0, 0.65);
+  --shadow-glow-soft: 0 12px 36px -10px rgba(0, 0, 0, 0.55);
   --shadow-float: 0 20px 50px -14px rgb(0 0 0 / 0.85);
 
   --shadow-clay: var(--shadow-md);
@@ -1600,11 +1600,11 @@
 
 @layer components {
   .landing-stage {
-    /* Electric accents — blue family, one restrained violet echo. */
-    --electric: 205 100% 62%;
-    --electric-hot: 194 100% 88%;
-    --electric-deep: 222 92% 56%;
-    --violet-echo: 252 78% 64%;
+    /* Neutral platinum/silver accents — zero blue */
+    --electric: 0 0% 90%;
+    --electric-hot: 0 0% 100%;
+    --electric-deep: 0 0% 65%;
+    --violet-echo: 0 0% 75%;
     --stage: 0 0% 2%;
 
     --ease-electric: cubic-bezier(0.23, 1, 0.32, 1);
@@ -1686,8 +1686,8 @@
     background-image: linear-gradient(
       177deg,
       hsl(0 0% 100%) 0%,
-      hsl(210 14% 84%) 52%,
-      hsl(212 18% 60%) 100%
+      hsl(0 0% 84%) 52%,
+      hsl(0 0% 60%) 100%
     );
     -webkit-background-clip: text;
     background-clip: text;
@@ -2064,8 +2064,8 @@
     background-image:
       linear-gradient(
         155deg,
-        hsl(var(--art-h, 210) 70% 42% / 0.85),
-        hsl(var(--art-h, 210) 40% 12% / 0.95) 58%,
+        hsl(0 0% 25% / 0.85),
+        hsl(0 0% 12% / 0.95) 58%,
         hsl(0 0% 5%) 100%
       ),
       linear-gradient(0deg, hsl(0 0% 6%), hsl(0 0% 6%));

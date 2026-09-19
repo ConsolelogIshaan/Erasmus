@@ -95,3 +95,67 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Files: `src/app/(app)/dashboard/page.tsx`, `src/app/(app)/profile/page.tsx`, `src/app/(app)/settings/page.tsx`, `src/app/(marketing)/page.tsx`, `src/components/layout/logo.tsx`, `src/components/layout/user-menu.tsx`, `src/constants/navigation.ts`, `src/constants/shortcuts.ts`, `docs/keyboard-shortcuts.md`, `docs/architecture.md`, `README.md`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 - Result: Zero lint errors (`npm run lint`), zero build errors (`npm run build` across 41/41 routes). Committed and pushed to `origin/main`.
 
+## 2026-09-20 | Paarth | Gemini
+- Changed: Upgraded the Discover page (`/discover`) "Continue Watching" row to render cards in true horizontal landscape orientation (`orientation="landscape"` with `aspect-video` 16:9 ratio) and display each title's authentic official titled artwork, aligning exactly with how sites like `bingr.one` obtain and display them. Fixed root causes where browsers were still showing stale textless backdrops:
+  1. In `src/lib/media/providers/tmdb/mappers.ts`, updated `mapMovieDetails` and `mapTvDetails` so `backdropPath` itself defaults directly to the highest-rated English titled promotional backdrop (`enBackdrop?.file_path ?? raw.backdrop_path ?? null`).
+  2. In `src/app/api/media/details/route.ts`, removed the aggressive `Cache-Control: max-age=86400` header that was forcing browsers to serve stale cached textless image paths for 24 hours; set to `no-store, no-cache, must-revalidate`.
+  3. In `src/features/library/components/library-poster-card.tsx`, added a prop-sync effect for `entry.backdrop_path` and `entry.poster_path`, eliminated artificial logo overlays, and added cache-busting `_cb` timestamps to details queries so cards re-render with the new titled backdrop immediately.
+  4. In `src/features/library/components/continue-watching-rail.tsx`, enhanced lookup reconciliation by matching both `id` and `tmdbId` / `mediaType`, instantly saving the resolved titled backdrops to `localStorage` (`erasmus:playback:recent`) to ensure instant, persistent loads on subsequent visits.
+- Files: `src/lib/media/providers/tmdb/mappers.ts`, `src/types/media.ts`, `src/app/api/media/details/route.ts`, `src/features/library/components/library-poster-card.tsx`, `src/features/library/components/continue-watching-rail.tsx`, `src/features/library/actions/library-actions.ts`, `src/app/(app)/discover/page.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified locally on `main` branch. `npm run lint` passed (0 errors), `npm run build` compiled all 41 routes cleanly. No git push performed.
+
+## 2026-09-20 | Paarth | Gemini
+- Changed: Removed intrusive blue circular play buttons (`bg-primary text-primary-foreground`) and full-card dark overlays appearing on hover across poster cards in `src/features/library/components/library-poster-card.tsx` (both landscape 16:9 and portrait 2:3 formats). Posters now provide a clean, modern aesthetic where the authentic titled backdrops and artwork remain completely unobstructed and vibrant on hover, smoothly scaling up with subtle border/shadow highlights. Users can click anywhere on the card to navigate directly to the title page via Next.js `<Link>`. Kept the top-right remove ("X") button intact on Continue Watching cards for easy item dismissal.
+- Files: `src/features/library/components/library-poster-card.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified locally on `main` branch. `npm run lint` passed (0 errors), `npm run build` compiled all 41 routes cleanly. No git push performed.
+
+## 2026-09-20 | Paarth | Gemini
+- Changed: Made Continue Watching logo thumbnails load instantaneously (0ms on initial render) without the 2-3 second delay and visual thumbnail swapping.
+  1. Built a synchronous client-side backdrop cache (`src/lib/media/backdrop-cache.ts`) using an in-memory Map and persistent localStorage (`erasmus:media:backdrop_cache`), primed from local playback history.
+  2. In `src/features/library/components/continue-watching-rail.tsx`, initialized state synchronously from recent playback so cards mount immediately on frame zero with their logo backdrops rather than waiting for an async server action.
+  3. In `src/features/library/components/library-poster-card.tsx`, initialized `resolvedBackdrop` and `resolvedPoster` synchronously from the backdrop cache so `<Image>` tags receive the studio-titled artwork immediately on frame zero. Avoided redundant fetches for titles already in cache and removed cache-busting query params.
+  4. In `src/features/streaming/components/streaming-theater-modal.tsx`, resolved and persisted `resolvedBackdropPath` to the backdrop cache and playback history upon playback.
+  5. In `src/app/api/media/details/route.ts`, enabled public browser caching (`Cache-Control: public, max-age=86400, stale-while-revalidate=604800`) so subsequent details queries resolve in 0ms from browser cache.
+- Files: `src/lib/media/backdrop-cache.ts`, `src/features/library/components/continue-watching-rail.tsx`, `src/features/library/components/library-poster-card.tsx`, `src/features/streaming/components/streaming-theater-modal.tsx`, `src/app/api/media/details/route.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified locally on `main` branch. `npm run lint` passed (0 errors), `npm run build` compiled all 41 routes cleanly. No git push performed.
+
+## 2026-09-20 | Paarth | Gemini
+- Changed: Restored authentic studio-titled logo backdrops across all Continue Watching and landscape cards, resolving the bug where an overzealous cache attempt previously froze cards on unverified, textless images:
+  1. Identified root cause: `backdrop-cache.ts` had previously primed its in-memory map from raw recent playback items containing unverified, textless backdrop paths and aborted subsequent network queries with `if (cached) return;`, permanently locking cards into textless backdrops.
+  2. Purged contaminated legacy storage keys (`erasmus:media:backdrop_cache`) and introduced strict `erasmus:media:verified_logos_v3` that *only* stores verified studio-titled backdrops (matching `enBackdropPath` or `logoBackdropPath`).
+  3. In `src/features/library/components/library-poster-card.tsx`, bound initial state synchronously to verified logo backdrops for 0ms instant display, removed the blocking early return, and ensured queries to `/api/media/details` run with cache-busting timestamp `_cb=${Date.now()}` to guarantee fresh titled artwork resolves and persists.
+  4. In `src/features/library/components/continue-watching-rail.tsx`, removed cache-skipping filter in lookup and ensured all items in Continue Watching query `/api/media/details` and persist the authentic titled backdrop back into `localStorage["erasmus:playback:recent"]`.
+  5. In `src/app/api/media/details/route.ts`, set `Cache-Control` strictly to `no-store, no-cache, must-revalidate` to prevent any stale textless responses from persisting in browser HTTP caches.
+- Files: `src/lib/media/backdrop-cache.ts`, `src/features/library/components/library-poster-card.tsx`, `src/features/library/components/continue-watching-rail.tsx`, `src/features/streaming/components/streaming-theater-modal.tsx`, `src/app/api/media/details/route.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified locally on `main` branch. `npm run lint` passed (0 errors, 9 warnings), `npm run build` passed (41/41 routes compiled). No git push performed.
+
+## 2026-09-20 | Paarth | Gemini
+- Changed: Re-arranged `HeroBanner` (`src/features/media/components/hero-banner.tsx`) layout per user screenshot markings:
+  1. Removed the top badges row (`Featured`, media type, release year, star rating) from above the title logo / display typography.
+  2. Moved the metadata badges row down into the action button row, placed immediately next to `Watch Now` and `Details`.
+  3. Relocated the glass carousel navigation controls (next/prev chevrons + liquid progress pills) to the bottom-right corner of the hero banner stage across `content-container-fullbleed` via responsive flex row (`flex flex-col md:flex-row md:items-end md:justify-between`).
+- Files: `src/features/media/components/hero-banner.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified locally on `main` branch. `npm run lint` passed (0 errors, 9 warnings), `npm run build` passed (41/41 routes compiled). No git push performed.
+
+## 2026-09-20 | Paarth | Gemini
+- Changed: Replaced hero banner carousel progress dots with a miniature landscape thumbnail preview strip matching the Bingr reference:
+  1. Replaced the capsule containing progress dots with a sleek thumbnail strip showing landscape backdrop preview cards (`aspect-[16/10]` using `backdropUrl(s.backdropPath ?? s.posterPath, "w300")`).
+  2. Active card styling: distinctive bright white rounded border (`ring-2 ring-white ring-offset-2 ring-offset-black/80 rounded-lg scale-105 z-10 opacity-100 shadow-xl shadow-black/80`).
+  3. Inactive cards styling: dimmed and smoothly reactive (`opacity-40 hover:opacity-85 hover:scale-[1.02] transition-all rounded-lg overflow-hidden`).
+  4. Flanked by subtle chevron navigation arrows (`<` and `>`) on either side.
+  5. Smooth auto-advance timer every 6s, pausing on mouse hover (`onMouseEnter`/`onMouseLeave`).
+  6. Added automatic smooth scroll-into-view for active thumbnails when strip overflows (`thumbStripRef` with `scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })`).
+- Files: `src/features/media/components/hero-banner.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified locally on `main` branch. `npm run lint` passed (0 errors, 9 warnings), `npm run build` passed (41/41 routes compiled). No git push performed.
+
+## 2026-09-20 | Paarth | Gemini
+- Changed: Redesigned HeroBanner action buttons per Bingr reference and removed blue accents globally:
+  1. HeroBanner Buttons: Replaced "Watch Now" and "Details" with a circular pure white play button (`rounded-full bg-white text-black shadow-xl hover:scale-105 active:scale-95` with `<Play className="fill-black text-black ml-0.5" />`) and a pill-shaped "See More" button (`rounded-full border border-white/25 bg-black/45 hover:bg-white/15 px-6 py-3.5 text-white font-semibold` with `<Info className="h-5 w-5" />`).
+  2. "Featured" badge: Removed blue background and border (`border-primary/40 bg-primary/20 text-primary`), replaced with crisp monochrome glass (`border-white/20 bg-white/10 text-white`).
+  3. Global Blue Removal: Updated design system tokens in `src/app/globals.css` from vivid blue (`210 100% 56%`) to clean monochrome white/silver (`--primary: 0 0% 98%`, `--primary-foreground: 0 0% 5%`, `--nav-active: 0 0% 20%`, `--accent: 0 0% 13%`, `--ring: 0 0% 90%`).
+  4. Stream Buttons: Replaced blue `rgba(29,144,245,...)` shadows and borders in `src/features/streaming/components/stream-button.tsx` with clean monochrome/glass styling.
+  5. Sidebar: Removed cyan/blue/indigo caustic blooms in `src/components/layout/sidebar.tsx` in favor of crystalline neutral glass.
+  6. Landing & Showcase: Neutralized `--electric`, `.text-silver`, `.lx-art`, and `FALLBACK_HUES` in `src/features/marketing/showcase.ts` to clean monochrome.
+- Files: `src/features/media/components/hero-banner.tsx`, `src/app/globals.css`, `src/components/layout/sidebar.tsx`, `src/features/streaming/components/stream-button.tsx`, `src/features/marketing/showcase.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified locally on `main` branch. `npm run lint` passed (0 errors, 9 warnings), `npm run build` passed (41/41 routes compiled). No git push performed.
+

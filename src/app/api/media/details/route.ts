@@ -21,7 +21,9 @@ export async function GET(request: NextRequest) {
         {
           logoPath: movie?.logoPath ?? null,
           posterPath: movie?.posterPath ?? null,
-          backdropPath: movie?.backdropPath ?? null,
+          backdropPath: movie?.enBackdropPath ?? movie?.backdropPath ?? null,
+          enBackdropPath: movie?.enBackdropPath ?? null,
+          logoBackdropPath: movie?.logoBackdropPath ?? null,
           tagline: movie?.tagline ?? null,
           overview: movie?.overview ?? null,
           title: movie?.title ?? null,
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest) {
         },
         {
           headers: {
-            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+            "Cache-Control": "no-store, no-cache, must-revalidate",
           },
         },
       );
@@ -39,7 +41,9 @@ export async function GET(request: NextRequest) {
         {
           logoPath: show?.logoPath ?? null,
           posterPath: show?.posterPath ?? null,
-          backdropPath: show?.backdropPath ?? null,
+          backdropPath: show?.enBackdropPath ?? show?.backdropPath ?? null,
+          enBackdropPath: show?.enBackdropPath ?? null,
+          logoBackdropPath: show?.logoBackdropPath ?? null,
           tagline: show?.tagline ?? null,
           overview: show?.overview ?? null,
           title: show?.title ?? null,
@@ -47,7 +51,7 @@ export async function GET(request: NextRequest) {
         },
         {
           headers: {
-            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+            "Cache-Control": "no-store, no-cache, must-revalidate",
           },
         },
       );

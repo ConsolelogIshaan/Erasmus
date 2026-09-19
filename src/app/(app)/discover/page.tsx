@@ -11,6 +11,8 @@ import { safeGetDiscoveryHome } from "@/lib/media/catalog";
 import { extractAmbientColors } from "@/lib/media/ambient-colors";
 import { backdropUrl } from "@/lib/media/image";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ContinueWatchingRail } from "@/features/library/components/continue-watching-rail";
+import { ROUTES } from "@/constants/routes";
 
 export const metadata: Metadata = {
   title: "Discover",
@@ -78,6 +80,7 @@ export default async function DiscoverPage() {
         </Suspense>
 
         <div className="space-y-10">
+          <ContinueWatchingRail variant="row" cardOrientation="landscape" href={ROUTES.library} />
           {data.sections.map((section, index) => (
             <MediaRow
               key={section.id}

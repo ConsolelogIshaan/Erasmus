@@ -125,8 +125,8 @@ export function Sidebar({ isFullBleed }: { isFullBleed?: boolean }) {
         // Liquid glass backdrop: heavy optical refraction, crystalline blur, and luminous translucent depth
         "backdrop-blur-3xl backdrop-saturate-[190%] backdrop-contrast-[105%]",
         isFullBleed
-          ? "fixed top-0 left-0 z-50 bg-[#03060c]/42 shadow-[6px_0_40px_rgba(0,0,0,0.4)] border-r border-white/[0.10]"
-          : "sticky top-0 z-40 bg-[#040710]/52 shadow-[4px_0_30px_rgba(0,0,0,0.3)] border-r border-white/[0.08]",
+          ? "fixed top-0 left-0 z-50 bg-black/45 shadow-[6px_0_40px_rgba(0,0,0,0.5)] border-r border-white/[0.10]"
+          : "sticky top-0 z-40 bg-black/55 shadow-[4px_0_30px_rgba(0,0,0,0.4)] border-r border-white/[0.08]",
         "transition-[width] duration-[var(--duration-fast)] ease-[var(--ease-out)]",
         "motion-reduce:transition-none",
       )}
@@ -138,29 +138,29 @@ export function Sidebar({ isFullBleed }: { isFullBleed?: boolean }) {
           "inset -1px 0 0 0 rgba(255, 255, 255, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.06), inset 1px 0 0 0 rgba(255, 255, 255, 0.02), 8px 0 32px -4px rgba(0, 0, 0, 0.4)",
       }}
     >
-      {/* 1. Base Liquid Glass Surface: Ambient diagonal refraction */}
+      {/* 1. Underlying Glass Refraction Scrim */}
       <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.04] via-transparent to-black/20"
+        className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-white/[0.04] via-transparent to-white/[0.02]"
         aria-hidden
       />
 
-      {/* 2. Top Specular Meniscus / Water Sheen */}
+      {/* 2. Top-down Atmospheric Sheen (Liquid Glass Depth) */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-white/[0.09] via-white/[0.02] to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/[0.07] to-transparent opacity-80"
         aria-hidden
       />
       
-      {/* 3. Subtle Liquid Caustic Blooms (Organic color refraction) */}
+      {/* 3. Subtle Liquid Caustic Blooms (Neutral crystalline refraction) */}
       <div
-        className="pointer-events-none absolute -top-12 -left-10 h-48 w-48 rounded-full bg-cyan-400/[0.04] blur-3xl"
+        className="pointer-events-none absolute -top-12 -left-10 h-48 w-48 rounded-full bg-white/[0.02] blur-3xl"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute top-1/3 -right-12 h-52 w-52 rounded-full bg-blue-500/[0.03] blur-3xl"
+        className="pointer-events-none absolute top-1/3 -right-12 h-52 w-52 rounded-full bg-white/[0.015] blur-3xl"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute bottom-28 -left-8 h-44 w-44 rounded-full bg-indigo-500/[0.025] blur-3xl"
+        className="pointer-events-none absolute bottom-28 -left-8 h-44 w-44 rounded-full bg-white/[0.01] blur-3xl"
         aria-hidden
       />
 

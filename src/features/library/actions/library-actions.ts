@@ -12,6 +12,7 @@ import {
   setMovieProgress,
   getLibraryEntryByExternal,
   deleteLibraryEntry,
+  getContinueWatching,
 } from "@/lib/library/entries";
 import { setRating, upsertReview, createNote, updateNote, deleteNote } from "@/lib/library/ratings-reviews-notes";
 import {
@@ -43,7 +44,7 @@ import {
   sessionSchema,
 } from "@/lib/validations/library";
 import type { ActionResult } from "@/types";
-import type { MediaIdentity, RatingScale, WatchStatus } from "@/types/library";
+import type { LibraryEntry, MediaIdentity, RatingScale, WatchStatus } from "@/types/library";
 import { ROUTES } from "@/constants/routes";
 
 function revalidateLibrary(paths: string[] = []) {
@@ -642,5 +643,18 @@ export async function actionLogSession(
     return { success: true, data: undefined };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed" };
+  }
+}
+
+/**
+ * Fetch the authenticated user's continue watching items.
+ */
+export async function actionGetContinueWatching(limit = 12): Promise<LibraryEntry[]> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return [];
+    return await getContinueWatching(user.id, limit);
+  } catch {
+    return [];
   }
 }

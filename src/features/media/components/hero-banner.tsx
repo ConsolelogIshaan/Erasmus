@@ -62,14 +62,28 @@ export function HeroBanner({
     [slides.length]
   );
 
-  // Fallback auto-advance for reduceMotion mode
+  const thumbStripRef = React.useRef<HTMLDivElement>(null);
+
+  // Auto-advance carousel timer (pauses on hover)
   React.useEffect(() => {
-    if (!reduceMotion || slides.length <= 1 || paused) return;
+    if (slides.length <= 1 || paused) return;
     const timer = window.setInterval(() => {
       setIndex((i) => (i + 1) % slides.length);
     }, intervalMs);
     return () => window.clearInterval(timer);
-  }, [reduceMotion, slides.length, paused, intervalMs]);
+  }, [slides.length, paused, intervalMs]);
+
+  // Keep active thumbnail centered in view when strip overflows
+  React.useEffect(() => {
+    if (thumbStripRef.current) {
+      const activeThumb = thumbStripRef.current.children[index] as HTMLElement | undefined;
+      activeThumb?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
+    }
+  }, [index]);
 
   const active = slides[index] ?? slides[0];
 
@@ -196,12 +210,7 @@ export function HeroBanner({
       aria-roledescription="carousel"
       aria-label="Featured titles"
     >
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes heroProgress {
-          0% { width: 0%; }
-          100% { width: 100%; }
-        }
-      ` }} />
+
 
       {/* -------------------------------------------------------------
           EXPANSIVE FULL-BLEED BACKDROP STAGE WITH SWEET, SILKY SCRIMS
@@ -303,20 +312,94 @@ export function HeroBanner({
           FOREGROUND MOVING PANEL: PROMINENT LOGO & CINEMATIC CONTROLS
          ------------------------------------------------------------- */}
       <div className="content-container-fullbleed relative z-[2] pb-12 sm:pb-16 pt-[calc(var(--header-height)+3rem)]">
-        <div className="max-w-3xl space-y-4 text-center sm:text-left min-w-0">
-          <AnimatePresence mode="popLayout">
-            <motion.div
-              key={`info-${active.mediaType}-${active.id}`}
-              initial={reduceMotion ? false : { opacity: 0, y: 12, filter: "blur(4px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              exit={reduceMotion ? undefined : { opacity: 0, y: -8, filter: "blur(4px)" }}
-              transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-              className="space-y-4"
-            >
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+          <div className="max-w-3xl space-y-4 text-center sm:text-left min-w-0">
+            <AnimatePresence mode="popLayout">
+              <motion.div
+                key={`info-${active.mediaType}-${active.id}`}
+                initial={reduceMotion ? false : { opacity: 0, y: 12, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -8, filter: "blur(4px)" }}
+                transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+                className="space-y-4"
+              >
+                {/* Prominent Title Logo or Styled Display Typography */}
+                <div className="space-y-3">
+                  {logo ? (
+                    <Link
+                      href={href}
+                      className="inline-block transition-transform duration-300 hover:scale-[1.02] focus:outline-none"
+                      aria-label={`View ${active.title}`}
+                    >
+                      <div className="relative h-28 sm:h-36 lg:h-44 w-80 sm:w-[28rem] lg:w-[34rem] max-w-full">
+                        <Image
+                          src={logo}
+                          alt={active.title}
+                          fill
+                          priority={index === 0}
+                          sizes="(max-width: 768px) 360px, 560px"
+                          className="object-contain object-bottom sm:object-left-bottom filter drop-shadow-[0_12px_32px_rgba(0,0,0,0.9)] brightness-[1.06]"
+                          onError={() => {
+                            setFailedLogos((prev) => ({ ...prev, [activeKey]: true }));
+                          }}
+                        />
+                      </div>
+                    </Link>
+                  ) : (
+                    <h2 className="font-display text-balance text-[clamp(2.6rem,1.8rem+3.4vw,4.8rem)] font-extrabold leading-[1.04] tracking-[-0.03em] text-white drop-shadow-xl">
+                      <Link
+                        href={href}
+                        className="transition-colors hover:text-primary focus-visible:text-primary focus:outline-none"
+                      >
+                        {active.title}
+                      </Link>
+                    </h2>
+                  )}
+
+                  {/* Tagline below logo/title */}
+                  {activeTagline ? (
+                    <p className="text-base sm:text-lg italic text-white/90 text-pretty font-light tracking-wide drop-shadow-md">
+                      {activeTagline}
+                    </p>
+                  ) : null}
+
+                  {/* Overview */}
+                  {active.overview ? (
+                    <p className="max-w-xl text-sm sm:text-base text-white/85 line-clamp-3 leading-relaxed drop-shadow font-normal text-pretty">
+                      {active.overview}
+                    </p>
+                  ) : null}
+                </div>
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Action Buttons & Badges Row */}
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 sm:gap-3.5 pt-2">
+              {/* Circular White Play Button */}
+              <Link
+                href={href}
+                prefetch
+                className="flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-full bg-white text-black shadow-xl shadow-black/50 transition-all duration-200 hover:bg-white/90 hover:scale-105 active:scale-95 shrink-0"
+                aria-label={`Play ${active.title}`}
+              >
+                <Play className="h-5 w-5 fill-black text-black ml-0.5" />
+              </Link>
+
+              {/* Pill See More Button */}
+              <Link
+                href={href}
+                prefetch
+                className="inline-flex items-center gap-2 sm:gap-2.5 rounded-full border border-white/25 bg-black/45 hover:bg-white/15 hover:border-white/35 px-5 sm:px-6 py-3 text-sm sm:text-base font-semibold text-white backdrop-blur-md transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                aria-label={`See more details about ${active.title}`}
+              >
+                <Info className="h-5 w-5 text-white" />
+                See More
+              </Link>
+
               {/* Badges Row */}
-              <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary backdrop-blur-md shadow-sm">
-                  <Sparkles className="h-3 w-3" />
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:ml-2">
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white backdrop-blur-md shadow-sm">
+                  <Sparkles className="h-3 w-3 text-white/80" />
                   Featured
                 </span>
                 <span className="inline-flex items-center rounded-md border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wider text-white/90 backdrop-blur-md">
@@ -332,90 +415,28 @@ export function HeroBanner({
                   </span>
                 ) : null}
               </div>
+            </div>
+          </div>
 
-              {/* Prominent Title Logo or Styled Display Typography */}
-              <div className="space-y-3">
-                {logo ? (
-                  <Link
-                    href={href}
-                    className="inline-block transition-transform duration-300 hover:scale-[1.02] focus:outline-none"
-                    aria-label={`View ${active.title}`}
-                  >
-                    <div className="relative h-28 sm:h-36 lg:h-44 w-80 sm:w-[28rem] lg:w-[34rem] max-w-full">
-                      <Image
-                        src={logo}
-                        alt={active.title}
-                        fill
-                        priority={index === 0}
-                        sizes="(max-width: 768px) 360px, 560px"
-                        className="object-contain object-bottom sm:object-left-bottom filter drop-shadow-[0_12px_32px_rgba(0,0,0,0.9)] brightness-[1.06]"
-                        onError={() => {
-                          setFailedLogos((prev) => ({ ...prev, [activeKey]: true }));
-                        }}
-                      />
-                    </div>
-                  </Link>
-                ) : (
-                  <h2 className="font-display text-balance text-[clamp(2.6rem,1.8rem+3.4vw,4.8rem)] font-extrabold leading-[1.04] tracking-[-0.03em] text-white drop-shadow-xl">
-                    <Link
-                      href={href}
-                      className="transition-colors hover:text-primary focus-visible:text-primary focus:outline-none"
-                    >
-                      {active.title}
-                    </Link>
-                  </h2>
-                )}
-
-                {/* Tagline below logo/title */}
-                {activeTagline ? (
-                  <p className="text-base sm:text-lg italic text-white/90 text-pretty font-light tracking-wide drop-shadow-md">
-                    {activeTagline}
-                  </p>
-                ) : null}
-
-                {/* Overview */}
-                {active.overview ? (
-                  <p className="max-w-xl text-sm sm:text-base text-white/85 line-clamp-3 leading-relaxed drop-shadow font-normal text-pretty">
-                    {active.overview}
-                  </p>
-                ) : null}
-              </div>
-            </motion.div>
-          </AnimatePresence>
-
-          {/* Action Buttons & Glass Carousel Navigation */}
-          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 pt-2">
-            <Link
-              href={href}
-              prefetch
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:scale-[1.03] active:scale-[0.97]"
-            >
-              <Play className="h-4 w-4 fill-current" />
-              Watch Now
-            </Link>
-            <Link
-              href={href}
-              prefetch
-              className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-md transition-all hover:bg-white/20 hover:border-white/30 hover:scale-[1.03] active:scale-[0.97]"
-            >
-              <Info className="h-4 w-4" />
-              Details
-            </Link>
-
-            {/* Clean Glass Carousel Controls with Liquid Progress Fill */}
-            {slides.length > 1 ? (
-              <div className="ml-0 sm:ml-2 flex items-center gap-2 rounded-full border border-white/20 bg-black/45 px-3.5 py-1.5 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.5)]">
+          {/* Miniature Landscape Thumbnail Carousel Strip — positioned in bottom right */}
+          {slides.length > 1 ? (
+            <div className="flex items-center justify-center md:justify-end shrink-0 md:pb-1">
+              <div className="flex items-center gap-1 sm:gap-1.5">
                 <button
                   type="button"
                   onClick={() => go(-1)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-all duration-200 hover:bg-white/15 hover:text-white hover:scale-110 active:scale-95"
+                  className="flex h-9 w-6 sm:w-7 items-center justify-center text-white/60 transition-all duration-200 hover:text-white hover:scale-110 active:scale-95 shrink-0"
                   aria-label="Previous featured title"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
                 </button>
-                <div className="flex items-center gap-1.5 px-1">
+                <div
+                  ref={thumbStripRef}
+                  className="no-scrollbar flex items-center gap-2 max-w-[calc(100vw-4.5rem)] sm:max-w-xs md:max-w-md lg:max-w-lg overflow-x-auto py-2 px-1"
+                >
                   {slides.map((s, i) => {
                     const isActive = i === index;
+                    const thumbSrc = backdropUrl(s.backdropPath ?? s.posterPath, "w300");
                     return (
                       <button
                         key={`${s.mediaType}-${s.id}`}
@@ -424,27 +445,25 @@ export function HeroBanner({
                         aria-label={`Show ${s.title}`}
                         aria-current={isActive}
                         className={cn(
-                          "relative h-1.5 rounded-full overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary",
+                          "group relative shrink-0 aspect-[16/10] w-14 sm:w-16 md:w-20 overflow-hidden rounded-lg transition-all duration-300 focus-visible:outline-none",
                           isActive
-                            ? "w-8 sm:w-10 bg-white/20 shadow-[0_0_10px_rgba(0,0,0,0.4)]"
-                            : "w-2 bg-white/30 hover:bg-white/60 hover:w-3"
+                            ? "ring-2 ring-white ring-offset-2 ring-offset-black/80 scale-105 z-10 opacity-100 shadow-xl shadow-black/80"
+                            : "opacity-40 hover:opacity-85 hover:scale-[1.02] shadow-sm"
                         )}
                       >
-                        {isActive ? (
-                          <span
-                            key={`progress-${index}`}
-                            className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary via-primary to-blue-400 shadow-[0_0_10px_hsl(var(--primary)),0_0_2px_#fff]"
-                            style={{
-                              animation: `heroProgress ${intervalMs}ms linear forwards`,
-                              animationPlayState: paused ? "paused" : "running",
-                            }}
-                            onAnimationEnd={() => {
-                              if (!paused && !reduceMotion) {
-                                go(1);
-                              }
-                            }}
+                        {thumbSrc ? (
+                          <Image
+                            src={thumbSrc}
+                            alt={s.title}
+                            fill
+                            sizes="(max-width: 768px) 64px, 80px"
+                            className="object-cover object-center transition-transform duration-300 group-hover:scale-105"
                           />
-                        ) : null}
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-muted/40 text-[10px] text-white/50">
+                            {s.title.slice(0, 8)}
+                          </div>
+                        )}
                       </button>
                     );
                   })}
@@ -452,14 +471,14 @@ export function HeroBanner({
                 <button
                   type="button"
                   onClick={() => go(1)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-all duration-200 hover:bg-white/15 hover:text-white hover:scale-110 active:scale-95"
+                  className="flex h-9 w-6 sm:w-7 items-center justify-center text-white/60 transition-all duration-200 hover:text-white hover:scale-110 active:scale-95 shrink-0"
                   aria-label="Next featured title"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
                 </button>
               </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

@@ -40,6 +40,10 @@ import {
   resumeSeconds,
   savePlaybackProgress,
 } from "@/lib/streaming/playback-progress";
+import {
+  getCachedBackdrop,
+  setCachedBackdrop,
+} from "@/lib/media/backdrop-cache";
 import type { MediaIdentity } from "@/types/library";
 import type { TvEpisode, TvSeason } from "@/types/media";
 import {
@@ -338,19 +342,33 @@ export function StreamingTheaterModal({
   const [resolvedPosterPath, setResolvedPosterPath] = React.useState<string | null>(
     identity?.posterPath ?? null
   );
+  const [resolvedBackdropPath, setResolvedBackdropPath] = React.useState<string | null>(() => {
+    return getCachedBackdrop(mediaType, tmdbId) ?? identity?.backdropPath ?? null;
+  });
   const [canonicalTitle, setCanonicalTitle] = React.useState<string>(title);
   const [resolvedImdbId, setResolvedImdbId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open || !tmdbId) return;
     let cancelled = false;
-    fetch(`/api/media/details?type=${mediaType}&id=${tmdbId}&_v=2`)
+    fetch(`/api/media/details?type=${mediaType}&id=${tmdbId}&_cb=${Date.now()}`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { logoPath?: string | null; tagline?: string | null; posterPath?: string | null; title?: string | null; imdbId?: string | null } | null) => {
+      .then((data: { logoPath?: string | null; tagline?: string | null; posterPath?: string | null; title?: string | null; imdbId?: string | null; enBackdropPath?: string | null; logoBackdropPath?: string | null; backdropPath?: string | null } | null) => {
         if (cancelled || !data) return;
         if (data.logoPath) setResolvedLogoPath(data.logoPath);
         if (data.tagline) setResolvedTagline(data.tagline);
         if (data.posterPath) setResolvedPosterPath(data.posterPath);
+        const bestBackdrop = data.enBackdropPath || data.logoBackdropPath || data.backdropPath;
+        if (bestBackdrop) {
+          setResolvedBackdropPath(bestBackdrop);
+          if (data.enBackdropPath || data.logoBackdropPath) {
+            setCachedBackdrop(mediaType, tmdbId, {
+              backdropPath: bestBackdrop,
+              posterPath: data.posterPath,
+              title: data.title,
+            });
+          }
+        }
         if (data.title && (title.includes(",") || title.length > 35)) setCanonicalTitle(data.title);
         if (data.imdbId) setResolvedImdbId(data.imdbId);
       })
@@ -445,6 +463,7 @@ export function StreamingTheaterModal({
         ...identity,
         title: canonicalTitle || identity.title || title,
         posterPath: resolvedPosterPath ?? identity.posterPath ?? null,
+        backdropPath: resolvedBackdropPath ?? identity.backdropPath ?? null,
       };
     }
     return {
@@ -453,8 +472,9 @@ export function StreamingTheaterModal({
       externalId: String(tmdbId),
       title: canonicalTitle || title,
       posterPath: resolvedPosterPath,
+      backdropPath: resolvedBackdropPath,
     };
-  }, [identity, mediaType, tmdbId, title, canonicalTitle, resolvedPosterPath]);
+  }, [identity, mediaType, tmdbId, title, canonicalTitle, resolvedPosterPath, resolvedBackdropPath]);
 
   const progressInput = React.useMemo(
     () => ({
@@ -464,9 +484,9 @@ export function StreamingTheaterModal({
       episode: activeEpisode,
       title: canonicalTitle || title,
       posterPath: resolvedPosterPath ?? effectiveIdentity.posterPath ?? null,
-      backdropPath: effectiveIdentity.backdropPath ?? null,
+      backdropPath: resolvedBackdropPath ?? effectiveIdentity.backdropPath ?? null,
     }),
-    [mediaType, tmdbId, activeSeason, activeEpisode, title, canonicalTitle, resolvedPosterPath, effectiveIdentity],
+    [mediaType, tmdbId, activeSeason, activeEpisode, title, canonicalTitle, resolvedPosterPath, resolvedBackdropPath, effectiveIdentity],
   );
 
   React.useEffect(() => {

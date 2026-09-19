@@ -173,6 +173,8 @@ export interface MediaSummary {
   adult?: boolean;
   originalLanguage?: string | null;
   logoPath?: string | null;
+  enBackdropPath?: string | null;
+  logoBackdropPath?: string | null;
   tagline?: string | null;
 }
 

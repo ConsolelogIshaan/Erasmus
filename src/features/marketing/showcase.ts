@@ -21,8 +21,8 @@ export interface LandingShowcase {
   library: ShowcasePoster[];
 }
 
-/** Gradient hues reused when TMDB is unavailable, so layout never shifts. */
-const FALLBACK_HUES = [212, 232, 196, 250, 204, 222] as const;
+/** Neutral monochrome fallback hues when TMDB is unavailable */
+const FALLBACK_HUES = [0, 0, 0, 0, 0, 0] as const;
 
 const EMPTY_SHOWCASE: LandingShowcase = { hero: [], library: [] };
 
