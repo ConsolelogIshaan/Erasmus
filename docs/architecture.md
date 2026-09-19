@@ -29,9 +29,9 @@ app/ (routes, layouts, loading, error)
 
 | Group | Paths | Audience |
 | --- | --- | --- |
-| `(marketing)` | `/` | Public landing |
-| `(auth)` | `/login`, `/signup` | Guests (redirect if signed in) |
-| `(app)` | `/dashboard`, library, catalog, stats, settings, … | Authenticated |
+| `(marketing)` | `/` | Public landing (redirects to `/dashboard` if signed in) |
+| `(auth)` | `/login`, `/signup` | Guests (redirect to `/dashboard` if signed in) |
+| `(app)` | `/dashboard` (Profile & Home), `/discover`, `/movies`, `/tv`, `/anime`, library, settings, … | Authenticated |
 | system | `/auth/callback`, `/offline`, `not-found`, `error` | Infrastructure |
 
 Protected routes are listed in `src/constants/routes.ts` and enforced in `src/proxy.ts`.

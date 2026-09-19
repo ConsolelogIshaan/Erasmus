@@ -5,7 +5,6 @@ import {
   Film,
   Heart,
   Home,
-  LayoutDashboard,
   Settings,
   Target,
   Tv,
@@ -30,12 +29,6 @@ export interface NavItem {
 }
 
 export const MAIN_NAV: readonly NavItem[] = [
-  {
-    title: "Home",
-    href: ROUTES.dashboard,
-    icon: LayoutDashboard,
-    description: "Intelligence dashboard",
-  },
   {
     title: "Discover",
     href: ROUTES.discover,
@@ -89,9 +82,9 @@ export const MAIN_NAV: readonly NavItem[] = [
 export const SECONDARY_NAV: readonly NavItem[] = [
   {
     title: "Profile",
-    href: ROUTES.profile,
+    href: ROUTES.dashboard,
     icon: User,
-    description: "Your profile",
+    description: "Your profile & dashboard",
   },
   {
     title: "Settings",

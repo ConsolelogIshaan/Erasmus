@@ -13,7 +13,6 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PageHeaderMotion } from "@/components/motion/page-header-motion";
 import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { LibraryPosterCard } from "@/features/library/components/library-poster-card";
 import { LibraryFilters } from "@/features/library/components/library-filters";
@@ -30,34 +29,62 @@ import {
   ActivityAreaChart,
   GenrePieChart,
 } from "@/features/intelligence/components/charts";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { ProfileForm } from "@/features/profile/components/profile-form";
 import { getSessionContext } from "@/lib/services/user-service";
 import { formatDisplayName } from "@/lib/utils";
+import { formatDate } from "@/lib/media/format";
 import { ROUTES } from "@/constants/routes";
 import { getDashboardPayload } from "@/lib/intelligence/dashboard";
 import { formatWatchHours } from "@/lib/intelligence/stats-engine";
 import { formatRelativeDate } from "@/lib/utils";
+import type { Profile } from "@/types";
 
 export const metadata: Metadata = {
-  title: "Home",
-  description: "Your watch history, habits, and what to watch next",
+  title: "Profile",
+  description: "Your watch history, habits, and profile details",
 };
+
+function fallbackProfile(userId: string, email?: string | null): Profile {
+  const local = email?.split("@")[0] ?? "user";
+  return {
+    id: userId,
+    username: local.slice(0, 32),
+    display_name: local,
+    bio: null,
+    avatar_url: null,
+    website: null,
+    is_public: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
 
 interface PageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /**
- * Premium intelligence dashboard — personal home for Erasmus with integrated library.
+ * Premium intelligence dashboard & profile — personal home for Erasmus with integrated library and profile options.
  */
 export default async function DashboardPage({ searchParams }: PageProps) {
   const { user, profile } = await getSessionContext();
-  const name = formatDisplayName({
-    displayName: profile?.display_name,
-    username: profile?.username,
-    email: user?.email,
-  });
-
   if (!user) return null;
+
+  const profileData = profile ?? fallbackProfile(user.id, user.email);
+  const name = formatDisplayName({
+    displayName: profileData.display_name,
+    username: profileData.username,
+    email: user.email,
+  });
+  const initials = name.replace("@", "").slice(0, 2).toUpperCase();
 
   const params = searchParams ? await searchParams : {};
   const getParam = (k: string) => {
@@ -84,12 +111,33 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-10">
-      <PageHeaderMotion
-        eyebrow="Welcome back"
-        title={name}
-        description="Where you left off, your personal library, and what to watch next."
-        actions={
-          <>
+      <section className="relative overflow-hidden rounded-3xl border-0 bg-muted/30 dark:bg-white/[0.04]">
+        <div
+          className="absolute inset-0 h-32 gradient-mesh dark:gradient-mesh-dark sm:h-40"
+          aria-hidden
+        />
+        <div className="relative flex flex-col gap-4 px-4 pb-6 pt-16 sm:flex-row sm:items-end sm:px-8 sm:pt-24">
+          <Avatar className="h-20 w-20 sm:h-24 sm:w-24 border-4 border-background shadow-lg shrink-0">
+            {profileData.avatar_url ? <AvatarImage src={profileData.avatar_url} alt="" /> : null}
+            <AvatarFallback className="text-2xl font-semibold bg-white/[0.08]">{initials}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 space-y-1">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl text-balance">
+                {name}
+              </h1>
+              {profileData.username ? (
+                <span className="text-sm font-medium text-muted-foreground/80">@{profileData.username}</span>
+              ) : null}
+            </div>
+            {profileData.bio ? (
+              <p className="max-w-xl text-sm text-muted-foreground text-pretty">{profileData.bio}</p>
+            ) : null}
+            <p className="text-xs text-muted-foreground/70">
+              Member since {formatDate(profileData.created_at) ?? "—"}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
             <Button asChild size="sm">
               <Link href={ROUTES.library}>
                 <Library className="h-4 w-4" />
@@ -114,9 +162,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                 {year} Wrapped
               </Link>
             </Button>
-          </>
-        }
-      />
+          </div>
+        </div>
+      </section>
 
       {/* Hero metrics — equal-height tiles */}
       <ScrollReveal variant="scale">
@@ -416,6 +464,21 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           </ul>
         )}
       </DashboardSection>
+
+      {/* Profile options & settings */}
+      <section className="pt-2">
+        <Card className="mx-auto max-w-2xl border-0 bg-muted/30 dark:bg-white/[0.04] shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Edit profile</CardTitle>
+            <CardDescription>
+              Public details about you. Manage your username, display name, and bio.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ProfileForm profile={profileData} />
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }

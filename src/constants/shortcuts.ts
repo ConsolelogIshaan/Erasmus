@@ -75,7 +75,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     keys: ["G", "P"],
     description: "Go to Profile",
     sequence: ["g", "p"],
-    href: ROUTES.profile,
+    href: ROUTES.dashboard,
   },
   {
     id: "watchlist",

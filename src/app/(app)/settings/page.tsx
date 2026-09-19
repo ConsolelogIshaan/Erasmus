@@ -102,7 +102,7 @@ export default async function SettingsPage() {
               <Link href={ROUTES.library}>Open library</Link>
             </Button>
             <Button asChild variant="outline" size="sm">
-              <Link href={ROUTES.profile}>Edit profile</Link>
+              <Link href={ROUTES.dashboard}>Edit profile</Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link href={ROUTES.privacy}>Privacy Policy</Link>

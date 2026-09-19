@@ -90,12 +90,8 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Changed: Removed the vertical blue bar indicator from the sidebar active selector in `src/components/layout/sidebar.tsx` while preserving the frosted liquid glass active capsule and glow. Reorganized the Home dashboard (`src/app/(app)/dashboard/page.tsx`) to eliminate the massive empty space beneath the charts: converted `Continue watching` to a full-width horizontal rail, placed `ActivityAreaChart` and `GenrePieChart` side-by-side in a dedicated 2-column analytics row (`md:grid-cols-2`) with top-right quick links, paired `Recently completed` with `Plan to watch` in a symmetric 2-column grid (`lg:grid-cols-2`), and paired `Recently rated` with `Dropped` in a 2-column grid.
 - Files: `src/components/layout/sidebar.tsx`, `src/app/(app)/dashboard/page.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 - Result: Verified locally on `main` branch. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run build` compiled all 41 routes cleanly. No git push performed.
-- Next: Await user review and confirmation.
-
-
-
-
-
-
-
+## 2026-09-19 | Paarth | Gemini
+- Changed: Merged the homepage (`/dashboard`) with the Profile page so the intelligence dashboard dominates while housing profile identity in the header (avatar, @username, bio, member since) and the interactive "Edit profile" form (`ProfileForm`) at the very bottom. Updated `src/constants/navigation.ts` to remove Home from `MAIN_NAV`, elevating Discover to the topmost and default navigation item, and placed Profile (`ROUTES.dashboard`) as the second-to-last item on the sidebar in `SECONDARY_NAV` directly above Settings. Updated `src/app/(app)/profile/page.tsx` to redirect cleanly to `ROUTES.dashboard`. Updated `src/app/(marketing)/page.tsx` to redirect authenticated users to `ROUTES.dashboard`. Updated default Logo link and user menu Profile link to `ROUTES.dashboard`. Updated `g p` keyboard shortcut to `ROUTES.dashboard`.
+- Files: `src/app/(app)/dashboard/page.tsx`, `src/app/(app)/profile/page.tsx`, `src/app/(app)/settings/page.tsx`, `src/app/(marketing)/page.tsx`, `src/components/layout/logo.tsx`, `src/components/layout/user-menu.tsx`, `src/constants/navigation.ts`, `src/constants/shortcuts.ts`, `docs/keyboard-shortcuts.md`, `docs/architecture.md`, `README.md`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Zero lint errors (`npm run lint`), zero build errors (`npm run build` across 41/41 routes). Committed and pushed to `origin/main`.
 

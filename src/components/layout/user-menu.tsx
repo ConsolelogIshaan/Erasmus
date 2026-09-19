@@ -70,7 +70,7 @@ export function UserMenu({ user }: UserMenuProps) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href={ROUTES.profile}>
+          <Link href={ROUTES.dashboard}>
             <User className="h-4 w-4" />
             Profile
           </Link>

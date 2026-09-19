@@ -10,9 +10,9 @@ Frame is keyboard-first. Shortcuts work on authenticated pages (outside text fie
 | `G` then `L` | Library |
 | `G` then `C` | Collections |
 | `G` then `X` | Discover |
-| `G` then `S` | Statistics |
+| `G` then `A` | Anime |
 | `G` then `W` | Watchlist |
-| `G` then `P` | Profile |
+| `G` then `P` | Profile (Dashboard) |
 | `G` then `,` | Settings |
 | `Esc` | Close modals / palette (browser default + Radix) |
 | Arrow keys | Navigate command results (cmdk) |

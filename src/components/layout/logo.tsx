@@ -17,7 +17,7 @@ interface LogoProps {
  * Brand Logo — renders the transparent 3D orbit brand icon mark.
  * Features true alpha transparency, organic contour glow on hover, and responsive sizing.
  */
-export function Logo({ href = ROUTES.home, className }: LogoProps) {
+export function Logo({ href = ROUTES.dashboard, className }: LogoProps) {
   return (
     <span className={cn("inline-flex items-center", className)}>
       <Link
