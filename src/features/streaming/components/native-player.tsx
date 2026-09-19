@@ -253,13 +253,23 @@ export function NativePlayer({
       video.addEventListener("loadedmetadata", startPlayback, { once: true });
     } else if (Hls.isSupported()) {
       const hls = new Hls({
-        enableWorker: false,
+        enableWorker: true,
         startLevel: -1,
         capLevelToPlayerSize: false,
         startPosition: initialPosition,
         renderTextTracksNatively: false,
         enableWebVTT: false,
         startFragPrefetch: true,
+        progressive: true,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 180,
+        maxBufferSize: 200 * 1000 * 1000,
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 2,
+        nudgeOffset: 0.1,
+        nudgeMaxRetry: 10,
+        lowLatencyMode: false,
+        backBufferLength: 60,
       });
       hlsRef.current = hls;
       hls.loadSource(activeSrc);
@@ -361,6 +371,13 @@ export function NativePlayer({
         }
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
+          hls.startLoad();
+          if (video && video.paused) {
+            video.play().catch(() => {});
+          }
+          return;
+        }
         if (!data.fatal) return;
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
         else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();

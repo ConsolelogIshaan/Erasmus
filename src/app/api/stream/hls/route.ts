@@ -76,6 +76,47 @@ function enrichAudioTracks(text: string): string {
   return lines.join("\n");
 }
 
+function isDirectCdnSegment(rawUrl: string): boolean {
+  try {
+    const url = new URL(rawUrl);
+    const host = url.hostname.toLowerCase();
+    const pathname = url.pathname.toLowerCase();
+
+    // Playlists (.m3u8) must always pass through relay to enrich audio and rewrite child paths
+    const isPlaylist = pathname.endsWith(".m3u8") || pathname.includes("/playlist");
+    if (isPlaylist) return false;
+
+    const isMediaChunk =
+      pathname.endsWith(".ts") ||
+      pathname.endsWith(".m4s") ||
+      pathname.endsWith(".mp4") ||
+      pathname.endsWith(".html") ||
+      pathname.includes("video_") ||
+      pathname.includes("audio_") ||
+      pathname.includes("/seg-") ||
+      pathname.includes("/init-");
+
+    if (!isMediaChunk) return false;
+
+    // CDNs with verified open CORS (*) and zero referer locks:
+    // Browser can download segments directly with 0 Vercel bandwidth consumption
+    if (
+      host.includes("solarpanelcleaning") ||
+      host.includes("shegu.st") ||
+      host.includes("cloudflare") ||
+      host.includes("cloudfront") ||
+      host.includes("fastly") ||
+      host.includes("akamai")
+    ) {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function rewritePlaylist(
   text: string,
   baseUrl: string,
@@ -91,10 +132,16 @@ function rewritePlaylist(
       if (trimmed.startsWith("#")) {
         return trimmed.replace(/URI="([^"]+)"/gi, (_, uri: string) => {
           const absolute = new URL(uri, baseUrl).href;
+          if (isDirectCdnSegment(absolute)) {
+            return `URI="${absolute}"`;
+          }
           return `URI="${proxied(relay, absolute, referer)}"`;
         });
       }
       const absolute = new URL(trimmed, baseUrl).href;
+      if (isDirectCdnSegment(absolute)) {
+        return absolute;
+      }
       return proxied(relay, absolute, referer);
     })
     .join("\n");
@@ -143,10 +190,15 @@ export async function GET(request: Request) {
     /video_\d+p_\d+\.html/i.test(path) ||
     /audio_\d+_\d+\.html/i.test(path) ||
     /_init\.html/i.test(path);
+  // Detect standard and obfuscated video segments (.jpg, .css, .bin, etc. used by CDNs)
+  const isObfuscatedSegment =
+    /\.(jpg|jpeg|png|gif|css|bin|html)$/i.test(path) &&
+    (/cdn\d*\/|\/vd\/|\/\d+p\/|\/video|\/audio|\/seg-|\/init-/i.test(path) || path.length > 50);
   const looksMedia =
     /video|mp4/i.test(contentType) ||
     /\.(mp4|m4s|ts)$/i.test(path) ||
-    isHtmlMediaSegment;
+    isHtmlMediaSegment ||
+    isObfuscatedSegment;
   const relay = "/api/stream/hls";
 
   const playlistResponse = (text: string) =>
@@ -180,10 +232,13 @@ export async function GET(request: Request) {
     let responseType = contentType || "application/octet-stream";
     if (isHtmlMediaSegment || /\.(mp4|m4s)$/i.test(path)) {
       responseType = path.includes("audio") ? "audio/mp4" : "video/mp4";
+    } else if (isObfuscatedSegment || path.endsWith(".ts")) {
+      responseType = "video/mp2t";
     }
     const passthrough: Record<string, string> = {
       "Content-Type": responseType,
-      "Cache-Control": "public, max-age=3600",
+      "Cache-Control": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
+      "Access-Control-Allow-Origin": "*",
       "Accept-Ranges": "bytes",
     };
     const contentRange = upstream.headers.get("content-range");
