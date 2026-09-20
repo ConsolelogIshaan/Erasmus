@@ -8,29 +8,22 @@ Streaming architecture and playback reliability. Reduce Vercel bandwidth from HL
 
 ## Working
 - Web app (Erasmus, Next.js 16 / React 19): catalog, social, recommendations, ratings, ambient lighting, Continue Watching.
+- Supabase Egress & Bandwidth Optimization:
+  - Bypassed Next.js middleware (`src/proxy.ts` and `src/lib/supabase/middleware.ts`) for `/api/stream/*` routes so HLS video chunks and subtitle fetches never trigger `supabase.auth.getUser()`, eliminating thousands of round-trip auth calls per streamed title.
+  - Wrapped user session and profile getters (`getCurrentUser`, `getProfile`, `getUserSettings`, `getUserPreferences`, `getSessionContext`) in React `cache()` in `src/lib/services/user-service.ts`, deduplicating queries within each request render cycle.
+  - Targeted playback progress revalidations in `actionSetMovieProgress` and `actionSetTvProgress` (`src/features/library/actions/library-actions.ts`) to specific media paths instead of triggering full-site revalidation (`revalidateLibrary`) every 60 seconds of playback.
+  - Wrapped `loadIntelligenceData` in React `cache()` and pruned excessive table query limits (reducing 10,000 episode rows and 5,000 session rows to bounded limits), slashing payload transfer on `/dashboard` and detail pages.
 - Direct Playback Trigger on Poster Cards & Hero Banner:
   - Poster Card Quick Actions (`src/features/media/components/poster-card.tsx`): Clicking the hover **Play** button now directly opens `StreamingTheaterModal` with the title's resume progress point instead of navigating away to the details page, while also marking status to "watching".
   - Hero Banner Action Buttons (`src/features/media/components/hero-banner.tsx`): Clicking the circular white **Play** button directly opens `StreamingTheaterModal`, while the pill "See More" button navigates to the title's detail page.
 - Translucent Frosted Glass Quick Action Buttons on Poster Cards (`src/features/media/components/poster-card.tsx`):
-  - Updated action button styling with `backdrop-blur-xl`, semi-transparency, and specular inset highlights:
-    1. Top button: translucent white frosted **Play** button (`bg-white/75 hover:bg-white/90 text-black border border-white/60 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_1px_rgba(255,255,255,0.85)] active:scale-[0.97]`).
-    2. Bottom button: translucent dark frosted **Plan to Watch** button (`bg-black/50 hover:bg-black/70 text-white border border-white/20 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_1px_rgba(255,255,255,0.15)] active:scale-[0.97]`).
+  - Updated action button styling with `backdrop-blur-xl`, semi-transparency, and specular inset highlights.
 - Instant Direct Playback Resume on Continue Watching Click (`continue-watching-rail.tsx` & `library-poster-card.tsx`):
   - Clicking any card in the Continue Watching row now directly triggers playback via `StreamingTheaterModal` with zero detour to the details page.
-  - Automatically loads latest playback resume progress (`getTvShowResume` for TV shows and `getPlaybackProgress` for movies), launching Lisbon primary server at the exact timestamp.
-  - Retains native link attributes so middle-click or Cmd-click still allows opening the details page in a new tab if desired.
-- Profile Page Cleanup (`src/app/(app)/dashboard/page.tsx`):
-  - Completely removed the "Insights" section and the "Activity" section per user design feedback.
-  - Cleaned up unused component imports (`InsightCards`, `formatRelativeDate`) maintaining 0 lint warnings/errors.
 - Centered Navigation Icons on Collapsed Sidebar (`src/components/layout/sidebar.tsx`):
   - In `NavRow`, when collapsed, row links become a 40x40px (`w-10 h-10`) centered square container with the icon dead-centered, eliminating label whitespace.
-  - Label text is strictly hidden when collapsed (`collapsed && "hidden"`, `group-data-[collapsed]/rail:hidden`).
-  - Container and header toggle button centered horizontally on the 64px rail (`justify-center px-0`).
-  - Active and hover states now form a symmetrical square centered on the rail.
-- Clean Monochrome Palette & Complete Removal of Blue Accents:
-  - System tokens in `src/app/globals.css` updated to pure monochrome silver/white/neutral palette.
-  - Removed blue shadows and replaced with crisp white/neutral shadows across stream buttons.
-- Verification: Zero lint errors (`npm run lint`), zero build errors (`npm run build` across 41/41 routes).
+- Clean Monochrome Palette & Complete Removal of Blue Accents.
+- Verification: 209/209 tests passed (`npm run test`), 0 type errors (`npm run typecheck`), 0 lint errors (`npm run lint`), 41/41 routes compiled cleanly (`npm run build`).
 
 ## Broken / Risky
 - Full video traffic still passes through Vercel via `/api/stream/hls` for non-passthrough CDNs (bandwidth problem).
@@ -39,10 +32,10 @@ Streaming architecture and playback reliability. Reduce Vercel bandwidth from HL
 - Proxy and resolver disable TLS verification (`NODE_TLS_REJECT_UNAUTHORIZED = "0"`) for upstream CDN nodes.
 
 ## In progress
-- Complete: Restored luxury frosted glass liquid progress timer pill in Hero Banner carousel, removing movie thumbnail tiles; verified with 0 TypeScript errors.
+- Complete: Resolved Supabase egress bandwidth overages across middleware, user session caching, intelligence query limits, and playback progress revalidation.
 
 ## Next
-- Await user verification of the updated playback behavior.
+- Monitor Supabase billing/usage dashboard to observe egress dropping to near zero.
 
 ## Key locations
 - Web repo: `/Users/paarthsharma/Developer/GitHub/Erasmus` (branch: `main`)

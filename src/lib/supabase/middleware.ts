@@ -35,6 +35,11 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Never run auth checks or Supabase network calls on stream relay chunks/subtitles
+  if (pathname.startsWith("/api/stream")) {
+    return supabaseResponse;
+  }
+
   // Crucial: auth callback must NOT run getUser() in middleware.
   // The route handler at /auth/callback exchanges the code and sets the session.
   // Running getUser() here beforehand is unnecessary and risks exhausting the budget.

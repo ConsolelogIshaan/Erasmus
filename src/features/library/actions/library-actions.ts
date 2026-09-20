@@ -580,7 +580,7 @@ export async function actionSetMovieProgress(
     const identity = mediaIdentitySchema.parse(identityInput);
     const entry = await ensureLibraryEntry(user.id, identity);
     await setMovieProgress(user.id, entry.id, minutes, identity.runtimeMinutes);
-    revalidateLibrary([ROUTES.movie(identity.externalId)]);
+    revalidatePath(ROUTES.movie(identity.externalId));
     return { success: true, data: undefined };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed" };
@@ -616,7 +616,7 @@ export async function actionSetTvProgress(
       episodeRuntimeMinutes: identity.runtimeMinutes,
       totalEpisodes: identity.totalEpisodes,
     });
-    revalidateLibrary([ROUTES.show(identity.externalId), ROUTES.dashboard, ROUTES.stats]);
+    revalidatePath(ROUTES.show(identity.externalId));
     return { success: true, data: result };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed" };

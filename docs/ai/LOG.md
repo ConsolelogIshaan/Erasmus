@@ -191,3 +191,13 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   3. Monochrome Design Integrity: Applied pure white/silver frosted glass aesthetic matching the current design system (`bg-white/20` track, `bg-white` fill with white specular glow, `backdrop-blur-xl`).
 - Files: `src/features/media/components/hero-banner.tsx`, `src/app/globals.css`, `AGENTS.md`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 - Result: Verified via `npx tsc --noEmit` (0 errors).
+
+## 2026-09-20 | Paarth | Antigravity
+- Changed: Fixed runaway Supabase egress bandwidth (6.61 GB used / 5 GB free plan quota) without touching database schema or altering any UI/playback functionality:
+  1. Root Cause 1 (Streaming auth storm): In `src/proxy.ts` and `src/lib/supabase/middleware.ts`, excluded `/api/stream/*` routes from proxy matcher and middleware checks so video chunk proxying (`/api/stream/hls`) and subtitles never trigger `supabase.auth.getUser()`, saving thousands of redundant round-trip auth requests per watched movie/episode.
+  2. Root Cause 2 (Duplicate session lookups): In `src/lib/services/user-service.ts`, wrapped `getCurrentUser`, `getProfile`, `getUserSettings`, `getUserPreferences`, and `getSessionContext` in React `cache()`, completely deduplicating lookups between layouts and pages within each request cycle.
+  3. Root Cause 3 (Progress revalidation storm): In `src/features/library/actions/library-actions.ts`, stopped `actionSetMovieProgress` and `actionSetTvProgress` from calling full-site `revalidateLibrary` (8 server routes) every 60 seconds of playback, switching to targeted title path revalidation.
+  4. Root Cause 4 (Heavy intelligence payload): In `src/lib/intelligence/load-profile.ts`, wrapped `loadIntelligenceData` in React `cache()` and bounded extreme table limits (10,000 episode rows and 5,000 session rows to bounded limits), slashing payload transfer on `/dashboard` and detail pages.
+- Files: `src/proxy.ts`, `src/lib/supabase/middleware.ts`, `src/lib/services/user-service.ts`, `src/features/library/actions/library-actions.ts`, `src/lib/intelligence/load-profile.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified on `main` branch. `npm run typecheck` passed (0 errors), `npm run test` passed (19/19 files, 209 tests passed), `npm run lint` passed (0 errors, 9 warnings), `npm run build` compiled all 41 routes cleanly.
+

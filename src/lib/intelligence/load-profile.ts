@@ -1,7 +1,9 @@
 /**
  * Load raw personal data used by the stats / insights engines.
+ * Wrapped in React cache to deduplicate per-request calls across server components.
  */
 
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { table } from "@/lib/library/supabase-table";
 import type { LibraryEntry } from "@/types/library";
@@ -34,7 +36,9 @@ export interface IntelligenceRawData {
   }[];
 }
 
-export async function loadIntelligenceData(userId: string): Promise<IntelligenceRawData> {
+export const loadIntelligenceData = cache(async function loadIntelligenceData(
+  userId: string,
+): Promise<IntelligenceRawData> {
   if (userId.startsWith("local-user-")) {
     return {
       entries: [],
@@ -66,41 +70,42 @@ export async function loadIntelligenceData(userId: string): Promise<Intelligence
       .select("*")
       .eq("user_id", userId)
       .eq("is_hidden", false)
-      .limit(5000),
+      .limit(1000),
     table(supabase, "watch_sessions")
       .select(
         "id, entry_id, session_date, duration_minutes, season_number, episode_number, is_rewatch, created_at",
       )
       .eq("user_id", userId)
       .order("session_date", { ascending: false })
-      .limit(5000),
+      .limit(500),
     table(supabase, "reviews")
       .select("id, entry_id, body, created_at, updated_at")
       .eq("user_id", userId)
-      .limit(2000),
+      .order("updated_at", { ascending: false })
+      .limit(50),
     table(supabase, "notes")
       .select("id, entry_id, created_at")
       .eq("user_id", userId)
-      .limit(5000),
-    table(supabase, "tags").select("id, name").eq("user_id", userId).limit(500),
+      .limit(200),
+    table(supabase, "tags").select("id, name").eq("user_id", userId).limit(100),
     table(supabase, "tag_assignments")
       .select("tag_id, entry_id")
       .eq("user_id", userId)
-      .limit(5000),
+      .limit(500),
     table(supabase, "collections")
       .select("id, name, item_count, is_pinned")
       .eq("user_id", userId)
-      .limit(500),
+      .limit(100),
     table(supabase, "activity_log")
       .select("id, summary, created_at, activity_type")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
-      .limit(100),
+      .limit(50),
     table(supabase, "episode_progress")
       .select("id, entry_id, is_watched, watched_at, season_number, episode_number")
       .eq("user_id", userId)
       .eq("is_watched", true)
-      .limit(10000),
+      .limit(1500),
   ]);
 
   return {
@@ -114,4 +119,4 @@ export async function loadIntelligenceData(userId: string): Promise<Intelligence
     activity: activityRes.data ?? [],
     episodeProgress: episodesRes.data ?? [],
   };
-}
+});

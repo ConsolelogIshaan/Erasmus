@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { withAuthBudget } from "@/lib/supabase/fetch";
@@ -7,6 +8,7 @@ import type { Profile, UserPreferences, UserSettings } from "@/types";
 /**
  * Server-side user data access.
  * Keeps Supabase queries out of page components for cleaner composition.
+ * Wrapped in React cache to deduplicate calls within a single request pass.
  */
 
 /**
@@ -17,7 +19,7 @@ import type { Profile, UserPreferences, UserSettings } from "@/types";
  * stall each of them for as long as the Supabase SDK keeps retrying. Treating a
  * stalled check as "signed out" degrades to the public view instead of hanging.
  */
-export async function getCurrentUser(): Promise<User | null> {
+export const getCurrentUser = cache(async function getCurrentUser(): Promise<User | null> {
   const cookieStore = await cookies();
   const allCookies = cookieStore.getAll();
   const localUserCookie = cookieStore.get("sb-local-auth-user");
@@ -62,9 +64,9 @@ export async function getCurrentUser(): Promise<User | null> {
   }
 
   return null;
-}
+});
 
-export async function getProfile(userId: string): Promise<Profile | null> {
+export const getProfile = cache(async function getProfile(userId: string): Promise<Profile | null> {
   if (userId.startsWith("local-user-")) {
     const cookieStore = await cookies();
     const localUserCookie = cookieStore.get("sb-local-auth-user");
@@ -99,9 +101,9 @@ export async function getProfile(userId: string): Promise<Profile | null> {
   }
 
   return data;
-}
+});
 
-export async function getUserSettings(userId: string): Promise<UserSettings | null> {
+export const getUserSettings = cache(async function getUserSettings(userId: string): Promise<UserSettings | null> {
   if (userId.startsWith("local-user-")) {
     return {
       id: "settings-" + userId,
@@ -131,9 +133,9 @@ export async function getUserSettings(userId: string): Promise<UserSettings | nu
   }
 
   return data;
-}
+});
 
-export async function getUserPreferences(
+export const getUserPreferences = cache(async function getUserPreferences(
   userId: string,
 ): Promise<UserPreferences | null> {
   if (userId.startsWith("local-user-")) {
@@ -163,12 +165,12 @@ export async function getUserPreferences(
   }
 
   return data;
-}
+});
 
 /**
  * Bundled load for app shell hydration.
  */
-export async function getSessionContext() {
+export const getSessionContext = cache(async function getSessionContext() {
   const user = await getCurrentUser();
   if (!user) {
     return { user: null, profile: null, settings: null, preferences: null };
@@ -181,4 +183,4 @@ export async function getSessionContext() {
   ]);
 
   return { user, profile, settings, preferences };
-}
+});
