@@ -10,7 +10,7 @@ Tools that need their own filename (`CLAUDE.md`, `GEMINI.md`, `.cursorrules`) sh
 - Two developers: Paarth Sharma and Ishaan Jangid. Each uses different AI tools, so all shared context lives in this repo.
 
 ## Current priority
-Streaming architecture and playback reliability. Do not risk working playback.
+Streaming/playback is currently frozen and stable. Do NOT work on or modify streaming/playback (src/lib/streaming/*, src/app/api/stream/*, src/features/streaming/*) unless explicitly instructed by the user. Do not risk working playback.
 
 ## Streaming architecture (summary)
 - Resolver: `src/lib/streaming/direct-stream.ts` dispatches VidFast Direct (primary, `vidfast-direct.ts`) then Cinejoy/Shegu (secondary, `cinejoy-stream.ts`). Subtitles: `subtitles.ts` (Stremio fallback, ASS/SSA to WebVTT).
@@ -33,6 +33,7 @@ Streaming architecture and playback reliability. Do not risk working playback.
 - Adding paid services or new dependencies (project goal: zero paid infrastructure).
 
 ### Never
+- Work on or modify streaming/playback unless explicitly instructed by the user.
 - Add iframe embeds (ad/redirect behavior).
 - Commit secrets or `.env` files.
 - Force-push or rewrite shared history.

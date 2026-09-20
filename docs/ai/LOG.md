@@ -184,5 +184,10 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Files: `src/features/media/components/poster-card.tsx`, `src/features/media/components/hero-banner.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 - Result: Verified locally on `main` branch. `npm run lint` passed (0 errors, 9 warnings), `npm run build` passed (41/41 routes compiled).
 
-
-
+## 2026-09-20 | Paarth | Antigravity
+- Changed: Restored elegant liquid progress timer pill to Hero Banner carousel and removed thumbnail tiles:
+  1. Hero Banner Carousel Controls (`src/features/media/components/hero-banner.tsx`): Removed the landscape thumbnail preview strip and replaced it with a luxury frosted glass carousel pill capsule featuring chevron navigation buttons and a liquid timer progress bar.
+  2. Progress Animation (`src/app/globals.css`): Added `@keyframes heroProgress` smoothly filling from 0% to 100% over the carousel duration, with automatic pause on hover.
+  3. Monochrome Design Integrity: Applied pure white/silver frosted glass aesthetic matching the current design system (`bg-white/20` track, `bg-white` fill with white specular glow, `backdrop-blur-xl`).
+- Files: `src/features/media/components/hero-banner.tsx`, `src/app/globals.css`, `AGENTS.md`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified via `npx tsc --noEmit` (0 errors).

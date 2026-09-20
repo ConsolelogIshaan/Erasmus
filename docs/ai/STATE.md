@@ -39,7 +39,7 @@ Streaming architecture and playback reliability. Reduce Vercel bandwidth from HL
 - Proxy and resolver disable TLS verification (`NODE_TLS_REJECT_UNAUTHORIZED = "0"`) for upstream CDN nodes.
 
 ## In progress
-- Complete: Poster card and hero banner play buttons directly initiate playback via StreamingTheaterModal; verified 0 lint errors, 0 build errors.
+- Complete: Restored luxury frosted glass liquid progress timer pill in Hero Banner carousel, removing movie thumbnail tiles; verified with 0 TypeScript errors.
 
 ## Next
 - Await user verification of the updated playback behavior.

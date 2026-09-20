@@ -65,8 +65,6 @@ export function HeroBanner({
     [slides.length]
   );
 
-  const thumbStripRef = React.useRef<HTMLDivElement>(null);
-
   // Auto-advance carousel timer (pauses on hover)
   React.useEffect(() => {
     if (slides.length <= 1 || paused) return;
@@ -75,18 +73,6 @@ export function HeroBanner({
     }, intervalMs);
     return () => window.clearInterval(timer);
   }, [slides.length, paused, intervalMs]);
-
-  // Keep active thumbnail centered in view when strip overflows
-  React.useEffect(() => {
-    if (thumbStripRef.current) {
-      const activeThumb = thumbStripRef.current.children[index] as HTMLElement | undefined;
-      activeThumb?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-        inline: "center",
-      });
-    }
-  }, [index]);
 
   const active = slides[index] ?? slides[0];
 
@@ -425,25 +411,21 @@ export function HeroBanner({
             </div>
           </div>
 
-          {/* Miniature Landscape Thumbnail Carousel Strip — positioned in bottom right */}
+          {/* Clean Glass Carousel Controls with Liquid Progress Fill — positioned in bottom right */}
           {slides.length > 1 ? (
             <div className="flex items-center justify-center md:justify-end shrink-0 md:pb-1">
-              <div className="flex items-center gap-1 sm:gap-1.5">
+              <div className="flex items-center gap-2 rounded-full border border-white/20 bg-black/45 px-3.5 py-1.5 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.5)]">
                 <button
                   type="button"
                   onClick={() => go(-1)}
-                  className="flex h-9 w-6 sm:w-7 items-center justify-center text-white/60 transition-all duration-200 hover:text-white hover:scale-110 active:scale-95 shrink-0"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-all duration-200 hover:bg-white/15 hover:text-white hover:scale-110 active:scale-95"
                   aria-label="Previous featured title"
                 >
-                  <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
-                <div
-                  ref={thumbStripRef}
-                  className="no-scrollbar flex items-center gap-2 max-w-[calc(100vw-4.5rem)] sm:max-w-xs md:max-w-md lg:max-w-lg overflow-x-auto py-2 px-1"
-                >
+                <div className="flex items-center gap-1.5 px-1">
                   {slides.map((s, i) => {
                     const isActive = i === index;
-                    const thumbSrc = backdropUrl(s.backdropPath ?? s.posterPath, "w300");
                     return (
                       <button
                         key={`${s.mediaType}-${s.id}`}
@@ -452,25 +434,22 @@ export function HeroBanner({
                         aria-label={`Show ${s.title}`}
                         aria-current={isActive}
                         className={cn(
-                          "group relative shrink-0 aspect-[16/10] w-14 sm:w-16 md:w-20 overflow-hidden rounded-lg transition-all duration-300 focus-visible:outline-none",
+                          "relative h-1.5 rounded-full overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white",
                           isActive
-                            ? "ring-2 ring-white ring-offset-2 ring-offset-black/80 scale-105 z-10 opacity-100 shadow-xl shadow-black/80"
-                            : "opacity-40 hover:opacity-85 hover:scale-[1.02] shadow-sm"
+                            ? "w-8 sm:w-10 bg-white/20 shadow-[0_0_10px_rgba(0,0,0,0.4)]"
+                            : "w-2 bg-white/30 hover:bg-white/60 hover:w-3"
                         )}
                       >
-                        {thumbSrc ? (
-                          <Image
-                            src={thumbSrc}
-                            alt={s.title}
-                            fill
-                            sizes="(max-width: 768px) 64px, 80px"
-                            className="object-cover object-center transition-transform duration-300 group-hover:scale-105"
+                        {isActive ? (
+                          <span
+                            key={`progress-${index}`}
+                            className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9),0_0_2px_#fff]"
+                            style={{
+                              animation: `heroProgress ${intervalMs}ms linear forwards`,
+                              animationPlayState: paused ? "paused" : "running",
+                            }}
                           />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-muted/40 text-[10px] text-white/50">
-                            {s.title.slice(0, 8)}
-                          </div>
-                        )}
+                        ) : null}
                       </button>
                     );
                   })}
@@ -478,10 +457,10 @@ export function HeroBanner({
                 <button
                   type="button"
                   onClick={() => go(1)}
-                  className="flex h-9 w-6 sm:w-7 items-center justify-center text-white/60 transition-all duration-200 hover:text-white hover:scale-110 active:scale-95 shrink-0"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-all duration-200 hover:bg-white/15 hover:text-white hover:scale-110 active:scale-95"
                   aria-label="Next featured title"
                 >
-                  <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             </div>
