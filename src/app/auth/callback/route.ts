@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       if (error) {
         console.error("[auth/callback] exchangeCodeForSession failed:", error.message, error);
       } else if (data?.session) {
-        return NextResponse.redirect(safeRedirectUrl(origin, next, ROUTES.dashboard));
+        return NextResponse.redirect(safeRedirectUrl(origin, next, ROUTES.discover));
       }
     } catch (err) {
       console.error("[auth/callback] Unexpected error during code exchange:", err);

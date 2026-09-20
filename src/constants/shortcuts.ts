@@ -31,7 +31,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: "dashboard",
     keys: ["G", "D"],
-    description: "Go to Home dashboard",
+    description: "Go to Dashboard",
     sequence: ["g", "d"],
     href: ROUTES.dashboard,
   },

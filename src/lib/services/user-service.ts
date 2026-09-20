@@ -143,7 +143,7 @@ export const getUserPreferences = cache(async function getUserPreferences(
       id: "prefs-" + userId,
       user_id: userId,
       sidebar_collapsed: false,
-      default_landing: "/dashboard",
+      default_landing: "/discover",
       content_languages: ["en"],
       spoiler_protection: false,
       metadata: {},

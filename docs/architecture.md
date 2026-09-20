@@ -29,9 +29,9 @@ app/ (routes, layouts, loading, error)
 
 | Group | Paths | Audience |
 | --- | --- | --- |
-| `(marketing)` | `/` | Public landing (redirects to `/dashboard` if signed in) |
-| `(auth)` | `/login`, `/signup` | Guests (redirect to `/dashboard` if signed in) |
-| `(app)` | `/dashboard` (Profile & Home), `/discover`, `/movies`, `/tv`, `/anime`, library, settings, … | Authenticated |
+| `(marketing)` | `/` | Public landing (redirects to `/discover` if signed in) |
+| `(auth)` | `/login`, `/signup` | Guests (redirect to `/discover` if signed in) |
+| `(app)` | `/discover` (Main Home), `/dashboard` (Profile & Stats), `/movies`, `/tv`, `/anime`, library, settings, … | Authenticated |
 | system | `/auth/callback`, `/offline`, `not-found`, `error` | Infrastructure |
 
 Protected routes are listed in `src/constants/routes.ts` and enforced in `src/proxy.ts`.
@@ -42,7 +42,7 @@ Protected routes are listed in `src/constants/routes.ts` and enforced in `src/pr
 2. Supabase sets HTTP-only cookies via `@supabase/ssr`
 3. Middleware calls `getUser()` to refresh/validate the session
 4. Protected routes redirect to `/login?next=…`
-5. Auth routes redirect signed-in users to `/dashboard`
+5. Auth routes redirect signed-in users to `/discover`
 6. `handle_new_user` trigger creates profile + settings + preferences rows
 
 ## Design system

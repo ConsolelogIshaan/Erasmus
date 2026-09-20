@@ -18,8 +18,10 @@
  * `/\evil.com` becomes `//evil.com` after normalisation.
  */
 
+import { ROUTES } from "@/constants/routes";
+
 /** Where to send someone when the requested target cannot be trusted. */
-const DEFAULT_PATH = "/dashboard";
+const DEFAULT_PATH = ROUTES.discover;
 
 /**
  * Reduce an untrusted redirect target to a safe same-origin path.

@@ -25,7 +25,7 @@ import { ROUTES } from "@/constants/routes";
  */
 export function MobileNav() {
   const pathname = usePathname();
-  const isHomeScreen = pathname === ROUTES.dashboard || pathname === ROUTES.home;
+  const isHomeScreen = pathname === ROUTES.discover || pathname === ROUTES.home;
   const { mobileNavOpen, setMobileNavOpen } = useUI();
 
   return (
@@ -43,7 +43,7 @@ export function MobileNav() {
       <SheetContent side="left" className="w-[min(100%,20rem)] p-0">
         <SheetHeader className="border-0 px-4 py-4 text-left">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          {isHomeScreen ? <Logo href={ROUTES.dashboard} /> : null}
+          {isHomeScreen ? <Logo href={ROUTES.discover} /> : null}
         </SheetHeader>
         <nav className="flex flex-col gap-1 p-3" aria-label="Mobile navigation">
           {[...MAIN_NAV, ...SECONDARY_NAV].map((item, index) => {

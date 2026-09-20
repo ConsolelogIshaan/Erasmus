@@ -10,54 +10,54 @@ describe("safeNextPath — rejects off-origin targets", () => {
   it("rejects protocol-relative URLs", () => {
     // The bug this replaces: "//evil.com" starts with "/" but a Location header
     // of "//evil.com" keeps the scheme and swaps the host.
-    expect(safeNextPath("//evil.com")).toBe("/dashboard");
-    expect(safeNextPath("//evil.com/login")).toBe("/dashboard");
-    expect(safeNextPath("///evil.com")).toBe("/dashboard");
+    expect(safeNextPath("//evil.com")).toBe("/discover");
+    expect(safeNextPath("//evil.com/login")).toBe("/discover");
+    expect(safeNextPath("///evil.com")).toBe("/discover");
   });
 
   it("rejects backslash variants browsers normalise to slashes", () => {
-    expect(safeNextPath("/\\evil.com")).toBe("/dashboard");
-    expect(safeNextPath("\\\\evil.com")).toBe("/dashboard");
-    expect(safeNextPath("/\\/evil.com")).toBe("/dashboard");
+    expect(safeNextPath("/\\evil.com")).toBe("/discover");
+    expect(safeNextPath("\\\\evil.com")).toBe("/discover");
+    expect(safeNextPath("/\\/evil.com")).toBe("/discover");
   });
 
   it("rejects absolute URLs", () => {
-    expect(safeNextPath("https://evil.com")).toBe("/dashboard");
-    expect(safeNextPath("http://evil.com")).toBe("/dashboard");
-    expect(safeNextPath("HTTPS://evil.com")).toBe("/dashboard");
+    expect(safeNextPath("https://evil.com")).toBe("/discover");
+    expect(safeNextPath("http://evil.com")).toBe("/discover");
+    expect(safeNextPath("HTTPS://evil.com")).toBe("/discover");
   });
 
   it("rejects non-http schemes", () => {
-    expect(safeNextPath("javascript:alert(1)")).toBe("/dashboard");
-    expect(safeNextPath("data:text/html,<script>alert(1)</script>")).toBe("/dashboard");
-    expect(safeNextPath("/javascript:alert(1)")).toBe("/dashboard");
+    expect(safeNextPath("javascript:alert(1)")).toBe("/discover");
+    expect(safeNextPath("data:text/html,<script>alert(1)</script>")).toBe("/discover");
+    expect(safeNextPath("/javascript:alert(1)")).toBe("/discover");
   });
 
   it("rejects a scheme smuggled into the first path segment", () => {
-    expect(safeNextPath("/mailto:a@b.c")).toBe("/dashboard");
+    expect(safeNextPath("/mailto:a@b.c")).toBe("/discover");
   });
 
   it("strips control characters used for header injection", () => {
     // searchParams.get() percent-decodes, so real CR/LF can arrive here. After
     // stripping them the residue contains a colon in the first segment, so the
     // target is rejected outright rather than forwarded as a mangled path.
-    expect(safeNextPath("/dashboard\r\nSet-Cookie: a=b")).toBe("/dashboard");
-    expect(safeNextPath("//evil.com\r\n")).toBe("/dashboard");
+    expect(safeNextPath("/dashboard\r\nSet-Cookie: a=b")).toBe("/discover");
+    expect(safeNextPath("//evil.com\r\n")).toBe("/discover");
     // A control character inside an otherwise valid path is simply removed.
     expect(safeNextPath("/lib\u0000rary")).toBe("/library");
   });
 
   it("rejects empty, blank and non-string input", () => {
-    expect(safeNextPath("")).toBe("/dashboard");
-    expect(safeNextPath("   ")).toBe("/dashboard");
-    expect(safeNextPath(null)).toBe("/dashboard");
-    expect(safeNextPath(undefined)).toBe("/dashboard");
-    expect(safeNextPath(42 as unknown as string)).toBe("/dashboard");
+    expect(safeNextPath("")).toBe("/discover");
+    expect(safeNextPath("   ")).toBe("/discover");
+    expect(safeNextPath(null)).toBe("/discover");
+    expect(safeNextPath(undefined)).toBe("/discover");
+    expect(safeNextPath(42 as unknown as string)).toBe("/discover");
   });
 
   it("rejects bare relative paths that are not rooted", () => {
-    expect(safeNextPath("dashboard")).toBe("/dashboard");
-    expect(safeNextPath("evil.com")).toBe("/dashboard");
+    expect(safeNextPath("dashboard")).toBe("/discover");
+    expect(safeNextPath("evil.com")).toBe("/discover");
   });
 });
 
@@ -92,13 +92,13 @@ describe("safeRedirectUrl", () => {
 
   it("cannot be pushed off the origin", () => {
     expect(safeRedirectUrl("https://erasmus.app", "//evil.com")).toBe(
-      "https://erasmus.app/dashboard",
+      "https://erasmus.app/discover",
     );
     expect(safeRedirectUrl("https://erasmus.app", "https://evil.com")).toBe(
-      "https://erasmus.app/dashboard",
+      "https://erasmus.app/discover",
     );
     expect(safeRedirectUrl("https://erasmus.app", "/\\evil.com")).toBe(
-      "https://erasmus.app/dashboard",
+      "https://erasmus.app/discover",
     );
   });
 

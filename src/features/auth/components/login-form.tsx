@@ -28,7 +28,7 @@ import { OAuthButtons } from "@/features/auth/components/oauth-buttons";
  */
 export function LoginForm() {
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? ROUTES.dashboard;
+  const next = searchParams.get("next") ?? ROUTES.discover;
   const [pending, startTransition] = React.useTransition();
 
   const form = useForm<LoginInput>({

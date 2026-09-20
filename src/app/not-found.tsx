@@ -28,10 +28,10 @@ export default function NotFound() {
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Button asChild>
-            <Link href={ROUTES.dashboard}>Go to home</Link>
+            <Link href={ROUTES.discover}>Discover</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href={ROUTES.discover}>Discover</Link>
+            <Link href={ROUTES.dashboard}>Dashboard</Link>
           </Button>
         </div>
       </div>

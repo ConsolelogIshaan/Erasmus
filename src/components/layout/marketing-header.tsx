@@ -30,7 +30,7 @@ export function MarketingHeader({ isAuthenticated }: MarketingHeaderProps) {
 
         <div className="flex items-center gap-3">
           {isAuthenticated ? (
-            <ElectricCta href={ROUTES.dashboard} size="sm">
+            <ElectricCta href={ROUTES.discover} size="sm">
               Open app
             </ElectricCta>
           ) : (

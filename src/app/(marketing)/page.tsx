@@ -23,7 +23,7 @@ export const revalidate = 3600;
 export default async function LandingPage() {
   const { user } = await getSessionContext();
   if (user) {
-    redirect(ROUTES.dashboard);
+    redirect(ROUTES.discover);
   }
 
   const showcase = await getLandingShowcase();

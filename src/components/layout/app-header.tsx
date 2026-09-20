@@ -20,7 +20,7 @@ interface AppHeaderProps {
  */
 export function AppHeader({ user, isFullBleed }: AppHeaderProps) {
   const pathname = usePathname();
-  const isHomeScreen = pathname === ROUTES.dashboard || pathname === ROUTES.home;
+  const isHomeScreen = pathname === ROUTES.discover || pathname === ROUTES.home;
 
   return (
     <header
@@ -38,7 +38,7 @@ export function AppHeader({ user, isFullBleed }: AppHeaderProps) {
       {/* Logo only rendered on the home screen */}
       {isHomeScreen ? (
         <div className="hidden min-w-0 md:block drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
-          <Logo href={ROUTES.dashboard} />
+          <Logo href={ROUTES.discover} />
         </div>
       ) : null}
 

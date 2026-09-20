@@ -113,7 +113,7 @@ export async function signInWithPassword(
         maxAge: 60 * 60 * 24 * 7,
       });
       revalidatePath("/", "layout");
-      redirect(safeNextPath(typeof next === "string" ? next : null, ROUTES.dashboard));
+      redirect(safeNextPath(typeof next === "string" ? next : null, ROUTES.discover));
     }
     return { success: false, error: attempt.error };
   }
@@ -137,14 +137,14 @@ export async function signInWithPassword(
         maxAge: 60 * 60 * 24 * 7,
       });
       revalidatePath("/", "layout");
-      redirect(safeNextPath(typeof next === "string" ? next : null, ROUTES.dashboard));
+      redirect(safeNextPath(typeof next === "string" ? next : null, ROUTES.discover));
     }
     return { success: false, error: error.message };
   }
 
   cookieStore.delete("sb-local-auth-user");
   revalidatePath("/", "layout");
-  redirect(safeNextPath(typeof next === "string" ? next : null, ROUTES.dashboard));
+  redirect(safeNextPath(typeof next === "string" ? next : null, ROUTES.discover));
 }
 
 /**
@@ -203,7 +203,7 @@ export async function signUpWithPassword(
         maxAge: 60 * 60 * 24 * 7,
       });
       revalidatePath("/", "layout");
-      redirect(ROUTES.dashboard);
+      redirect(ROUTES.discover);
     }
     return { success: false, error: attempt.error };
   }
@@ -227,14 +227,14 @@ export async function signUpWithPassword(
         maxAge: 60 * 60 * 24 * 7,
       });
       revalidatePath("/", "layout");
-      redirect(ROUTES.dashboard);
+      redirect(ROUTES.discover);
     }
     return { success: false, error: error.message };
   }
 
   cookieStore.delete("sb-local-auth-user");
   revalidatePath("/", "layout");
-  redirect(ROUTES.dashboard);
+  redirect(ROUTES.discover);
 }
 
 /**

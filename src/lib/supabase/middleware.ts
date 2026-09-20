@@ -69,7 +69,7 @@ export async function updateSession(request: NextRequest) {
   if (hasLocalUserCookie && !hasRemoteAuthCookie) {
     if (isAuthRoute) {
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = ROUTES.dashboard;
+      redirectUrl.pathname = ROUTES.discover;
       redirectUrl.search = "";
       return NextResponse.redirect(redirectUrl);
     }
@@ -129,7 +129,7 @@ export async function updateSession(request: NextRequest) {
 
   if (isAuthRoute && user) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = ROUTES.dashboard;
+    redirectUrl.pathname = ROUTES.discover;
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }
