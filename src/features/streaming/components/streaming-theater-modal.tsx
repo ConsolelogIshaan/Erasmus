@@ -976,13 +976,10 @@ export function StreamingTheaterModal({
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                 </div>
-                <div className="flex h-12 w-12 items-center justify-center">
-                  <div className="h-8 w-8 animate-spin rounded-full border-[2px] border-white/15 border-t-white" />
-                </div>
                 {loadError ? (
                   <p className="text-[13px] text-white/50">{loadError}</p>
                 ) : (
-                  <p className="max-w-sm px-8 text-center text-[13px] leading-relaxed text-white/45">
+                  <p className="joke-shimmer max-w-sm px-8 text-center text-[14px] font-medium leading-relaxed">
                     {loadJoke}
                   </p>
                 )}
