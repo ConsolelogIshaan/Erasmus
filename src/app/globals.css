@@ -427,22 +427,29 @@
   }
 }
 
-/* Loading joke shimmer — brightness wave flowing through static text */
+/* Loading joke shimmer — brightness glint sweeping left → right through static text */
+@keyframes joke-shimmer-sweep {
+  from {
+    background-position: 200% center;
+  }
+  to {
+    background-position: -100% center;
+  }
+}
+
 .joke-shimmer {
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.28) 0%,
-    rgba(255, 255, 255, 0.28) 30%,
-    rgba(255, 255, 255, 0.72) 50%,
-    rgba(255, 255, 255, 0.28) 70%,
-    rgba(255, 255, 255, 0.28) 100%
+    rgba(255, 255, 255, 0.22) 25%,
+    rgba(255, 255, 255, 0.88) 50%,
+    rgba(255, 255, 255, 0.22) 75%
   );
-  background-size: 250% auto;
+  background-size: 200% 100%;
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
-  animation: shimmer 3s linear infinite;
+  animation: joke-shimmer-sweep 2.5s ease-in-out infinite;
 }
 
 /* ---------------------------------------------------------------------------

@@ -979,7 +979,7 @@ export function StreamingTheaterModal({
                 {loadError ? (
                   <p className="text-[13px] text-white/50">{loadError}</p>
                 ) : (
-                  <p className="joke-shimmer max-w-sm px-8 text-center text-[14px] font-medium leading-relaxed">
+                  <p className="joke-shimmer max-w-sm px-8 text-center text-[17.5px] font-medium leading-relaxed">
                     {loadJoke}
                   </p>
                 )}
