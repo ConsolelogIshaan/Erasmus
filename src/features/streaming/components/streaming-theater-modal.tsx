@@ -27,6 +27,7 @@ import {
 
 import {
   NativePlayer,
+  useLoadingJoke,
   type ExternalSubtitle,
 } from "@/features/streaming/components/native-player";
 import {
@@ -387,6 +388,8 @@ export function StreamingTheaterModal({
   const [directHdSrc, setDirectHdSrc] = React.useState<string | null>(null);
   const [directFourKSrc, setDirectFourKSrc] = React.useState<string | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
+  const isLoadingStream = !directSrc && !embedSrc && open;
+  const { joke: loadJoke, visible: loadJokeVisible } = useLoadingJoke(isLoadingStream && !loadError);
   const [selectedServerId, setSelectedServerId] = React.useState(() => readPreferredServer());
   const [serversOpen, setServersOpen] = React.useState(false);
   const [episodesOpen, setEpisodesOpen] = React.useState(false);
@@ -971,9 +974,19 @@ export function StreamingTheaterModal({
                 <div className="flex h-12 w-12 items-center justify-center">
                   <div className="h-8 w-8 animate-spin rounded-full border-[2px] border-white/15 border-t-white" />
                 </div>
-                <p className="text-[13px] text-white/50">
-                  {loadError || "Starting playback"}
-                </p>
+                {loadError ? (
+                  <p className="text-[13px] text-white/50">{loadError}</p>
+                ) : (
+                  <div className="flex flex-col items-center gap-1.5">
+                    <p className="text-[13px] text-white/50">Starting playback</p>
+                    <p
+                      className="max-w-xs px-6 text-center text-[11px] leading-relaxed text-white/30 transition-opacity duration-[400ms]"
+                      style={{ opacity: loadJokeVisible ? 1 : 0 }}
+                    >
+                      {loadJoke}
+                    </p>
+                  </div>
+                )}
                 {loadError && (
                   <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
                     <button

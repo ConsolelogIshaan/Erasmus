@@ -119,6 +119,90 @@ type Panel = "none" | "settings" | "subs" | "audio" | "quality" | "speed";
 
 const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 
+export const LOADING_JOKES: readonly string[] = [
+  // 🎬 Director & Cinema Tropes
+  "Adjusting dialogue volume so Hans Zimmer's brass doesn't blow your speakers...",
+  "Christopher Nolan is rendering this backward in time. Please hold...",
+  "Quentin Tarantino is currently double-checking the cast's footwear...",
+  "Applying 70mm grain so you feel like a certified film purist...",
+  "Cutting 45 minutes of Martin Scorsese exposition...",
+  "Tuning the brightness because the director insisted on filming in pitch darkness...",
+  "Waiting for Denis Villeneuve to finish filming another sand dune...",
+  "Checking if this movie really needed a 3-hour runtime...",
+  // 🍿 Binge-Watching & Streaming Confessions
+  "Don't worry, we won't tell anyone you use subtitles for English audio.",
+  "Popcorn countdown: grab your drink before the opening credits roll.",
+  "Skipping the recap you literally watched 3 minutes ago...",
+  "Pretending you didn't just tell someone 'just one more episode'...",
+  "Bribing your Wi-Fi router for maximum bitrate...",
+  "Re-buffering the emotional damage from the last episode...",
+  "Checking if your couch has molded to your exact body shape yet...",
+  // 🎞️ Classic Movie Line Parodies
+  "Houston, we have a buffer.",
+  "I'm going to make your bandwidth an offer it can't refuse.",
+  "May the bitrate be with you.",
+  "One does not simply skip the intro.",
+  "You're gonna need a bigger buffer.",
+  "Say hello to my little stream.",
+  "Here's buffering at you, kid.",
+  // ⚡ Purist & High-Res Tech Humor
+  "Warming up the pixels. Only organic, free-range photons here.",
+  "Locking in 4K because 1080p is so 2016.",
+  "Ensuring your OLED displays true absolute pitch blacks...",
+  "Fetching 24.000 fps because 23.976 wasn't purist enough.",
+  "Spinning up the 35mm projector spools...",
+  "Negotiating with the CDN for the sharpest pixels on the internet...",
+  // 🏴‍☠️ Pirate & Nautical Puns
+  "Hold fast! The crew is digging up the treasure...",
+  "Adjusting the sails. High seas mean high latency.",
+  "Batten down the hatches, we're outrunning the copyright lawyers.",
+  "Polishing the peglegs... please hold.",
+  "Even Blackbeard had to wait for the wind.",
+  // 💻 Tech & "Not-So-Legal" Meta Jokes
+  "Siphoning bytes from a server in international waters...",
+  "We pay our seeders in exposure. Please wait while they cooperate.",
+  "Downloading more RAM... jk, just fetching your movie.",
+  "Our 12-year-old developer is working as fast as he can.",
+  "Connecting to a server located in a very legally flexible country.",
+  "Getting your content before Netflix notices.",
+  // 🍿 Audience Teasing
+  "Grab your popcorn. Or a snack that requires less chewing — this might take a second.",
+  "Cheaper than Netflix, just slightly slower.",
+  "Think of this buffer as a mandatory commercial break, minus the commercials.",
+  "The best things in life are free. And slow. Mostly free.",
+  "We'd go faster, but our budget is literally zero dollars.",
+];
+
+/**
+ * Cycles through LOADING_JOKES with a fade-in/out transition.
+ * Returns the current joke text and an opacity class.
+ * Only ticks while `active` is true.
+ */
+export function useLoadingJoke(active: boolean, intervalMs = 4000) {
+  const [index, setIndex] = React.useState(() =>
+    Math.floor(Math.random() * LOADING_JOKES.length),
+  );
+  const [visible, setVisible] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!active) return;
+    const tick = setInterval(() => {
+      setVisible(false);
+      const t = setTimeout(() => {
+        setIndex((i) => (i + 1) % LOADING_JOKES.length);
+        setVisible(true);
+      }, 400);
+      return () => clearTimeout(t);
+    }, intervalMs);
+    return () => clearInterval(tick);
+  }, [active, intervalMs]);
+
+  return {
+    joke: LOADING_JOKES[index]!,
+    visible,
+  };
+}
+
 function checkIs4KSource(
   dims?: { height?: number; width?: number; url?: string | string[] },
   activeSrc?: string,
@@ -244,6 +328,7 @@ export function NativePlayer({
     return [...customSubtitles, ...externalSubtitles];
   }, [customSubtitles, externalSubtitles]);
   const [buffering, setBuffering] = React.useState(false);
+  const { joke: bufferJoke, visible: bufferJokeVisible } = useLoadingJoke(buffering && !paused);
   const [showControls, setShowControls] = React.useState(true);
   const [showPauseOverlay, setShowPauseOverlay] = React.useState(false);
   const [logoFailed, setLogoFailed] = React.useState(false);
@@ -1277,8 +1362,14 @@ export function NativePlayer({
 
       {/* Buffering Spinner */}
       {buffering && !paused && !streamError ? (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-4 z-30">
           <div className="h-10 w-10 animate-spin rounded-full border-[2.5px] border-white/15 border-t-white shadow-2xl" />
+          <p
+            className="max-w-xs px-4 text-center text-[12px] leading-relaxed text-white/40 transition-opacity duration-[400ms]"
+            style={{ opacity: bufferJokeVisible ? 1 : 0 }}
+          >
+            {bufferJoke}
+          </p>
         </div>
       ) : null}
 
