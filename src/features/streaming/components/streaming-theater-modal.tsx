@@ -27,7 +27,7 @@ import {
 
 import {
   NativePlayer,
-  useLoadingJoke,
+  pickLoadingJoke,
   type ExternalSubtitle,
 } from "@/features/streaming/components/native-player";
 import {
@@ -388,8 +388,13 @@ export function StreamingTheaterModal({
   const [directHdSrc, setDirectHdSrc] = React.useState<string | null>(null);
   const [directFourKSrc, setDirectFourKSrc] = React.useState<string | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const isLoadingStream = !directSrc && !embedSrc && open;
-  const { joke: loadJoke, visible: loadJokeVisible } = useLoadingJoke(isLoadingStream && !loadError);
+  // Pick one joke per play session — re-picked each time the modal opens
+  const [loadJoke, setLoadJoke] = React.useState(() => pickLoadingJoke());
+  React.useEffect(() => {
+    if (open) {
+      setLoadJoke(pickLoadingJoke());
+    }
+  }, [open]);
   const [selectedServerId, setSelectedServerId] = React.useState(() => readPreferredServer());
   const [serversOpen, setServersOpen] = React.useState(false);
   const [episodesOpen, setEpisodesOpen] = React.useState(false);
@@ -977,15 +982,9 @@ export function StreamingTheaterModal({
                 {loadError ? (
                   <p className="text-[13px] text-white/50">{loadError}</p>
                 ) : (
-                  <div className="flex flex-col items-center gap-1.5">
-                    <p className="text-[13px] text-white/50">Starting playback</p>
-                    <p
-                      className="max-w-xs px-6 text-center text-[11px] leading-relaxed text-white/30 transition-opacity duration-[400ms]"
-                      style={{ opacity: loadJokeVisible ? 1 : 0 }}
-                    >
-                      {loadJoke}
-                    </p>
-                  </div>
+                  <p className="max-w-sm px-8 text-center text-[13px] leading-relaxed text-white/45">
+                    {loadJoke}
+                  </p>
                 )}
                 {loadError && (
                   <div className="flex flex-wrap items-center justify-center gap-2 mt-2">

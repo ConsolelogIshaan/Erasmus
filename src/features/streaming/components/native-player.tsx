@@ -174,33 +174,11 @@ export const LOADING_JOKES: readonly string[] = [
 ];
 
 /**
- * Cycles through LOADING_JOKES with a fade-in/out transition.
- * Returns the current joke text and an opacity class.
- * Only ticks while `active` is true.
+ * Picks one random joke from LOADING_JOKES.
+ * Call once when the modal/player mounts to get a single joke for the session.
  */
-export function useLoadingJoke(active: boolean, intervalMs = 4000) {
-  const [index, setIndex] = React.useState(() =>
-    Math.floor(Math.random() * LOADING_JOKES.length),
-  );
-  const [visible, setVisible] = React.useState(true);
-
-  React.useEffect(() => {
-    if (!active) return;
-    const tick = setInterval(() => {
-      setVisible(false);
-      const t = setTimeout(() => {
-        setIndex((i) => (i + 1) % LOADING_JOKES.length);
-        setVisible(true);
-      }, 400);
-      return () => clearTimeout(t);
-    }, intervalMs);
-    return () => clearInterval(tick);
-  }, [active, intervalMs]);
-
-  return {
-    joke: LOADING_JOKES[index]!,
-    visible,
-  };
+export function pickLoadingJoke(): string {
+  return LOADING_JOKES[Math.floor(Math.random() * LOADING_JOKES.length)]!;
 }
 
 function checkIs4KSource(
@@ -328,7 +306,6 @@ export function NativePlayer({
     return [...customSubtitles, ...externalSubtitles];
   }, [customSubtitles, externalSubtitles]);
   const [buffering, setBuffering] = React.useState(false);
-  const { joke: bufferJoke, visible: bufferJokeVisible } = useLoadingJoke(buffering && !paused);
   const [showControls, setShowControls] = React.useState(true);
   const [showPauseOverlay, setShowPauseOverlay] = React.useState(false);
   const [logoFailed, setLogoFailed] = React.useState(false);
@@ -1362,14 +1339,8 @@ export function NativePlayer({
 
       {/* Buffering Spinner */}
       {buffering && !paused && !streamError ? (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-4 z-30">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
           <div className="h-10 w-10 animate-spin rounded-full border-[2.5px] border-white/15 border-t-white shadow-2xl" />
-          <p
-            className="max-w-xs px-4 text-center text-[12px] leading-relaxed text-white/40 transition-opacity duration-[400ms]"
-            style={{ opacity: bufferJokeVisible ? 1 : 0 }}
-          >
-            {bufferJoke}
-          </p>
         </div>
       ) : null}
 
