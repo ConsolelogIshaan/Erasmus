@@ -119,66 +119,254 @@ type Panel = "none" | "settings" | "subs" | "audio" | "quality" | "speed";
 
 const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 
-export const LOADING_JOKES: readonly string[] = [
-  // 🎬 Director & Cinema Tropes
-  "Adjusting dialogue volume so Hans Zimmer's brass doesn't blow your speakers...",
-  "Christopher Nolan is rendering this backward in time. Please hold...",
-  "Quentin Tarantino is currently double-checking the cast's footwear...",
-  "Applying 70mm grain so you feel like a certified film purist...",
-  "Cutting 45 minutes of Martin Scorsese exposition...",
-  "Tuning the brightness because the director insisted on filming in pitch darkness...",
-  "Waiting for Denis Villeneuve to finish filming another sand dune...",
-  "Checking if this movie really needed a 3-hour runtime...",
-  // 🍿 Binge-Watching & Streaming Confessions
-  "Don't worry, we won't tell anyone you use subtitles for English audio.",
-  "Popcorn countdown: grab your drink before the opening credits roll.",
-  "Skipping the recap you literally watched 3 minutes ago...",
-  "Pretending you didn't just tell someone 'just one more episode'...",
-  "Bribing your Wi-Fi router for maximum bitrate...",
-  "Re-buffering the emotional damage from the last episode...",
-  "Checking if your couch has molded to your exact body shape yet...",
-  // 🎞️ Classic Movie Line Parodies
-  "Houston, we have a buffer.",
-  "I'm going to make your bandwidth an offer it can't refuse.",
-  "May the bitrate be with you.",
-  "One does not simply skip the intro.",
-  "You're gonna need a bigger buffer.",
-  "Say hello to my little stream.",
-  "Here's buffering at you, kid.",
-  // ⚡ Purist & High-Res Tech Humor
-  "Warming up the pixels. Only organic, free-range photons here.",
-  "Locking in 4K because 1080p is so 2016.",
-  "Ensuring your OLED displays true absolute pitch blacks...",
-  "Fetching 24.000 fps because 23.976 wasn't purist enough.",
-  "Spinning up the 35mm projector spools...",
-  "Negotiating with the CDN for the sharpest pixels on the internet...",
-  // 🏴‍☠️ Pirate & Nautical Puns
-  "Hold fast! The crew is digging up the treasure...",
-  "Adjusting the sails. High seas mean high latency.",
-  "Batten down the hatches, we're outrunning the copyright lawyers.",
-  "Polishing the peglegs... please hold.",
-  "Even Blackbeard had to wait for the wind.",
-  // 💻 Tech & "Not-So-Legal" Meta Jokes
-  "Siphoning bytes from a server in international waters...",
-  "We pay our seeders in exposure. Please wait while they cooperate.",
-  "Downloading more RAM... jk, just fetching your movie.",
-  "Our 12-year-old developer is working as fast as he can.",
-  "Connecting to a server located in a very legally flexible country.",
-  "Getting your content before Netflix notices.",
-  // 🍿 Audience Teasing
-  "Grab your popcorn. Or a snack that requires less chewing — this might take a second.",
-  "Cheaper than Netflix, just slightly slower.",
-  "Think of this buffer as a mandatory commercial break, minus the commercials.",
-  "The best things in life are free. And slow. Mostly free.",
-  "We'd go faster, but our budget is literally zero dollars.",
+interface LoadingJoke {
+  text: string;
+  for: "movie" | "tv" | "both";
+}
+
+export const LOADING_JOKES: readonly LoadingJoke[] = [
+  // ─── BOTH ────────────────────────────────────────────────────────────────────
+  // Original: Director & Cinema Tropes
+  { for: "both",  text: "Adjusting dialogue volume so Hans Zimmer's brass doesn't blow your speakers..." },
+  { for: "both",  text: "Tuning the brightness because the director insisted on filming in pitch darkness..." },
+  // Original: Binge-Watching & Streaming Confessions
+  { for: "both",  text: "Don't worry, we won't tell anyone you use subtitles for English audio." },
+  { for: "both",  text: "Popcorn countdown: grab your drink before the opening credits roll." },
+  { for: "both",  text: "Bribing your Wi-Fi router for maximum bitrate..." },
+  { for: "both",  text: "Checking if your couch has molded to your exact body shape yet..." },
+  // Original: Classic Line Parodies (IP exists in both film & TV)
+  { for: "both",  text: "May the bitrate be with you." },
+  // Original: Purist & High-Res Tech Humor
+  { for: "both",  text: "Warming up the pixels. Only organic, free-range photons here." },
+  { for: "both",  text: "Locking in 4K because 1080p is so 2016." },
+  { for: "both",  text: "Ensuring your OLED displays true absolute pitch blacks..." },
+  { for: "both",  text: "Negotiating with the CDN for the sharpest pixels on the internet..." },
+  // Original: Pirate & Nautical Puns
+  { for: "both",  text: "Hold fast! The crew is digging up the treasure..." },
+  { for: "both",  text: "Adjusting the sails. High seas mean high latency." },
+  { for: "both",  text: "Batten down the hatches, we're outrunning the copyright lawyers." },
+  { for: "both",  text: "Polishing the peglegs... please hold." },
+  { for: "both",  text: "Even Blackbeard had to wait for the wind." },
+  // Original: Tech & "Not-So-Legal" Meta Jokes
+  { for: "both",  text: "Siphoning bytes from a server in international waters..." },
+  { for: "both",  text: "We pay our seeders in exposure. Please wait while they cooperate." },
+  { for: "both",  text: "Our 12-year-old developer is working as fast as he can." },
+  { for: "both",  text: "Connecting to a server located in a very legally flexible country." },
+  { for: "both",  text: "Getting your content before Netflix notices." },
+  // Original: Audience Teasing
+  { for: "both",  text: "Grab your popcorn. Or a snack that requires less chewing — this might take a second." },
+  { for: "both",  text: "Cheaper than Netflix, just slightly slower." },
+  { for: "both",  text: "Think of this buffer as a mandatory commercial break, minus the commercials." },
+  { for: "both",  text: "The best things in life are free. And slow. Mostly free." },
+  { for: "both",  text: "We'd go faster, but our budget is literally zero dollars." },
+  // New: Quote Parodies (both film & TV IPs)
+  { for: "both",  text: "Keep your friends close and your buffer closer." },
+  { for: "both",  text: "You had me at \"Connecting...\"" },
+  { for: "both",  text: "With great bandwidth comes great responsibility." },
+  { for: "both",  text: "I'll be buffering." },
+  { for: "both",  text: "Winter is coming. The stream is coming shortly after." },
+  { for: "both",  text: "The first rule of buffering is we do not talk about buffering." },
+  { for: "both",  text: "Elementary, my dear bandwidth." },
+  { for: "both",  text: "Frankly, my dear, we don't give a lag." },
+  { for: "both",  text: "Nobody puts this loading screen in a corner." },
+  { for: "both",  text: "You can't handle the bitrate." },
+  // New: General Streaming / Server Humor
+  { for: "both",  text: "Routing your stream through three continents for reasons we can't legally discuss." },
+  { for: "both",  text: "Pinging a server that has definitely heard worse requests than this one." },
+  { for: "both",  text: "Querying 12 server nodes. 11 said no. One said yes. Connecting to that one now." },
+  { for: "both",  text: "Successfully located the stream. Currently convincing it to move in your direction." },
+  { for: "both",  text: "Our caching strategy: aggressive, relentless, borderline personal." },
+  { for: "both",  text: "The stream exists. It is on its way. These are confirmed facts." },
+  { for: "both",  text: "Converting your bandwidth anxiety into actual loading progress. Almost there." },
+  { for: "both",  text: "Running a quiet background check on the CDN. Results: legally interesting." },
+  { for: "both",  text: "Your connection is doing its absolute best right now. Today, that's enough." },
+  { for: "both",  text: "We asked a guy who knows a guy. The stream is on its way." },
+  // New: Audience / Meta Humor
+  { for: "both",  text: "You have found the world's most reliable free streaming site. Take a moment." },
+  { for: "both",  text: "No ads. No upsell. No \"upgrade to premium.\" This is the internet as it was meant to be." },
+  { for: "both",  text: "Your watch history is safe with us. We don't actually track it. It's better for everyone." },
+  { for: "both",  text: "Calculating the hours you've saved not watching commercials this year. It's significant." },
+  { for: "both",  text: "Whatever you're watching, you have excellent taste. We have no idea what it is. We believe you." },
+  { for: "both",  text: "Loading quietly so nobody in the house knows you're still awake at this hour." },
+  { for: "both",  text: "Adjusting everything for the 2am experience. The neighbours will not know." },
+  { for: "both",  text: "We checked. It's not available on any legitimate platform in your region. You're welcome." },
+  { for: "both",  text: "The number of streaming subscriptions you'd need to watch this legally: 3. You chose wisely." },
+  { for: "both",  text: "This is a safe space. No watch history, no judgement, no recommendations based on your shame." },
+  // New: Purist / Technical
+  { for: "both",  text: "Fetching the version the studio didn't want released at this bitrate." },
+  { for: "both",  text: "Confirming the aspect ratio wasn't cropped and stretched by a streaming platform." },
+  { for: "both",  text: "The audio track was mixed for a cinema. Your neighbours are about to find out." },
+  { for: "both",  text: "Loading the colour-graded version, not the washed-out streaming-optimised one." },
+  { for: "both",  text: "Your screen is technically capable of displaying all of this. Your eyes may need a moment." },
+  // New: Pirate / Heist Vibe
+  { for: "both",  text: "The compass points toward the stream. Slightly northwest, but it's getting there." },
+  { for: "both",  text: "Dispatching a carrier pigeon to retrieve your content. Faster than you'd expect." },
+  { for: "both",  text: "Coordinates confirmed. Stream located. ETA: momentarily." },
+  { for: "both",  text: "Whistling innocently while the stream loads. Completely nothing to see here." },
+  { for: "both",  text: "We have people on the inside. They're working on it." },
+
+  // ─── MOVIE ONLY ──────────────────────────────────────────────────────────────
+  // Original: movie-specific
+  { for: "movie", text: "Christopher Nolan is rendering this backward in time. Please hold..." },
+  { for: "movie", text: "Quentin Tarantino is currently double-checking the cast's footwear..." },
+  { for: "movie", text: "Applying 70mm grain so you feel like a certified film purist..." },
+  { for: "movie", text: "Cutting 45 minutes of Martin Scorsese exposition..." },
+  { for: "movie", text: "Waiting for Denis Villeneuve to finish filming another sand dune..." },
+  { for: "movie", text: "Checking if this movie really needed a 3-hour runtime..." },
+  { for: "movie", text: "Fetching 24.000 fps because 23.976 wasn't purist enough." },
+  { for: "movie", text: "Spinning up the 35mm projector spools..." },
+  { for: "movie", text: "Downloading more RAM... jk, just fetching your movie." },
+  // Original: classic line parodies from films
+  { for: "movie", text: "Houston, we have a buffer." },
+  { for: "movie", text: "I'm going to make your bandwidth an offer it can't refuse." },
+  { for: "movie", text: "You're gonna need a bigger buffer." },
+  { for: "movie", text: "Say hello to my little stream." },
+  { for: "movie", text: "Here's buffering at you, kid." },
+  // New: Director References
+  { for: "movie", text: "Stanley Kubrick is reviewing every single frame for continuity errors. This may take a while." },
+  { for: "movie", text: "David Lynch has added another dream sequence. You might want to brew some coffee." },
+  { for: "movie", text: "Wes Anderson is centering the shot. And the shot inside the shot. And the one inside that." },
+  { for: "movie", text: "Michael Bay is negotiating how many explosions are technically \"too many.\"" },
+  { for: "movie", text: "Tim Burton is gluing one more button to the main character's eyeball." },
+  { for: "movie", text: "James Cameron is reminding the crew this could've been a 4-hour cut. You got lucky." },
+  { for: "movie", text: "Steven Spielberg is personally making sure the lens flare hits at exactly the right moment." },
+  { for: "movie", text: "Ridley Scott is restoring the director's cut you didn't know you needed." },
+  { for: "movie", text: "Peter Jackson is deciding which 20 minutes to cut from the theatrical version." },
+  { for: "movie", text: "The Coen Brothers have refused to explain what the ending means. Loading anyway." },
+  // New: Cinema Culture
+  { for: "movie", text: "Hunting for the post-credits scene you almost left the cinema before." },
+  { for: "movie", text: "The popcorn would've been $18 at the cinema. You're welcome." },
+  { for: "movie", text: "Confirming this isn't a \"the trailer was better\" situation." },
+  { for: "movie", text: "This film was shot on actual film. Respect the load time." },
+  { for: "movie", text: "Loading the version without the 20-minute studio logo montage." },
+  { for: "movie", text: "Calibrating audio so dialogue is audible and action doesn't blow your speakers off the wall." },
+  { for: "movie", text: "Pre-ordering the 4K Blu-ray in your mind while you wait." },
+  { for: "movie", text: "Checking that the runtime you looked up is the runtime you're actually getting." },
+  { for: "movie", text: "This was filmed on location in 14 countries. Buffer time is the cheap part." },
+  { for: "movie", text: "Muting the trailer you've already seen six times before the feature starts." },
+  // New: Sequels / Reboots / Franchises
+  { for: "movie", text: "Confirming this is the good sequel. Not the one everyone pretends doesn't exist." },
+  { for: "movie", text: "Cross-referencing 14 prequels so the opening scene makes any sense whatsoever." },
+  { for: "movie", text: "Verifying this isn't part of the extended universe you quietly gave up on in 2019." },
+  { for: "movie", text: "Confirming the mid-credits scene is actually mid-credits and not 12 minutes of silence." },
+  { for: "movie", text: "Checking whether the CGI villain looks better in 4K or significantly, noticeably worse." },
+  { for: "movie", text: "Loading the film before they announce the prequel spinoff nobody asked for." },
+  { for: "movie", text: "This is a reboot. The original was beloved. We're cautiously optimistic." },
+  { for: "movie", text: "The director's cut is 40 minutes longer than the studio release. This is the director's cut." },
+  { for: "movie", text: "Loading the franchise entry where they attempt a course-correction. Partially succeeding." },
+  { for: "movie", text: "This film was shot back-to-back with two sequels. The ambition is genuinely impressive." },
+  // New: Genre-Specific
+  { for: "movie", text: "Preparing the jump scare at minute 47. You will not be ready regardless." },
+  { for: "movie", text: "The villain's monologue is 11 minutes long. It is worth every second." },
+  { for: "movie", text: "Confirming that yes, everyone who investigates the strange noise dies." },
+  { for: "movie", text: "Loading the film where the dog survives. You deserve to know this upfront." },
+  { for: "movie", text: "Counting how many cars get flipped in the next two hours. Current estimate: a lot." },
+  { for: "movie", text: "Loading the romance where you've already guessed the ending from the poster." },
+  { for: "movie", text: "The protagonists almost kiss three separate times before they actually do. Trust the process." },
+  { for: "movie", text: "Preparing the heist. The crew will absolutely betray each other. Eventually." },
+  { for: "movie", text: "This is a psychological thriller. Everything is exactly as suspicious as it seems." },
+  { for: "movie", text: "The twist is in the last eight minutes. You will immediately want to rewatch everything." },
+  // New: Awards / Prestige Cinema
+  { for: "movie", text: "This film has 11 Oscar nominations. At least three are genuinely deserved." },
+  { for: "movie", text: "A24 presents: beautiful cinematography, ambiguous ending, no explanation whatsoever." },
+  { for: "movie", text: "This has won every award except the specific one that would've made the most sense." },
+  { for: "movie", text: "Certified Fresh at 97%. Audience score: \"I just wanted to see explosions.\"" },
+  { for: "movie", text: "Art-house disclaimer: the aspect ratio is intentional. So is the pacing." },
+  { for: "movie", text: "Loading the prestige drama that made everyone cry and then refuse to discuss." },
+  { for: "movie", text: "The director gave exactly one interview explaining the ending and it explained nothing." },
+  { for: "movie", text: "For your consideration: four hours of a man staring at water. Loading now." },
+  { for: "movie", text: "The ending divided the internet for six months. You're about to experience why." },
+  { for: "movie", text: "This is the film critics called \"a masterpiece\" and audiences called \"long.\"" },
+
+  // ─── TV ONLY ─────────────────────────────────────────────────────────────────
+  // Original: TV-specific
+  { for: "tv",    text: "Skipping the recap you literally watched 3 minutes ago..." },
+  { for: "tv",    text: "Pretending you didn't just tell someone 'just one more episode'..." },
+  { for: "tv",    text: "Re-buffering the emotional damage from the last episode..." },
+  { for: "tv",    text: "One does not simply skip the intro." },
+  // Original: classic line parody (skip intro = TV)
+  // New: Skip Intro / Are You Still Watching
+  { for: "tv",    text: "Preparing the theme song you'll skip every time but secretly know every single word of." },
+  { for: "tv",    text: "Netflix would've asked if you're still watching by now. We trust you completely." },
+  { for: "tv",    text: "\"Previously on...\" incoming. You watched it yesterday. We know. Loading it anyway." },
+  { for: "tv",    text: "Disabling the \"Are you still watching?\" prompt. You are. You obviously are." },
+  { for: "tv",    text: "The skip intro button loads before the oboe solo. You have about 4 seconds." },
+  // New: Cancelled Shows / Cliffhangers
+  { for: "tv",    text: "Loading the show that was cancelled on a cliffhanger that was never, ever resolved." },
+  { for: "tv",    text: "This show had the best pilot ever written and was cancelled after 8 episodes. Unforgivable." },
+  { for: "tv",    text: "The series finale was described as \"satisfying\" by the writers. Judge for yourself." },
+  { for: "tv",    text: "Warning: the creators knew about the cancellation. The ending absolutely shows it." },
+  { for: "tv",    text: "This was renewed for season 2. Season 2 was cancelled two weeks before it aired." },
+  { for: "tv",    text: "The showrunner fought for 5 seasons. The network gave them 2. Here's season 2." },
+  { for: "tv",    text: "This ended on a cliffhanger in 2017 and there has been silence ever since." },
+  // New: Character Deaths / Writer Decisions
+  { for: "tv",    text: "Loading the episode where your favourite character makes a catastrophically bad decision." },
+  { for: "tv",    text: "Statistically, someone you like dies in this episode. Begin preparing now." },
+  { for: "tv",    text: "The writers had a meeting about this plot point. Nobody stopped them. This is what happened." },
+  { for: "tv",    text: "This character was only supposed to appear in one episode. They stayed for three seasons." },
+  { for: "tv",    text: "The fan favourite gets 45 more minutes of screen time across this season. Enjoy them." },
+  { for: "tv",    text: "A character dies in this episode. The internet did not handle it well. Neither will you." },
+  { for: "tv",    text: "The showrunner personally apologised for this episode in a podcast interview. Loading it anyway." },
+  // New: Showrunners / Writers Room
+  { for: "tv",    text: "The original showrunner left after season 3. You'll be able to tell the exact episode." },
+  { for: "tv",    text: "This was co-written by the showrunner's assistant after the strike. Surprisingly good." },
+  { for: "tv",    text: "The writers' room had 12 people and 12 completely different ideas. All of them survived to air." },
+  { for: "tv",    text: "Season 4 was greenlit before season 3 finished airing. Godspeed to everyone involved." },
+  { for: "tv",    text: "The network asked for a procedural. The showrunner made something else entirely. This is it." },
+  { for: "tv",    text: "Loading the version of the season the showrunner wanted before the network's notes arrived." },
+  // New: Binge-Watching / Episode Culture
+  { for: "tv",    text: "This episode ends on a cliffhanger. The next one jumps three weeks forward in time. Enjoy." },
+  { for: "tv",    text: "Episode 4 is the slow one. Push through. Episode 5 changes everything — we mean everything." },
+  { for: "tv",    text: "This is the bottle episode. Two characters, one room, 42 minutes. Peak television." },
+  { for: "tv",    text: "Season 2 takes 4 episodes to find its footing. It finds it. Commit to the process." },
+  { for: "tv",    text: "This is the midseason finale. You will not handle what happens." },
+  { for: "tv",    text: "Loading the season everyone agrees is the weakest but is still better than most TV." },
+  { for: "tv",    text: "\"Just one more episode\" — said by 47% of viewers before watching four more." },
+  { for: "tv",    text: "This series has 8 seasons. The first 6 are absolutely worth it." },
+  { for: "tv",    text: "Loading the episode that broke the internet in real time. Somehow still holds up." },
+  { for: "tv",    text: "You've been watching for 3 hours. No judgment here. We're genuinely proud of you." },
+  // New: Spin-offs / Reboots
+  { for: "tv",    text: "Loading the spin-off nobody asked for but everyone watched immediately." },
+  { for: "tv",    text: "This is technically a reboot. The original ran 11 seasons and ended strangely." },
+  { for: "tv",    text: "Loading the prequel series that retcons exactly one thing you really liked. Just one." },
+  { for: "tv",    text: "This character got a spin-off purely because everyone tweeted about them for two years." },
+  { for: "tv",    text: "It shares the same universe as something you've already seen. Whether that's good: TBD." },
+  // New: Streaming-Specific TV
+  { for: "tv",    text: "All 8 episodes dropped at midnight. This is episode 1. Pace yourself. (You won't.)" },
+  { for: "tv",    text: "This show was renewed for season 2 three days after episode 1 dropped. Extremely confident." },
+  { for: "tv",    text: "Loading the \"limited series\" that got extended because the finale was too good to end on." },
+  { for: "tv",    text: "This was originally a movie pitch. They turned it into a series. It was the right call." },
+  { for: "tv",    text: "It's a \"Netflix Original\" in the sense that Netflix acquired it after it aired somewhere else." },
+  // New: Episode Length / Runtime
+  { for: "tv",    text: "This episode is 22 minutes long. It will feel like 2. You will want more immediately." },
+  { for: "tv",    text: "Runtime: 58 minutes. Emotional damage: not quantifiable." },
+  { for: "tv",    text: "This is the season finale. It is 82 minutes long. You will not be disappointed." },
+  { for: "tv",    text: "Episode title: \"Part 4.\" Description: \"Things escalate.\" Extremely informative. Loading." },
+  { for: "tv",    text: "The episode description gives nothing away. The episode gives away absolutely everything." },
+  // New: TV Tropes / Character Dynamics
+  { for: "tv",    text: "Loading the episode where the main couple finally gets together, thereby changing everything." },
+  { for: "tv",    text: "The villain gets a full backstory episode this season. You will feel terrible for them. That's the plan." },
+  { for: "tv",    text: "This is the holiday special. It's genuinely good and weirdly important to the main plot." },
+  { for: "tv",    text: "A character disappears between seasons with zero explanation. This is that season." },
+  { for: "tv",    text: "The fan theory that divided Reddit? Partially addressed in this episode. Partially." },
+  { for: "tv",    text: "This is episode 9 of 10. You already know what happens in episode 9. Brace yourself." },
+  { for: "tv",    text: "Loading the season where a character randomly picks up a hobby and it becomes an actual subplot." },
+  { for: "tv",    text: "The season 1 villain is the season 3 fan favourite. Character development of the highest order." },
+  { for: "tv",    text: "This episode features a character from 4 seasons ago. You will remember exactly who they are." },
+  { for: "tv",    text: "They recast one character between seasons. You will notice immediately and completely move on." },
 ];
 
 /**
- * Picks one random joke from LOADING_JOKES.
- * Call once when the modal/player mounts to get a single joke for the session.
+ * Picks one random joke from the appropriate pool based on media type.
+ * "movie" → movie + both jokes
+ * "tv"    → tv + both jokes
+ * default → all jokes
  */
-export function pickLoadingJoke(): string {
-  return LOADING_JOKES[Math.floor(Math.random() * LOADING_JOKES.length)]!;
+export function pickLoadingJoke(mediaType?: "movie" | "tv"): string {
+  const pool = mediaType
+    ? LOADING_JOKES.filter((j) => j.for === mediaType || j.for === "both")
+    : LOADING_JOKES;
+  return pool[Math.floor(Math.random() * pool.length)]!.text;
 }
 
 function checkIs4KSource(

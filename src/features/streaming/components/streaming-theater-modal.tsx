@@ -389,12 +389,12 @@ export function StreamingTheaterModal({
   const [directFourKSrc, setDirectFourKSrc] = React.useState<string | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   // Pick one joke per play session — re-picked each time the modal opens
-  const [loadJoke, setLoadJoke] = React.useState(() => pickLoadingJoke());
+  const [loadJoke, setLoadJoke] = React.useState(() => pickLoadingJoke(mediaType));
   React.useEffect(() => {
     if (open) {
-      setLoadJoke(pickLoadingJoke());
+      setLoadJoke(pickLoadingJoke(mediaType));
     }
-  }, [open]);
+  }, [open, mediaType]);
   const [selectedServerId, setSelectedServerId] = React.useState(() => readPreferredServer());
   const [serversOpen, setServersOpen] = React.useState(false);
   const [episodesOpen, setEpisodesOpen] = React.useState(false);
