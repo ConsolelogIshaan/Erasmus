@@ -219,3 +219,13 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Files: `src/app/(marketing)/page.tsx`, `src/components/layout/marketing-header.tsx`, `src/lib/utils/safe-redirect.ts`, `src/lib/utils/safe-redirect.test.ts`, `src/lib/supabase/middleware.ts`, `src/features/auth/actions/auth-actions.ts`, `src/features/auth/components/login-form.tsx`, `src/app/auth/callback/route.ts`, `src/lib/services/user-service.ts`, `src/components/layout/logo.tsx`, `src/components/layout/app-header.tsx`, `src/components/layout/mobile-nav.tsx`, `src/constants/shortcuts.ts`, `src/app/not-found.tsx`, `src/app/offline/page.tsx`, `src/app/error.tsx`, `docs/architecture.md`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 - Result: 209/209 tests passed (`npm run test`), 0 type errors (`npm run typecheck`), 0 lint errors (`npm run lint`), 41/41 routes built cleanly (`npm run build`).
 
+## 2026-09-21 | Paarth | Antigravity
+- Changed: Configured the website typeface to Instrument Sans using the user-provided font package (`/Users/paarthsharma/Downloads/instrument-sans.zip`):
+  1. Extracted `InstrumentSans-Variable.ttf` and `InstrumentSans-Italic-Variable.ttf` into `src/assets/fonts/instrument-sans/`.
+  2. Created `src/lib/fonts/instrument-sans.ts` to configure `instrumentSans` using Next.js `next/font/local` with variable font support for normal and italic styles.
+  3. In `src/app/layout.tsx`, replaced Google Fonts `Source_Sans_3` with `instrumentSans`, applying `${instrumentSans.variable}` to the root `<html>` element. Kept `Geist_Mono` for `--font-mono`.
+  4. In `src/app/globals.css`, updated `--font-sans` and `--font-display` to use `var(--font-instrument-sans), "Instrument Sans", ui-sans-serif, system-ui, sans-serif;`, applying Instrument Sans across all headings, titles, navigation, buttons, and prose.
+- Files: `src/assets/fonts/instrument-sans/InstrumentSans-Variable.ttf`, `src/assets/fonts/instrument-sans/InstrumentSans-Italic-Variable.ttf`, `src/lib/fonts/instrument-sans.ts`, `src/app/layout.tsx`, `src/app/globals.css`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: 0 lint errors (`npm run lint`), 0 type errors (`npm run typecheck`), 209/209 tests passed (`npm run test`), 41/41 routes compiled cleanly (`npm run build`). No git push performed.
+
+

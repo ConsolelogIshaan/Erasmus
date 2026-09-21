@@ -1,6 +1,6 @@
 # STATE
 
-Updated: 2026-09-20
+Updated: 2026-09-21
 Git: local branch `main`
 
 ## Priority
@@ -8,6 +8,11 @@ Streaming architecture and playback reliability. Reduce Vercel bandwidth from HL
 
 ## Working
 - Web app (Erasmus, Next.js 16 / React 19): catalog, social, recommendations, ratings, ambient lighting, Continue Watching.
+- Typography: Instrument Sans Typeface:
+  - Configured Instrument Sans (`InstrumentSans-Variable.ttf`, `InstrumentSans-Italic-Variable.ttf`) via `next/font/local` in `src/lib/fonts/instrument-sans.ts`.
+  - Replaced Google Fonts `Source_Sans_3` in `src/app/layout.tsx` and `src/app/globals.css`, eliminating external font round-trip requests.
+  - Mapped `--font-sans` and `--font-display` to `var(--font-instrument-sans)` for all UI, buttons, body copy, headings, and section titles.
+  - Retained `Geist_Mono` exclusively for technical data, badges, and keyboard shortcuts via `--font-mono`.
 - Primary Home & Default Landing: Discover (`/discover`):
   - Made Discover the primary home screen and default landing page instead of `/dashboard`.
   - Authenticated visitors to `/` redirect directly to `/discover`.
@@ -40,6 +45,7 @@ Streaming architecture and playback reliability. Reduce Vercel bandwidth from HL
 - Proxy and resolver disable TLS verification (`NODE_TLS_REJECT_UNAUTHORIZED = "0"`) for upstream CDN nodes.
 
 ## In progress
+- Complete: Configured Instrument Sans variable typeface across the website from user-provided archive.
 - Complete: Set Discover page (`/discover`) as default main page and redirect route across the web platform.
 - Complete: Resolved Supabase egress bandwidth overages across middleware, user session caching, intelligence query limits, and playback progress revalidation.
 - Complete: Diagnosed Vercel Fast Origin Transfer spike and verified 403 CDN referer restrictions.

@@ -180,15 +180,15 @@
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
   /*
-   * Type pairing — two faces, two clearly separate jobs.
-   * - Display (Geist Mono): brand, page/rail titles, uppercase tracked labels,
-   *   numerals. The instrument-panel voice.
-   * - Sans (Source Sans 3): prose, overviews, values, forms, media titles.
+   * Type pairing — Instrument Sans for UI & display, Geist Mono for code/data.
+   * - Sans & Display (Instrument Sans): headings, rail titles, buttons, cards, prose.
+   * - Mono (Geist Mono): technical badges, kbd shortcuts, timestamps.
    */
   --font-sans:
-    var(--font-source-sans), "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+    var(--font-instrument-sans), "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-display: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display:
+    var(--font-instrument-sans), "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
 
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
@@ -559,7 +559,7 @@
   }
 
   /*
-   * BODY / CONTEXT face (Source Sans 3) — softer, smaller copy
+   * BODY / CONTEXT face (Instrument Sans) — softer copy
    * about movies, overviews, helpers, meta.
    */
   p {

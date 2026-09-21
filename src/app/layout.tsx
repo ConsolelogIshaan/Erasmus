@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Source_Sans_3, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 
+import { instrumentSans } from "@/lib/fonts/instrument-sans";
 import { AppProviders } from "@/providers/app-providers";
 import { SkipLink } from "@/components/layout/skip-link";
 import { RegisterServiceWorker } from "@/components/pwa/register-sw";
@@ -9,22 +10,8 @@ import { APP_METADATA } from "@/constants/app";
 import "./globals.css";
 
 /**
- * Body / context face — Source Sans 3 (soft, highly readable).
- * Used for overviews, descriptions, values, forms, meta.
- */
-const sourceSans = Source_Sans_3({
-  subsets: ["latin"],
-  variable: "--font-source-sans",
-  display: "swap",
-  weight: ["300", "400", "500", "600", "700"],
-});
-
-/**
- * Display / brand / label face — Geist Mono.
- *
- * The instrument-panel voice: the Erasmus wordmark, page and rail titles, and
- * every uppercase tracked-out label and numeral. Paired against Source Sans 3
- * for prose, so the two faces stay clearly different jobs.
+ * Display / code / data face — Geist Mono.
+ * Used for technical badges, kbd shortcuts, and numerical data.
  */
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -100,7 +87,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${sourceSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`dark ${instrumentSans.variable} ${geistMono.variable} h-full antialiased`}
       style={{ colorScheme: "dark" }}
       suppressHydrationWarning
     >
