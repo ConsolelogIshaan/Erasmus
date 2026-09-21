@@ -45,6 +45,7 @@ Streaming architecture and playback reliability. Reduce Vercel bandwidth from HL
 - Proxy and resolver disable TLS verification (`NODE_TLS_REJECT_UNAUTHORIZED = "0"`) for upstream CDN nodes.
 
 ## In progress
+- Complete: Default playback to highest available quality tier (4K or 1080p, never Auto) per user directive across `native-player.tsx` and `streaming-theater-modal.tsx`.
 - Complete: Configured Instrument Sans variable typeface across the website from user-provided archive.
 - Complete: Set Discover page (`/discover`) as default main page and redirect route across the web platform.
 - Complete: Resolved Supabase egress bandwidth overages across middleware, user session caching, intelligence query limits, and playback progress revalidation.

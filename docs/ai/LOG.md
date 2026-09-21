@@ -226,6 +226,20 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   3. In `src/app/layout.tsx`, replaced Google Fonts `Source_Sans_3` with `instrumentSans`, applying `${instrumentSans.variable}` to the root `<html>` element. Kept `Geist_Mono` for `--font-mono`.
   4. In `src/app/globals.css`, updated `--font-sans` and `--font-display` to use `var(--font-instrument-sans), "Instrument Sans", ui-sans-serif, system-ui, sans-serif;`, applying Instrument Sans across all headings, titles, navigation, buttons, and prose.
 - Files: `src/assets/fonts/instrument-sans/InstrumentSans-Variable.ttf`, `src/assets/fonts/instrument-sans/InstrumentSans-Italic-Variable.ttf`, `src/lib/fonts/instrument-sans.ts`, `src/app/layout.tsx`, `src/app/globals.css`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
-- Result: 0 lint errors (`npm run lint`), 0 type errors (`npm run typecheck`), 209/209 tests passed (`npm run test`), 41/41 routes compiled cleanly (`npm run build`). No git push performed.
+- Result: 0 lint errors (`npm run lint`), 0 type errors (`npm run typecheck`), 209/209 tests passed (`npm run test`), 41/41 routes compiled cleanly (`npm run build`).
+
+## 2026-09-21 | Paarth | Antigravity
+- Changed: Defaulted video playback to highest available quality tier (4K or 1080p, never Auto) per user directive:
+  1. `StreamingTheaterModal` (`src/features/streaming/components/streaming-theater-modal.tsx`): Prioritized `fourKUrl` as direct source (`resolvedFourK`) over standard HD direct src when available from `/api/stream/direct`.
+  2. `NativePlayer` (`src/features/streaming/components/native-player.tsx`):
+     - Initialized `activeSrc` to `fourKSrc` if available.
+     - Initialized `selectedQualityTier` state to `"4k"` (if 4K stream or hint is present) or `"1080p"`, never `"auto"`.
+     - In `Hls.Events.MANIFEST_PARSED`: Replaced default auto ABR (`hls.currentLevel = -1; setSelectedQualityTier("auto")`) with logic that inspects all parsed playlist levels, finds the highest resolution/bitrate level index (`topIdx`), sets `hls.currentLevel = topIdx`, sets `level = topIdx`, and syncs `selectedQualityTier` to `"4k"` or `"1080p"` (or highest available tier).
+     - In `Hls.Events.LEVEL_SWITCHED`: Synced `selectedQualityTier` to the switched level's dimensions.
+     - In Safari native HLS & direct file playback: Added `loadedmetadata` inspection to lock `selectedQualityTier` to 4K or 1080p.
+     - In `selectQualityTier`: Removed automatic reset to `-1` (Auto) when toggling 4K/HD streams so user stays on explicit tier. "Auto" remains selectable in the UI menu if desired.
+     - Refactored `checkIs4KSource` and `checkIs1080pSource` to module-level pure functions to comply with React 19 Compiler hook dependencies.
+- Files: `src/features/streaming/components/native-player.tsx`, `src/features/streaming/components/streaming-theater-modal.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: 0 lint errors (`npm run lint`), 0 type errors (`npm run typecheck`), 209/209 tests passed (`npm run test`), 41/41 routes compiled cleanly (`npm run build`).
 
 

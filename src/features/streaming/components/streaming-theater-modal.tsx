@@ -543,11 +543,14 @@ export function StreamingTheaterModal({
           if (data.ok && hit?.url) {
             setDirectKind(hit.kind === "file" ? "file" : "hls");
             const isDirect = Boolean((hit as { isDirectCors?: boolean })?.isDirectCors);
-            setDirectSrc(isDirect ? hit.url : relayUrl(hit.url, data.referer));
-            setDirectIs4K(Boolean((hit as { is4K?: boolean })?.is4K));
             const rawHit = hit as { hdUrl?: string; fourKUrl?: string };
-            setDirectHdSrc(rawHit.hdUrl ? (isDirect ? rawHit.hdUrl : relayUrl(rawHit.hdUrl, data.referer)) : null);
-            setDirectFourKSrc(rawHit.fourKUrl ? (isDirect ? rawHit.fourKUrl : relayUrl(rawHit.fourKUrl, data.referer)) : null);
+            const resolvedFourK = rawHit.fourKUrl ? (isDirect ? rawHit.fourKUrl : relayUrl(rawHit.fourKUrl, data.referer)) : null;
+            const resolvedHd = rawHit.hdUrl ? (isDirect ? rawHit.hdUrl : relayUrl(rawHit.hdUrl, data.referer)) : null;
+            const primarySrc = resolvedFourK || (isDirect ? hit.url : relayUrl(hit.url, data.referer));
+            setDirectSrc(primarySrc);
+            setDirectIs4K(Boolean((hit as { is4K?: boolean })?.is4K || resolvedFourK));
+            setDirectHdSrc(resolvedHd);
+            setDirectFourKSrc(resolvedFourK);
             if (data.captions?.length) {
               const relayed = data.captions.map((c) => ({
                 ...c,
