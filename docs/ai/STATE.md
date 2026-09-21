@@ -25,14 +25,18 @@ Streaming architecture and playback reliability. Reduce Vercel bandwidth from HL
   - Wrapped user session and profile getters (`getCurrentUser`, `getProfile`, `getUserSettings`, `getUserPreferences`, `getSessionContext`) in React `cache()` in `src/lib/services/user-service.ts`, deduplicating queries within each request render cycle.
   - Targeted playback progress revalidations in `actionSetMovieProgress` and `actionSetTvProgress` (`src/features/library/actions/library-actions.ts`) to specific media paths instead of triggering full-site revalidation (`revalidateLibrary`) every 60 seconds of playback.
   - Wrapped `loadIntelligenceData` in React `cache()` and pruned excessive table query limits (reducing 10,000 episode rows and 5,000 session rows to bounded limits), slashing payload transfer on `/dashboard` and detail pages.
-- Direct Playback Trigger on Poster Cards & Hero Banner:
-  - Poster Card Quick Actions (`src/features/media/components/poster-card.tsx`): Clicking the hover **Play** button directly opens `StreamingTheaterModal` with the title's resume progress point.
-  - Hero Banner Action Buttons (`src/features/media/components/hero-banner.tsx`): Clicking the circular white **Play** button directly opens `StreamingTheaterModal`, while the pill "See More" button navigates to the title's detail page.
-- Translucent Frosted Glass Quick Action Buttons on Poster Cards (`src/features/media/components/poster-card.tsx`).
-- Instant Direct Playback Resume on Continue Watching Click (`continue-watching-rail.tsx` & `library-poster-card.tsx`).
-- Centered Navigation Icons on Collapsed Sidebar (`src/components/layout/sidebar.tsx`).
+- Direct Playback Trigger on Poster Cards & Hero Banner.
+- Translucent Frosted Glass Quick Action Buttons on Poster Cards.
+- Instant Direct Playback Resume on Continue Watching Click.
+- Centered Navigation Icons on Collapsed Sidebar.
 - Clean Monochrome Palette & Complete Removal of Blue Accents.
-- Verification: 209/209 tests passed (`npm run test`), 0 type errors (`npm run typecheck`), 0 lint errors (`npm run lint`), 41/41 routes compiled cleanly (`npm run build`).
+- Default Highest Quality Playback: Playback starts at 4K or 1080p, never Auto, on both HLS and direct streams.
+- Loading Jokes on Starting Playback Screen:
+  - One joke per play session, picked randomly when the modal opens, static until playback starts.
+  - Jokes are categorized: `movie` (61 jokes), `tv` (65 jokes), `both` (74 jokes) — 200 total.
+  - `pickLoadingJoke(mediaType)` draws from the correct pool so movie-specific jokes never appear on TV shows and vice versa.
+  - Joke text displayed with a shimmer sweep animation (`joke-shimmer` CSS class using `background-clip: text` + `@keyframes joke-shimmer-sweep`) instead of a spinner — a brightness glint travels left-to-right through the static text.
+  - No joke during mid-video buffering (scrubbing, seeking, rebuffering) — plain spinner only.
 
 ## Broken / Risky
 - Vercel Fast Origin Transfer at 6.84 GB / 10 GB monthly limit.
@@ -45,7 +49,8 @@ Streaming architecture and playback reliability. Reduce Vercel bandwidth from HL
 - Proxy and resolver disable TLS verification (`NODE_TLS_REJECT_UNAUTHORIZED = "0"`) for upstream CDN nodes.
 
 ## In progress
-- Complete: Default playback to highest available quality tier (4K or 1080p, never Auto) per user directive across `native-player.tsx` and `streaming-theater-modal.tsx`.
+- Complete: Loading jokes on starting playback screen — 200 jokes categorized by media type with shimmer animation.
+- Complete: Default playback to highest available quality tier (4K or 1080p, never Auto).
 - Complete: Configured Instrument Sans variable typeface across the website from user-provided archive.
 - Complete: Set Discover page (`/discover`) as default main page and redirect route across the web platform.
 - Complete: Resolved Supabase egress bandwidth overages across middleware, user session caching, intelligence query limits, and playback progress revalidation.

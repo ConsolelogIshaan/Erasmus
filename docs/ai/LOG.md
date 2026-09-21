@@ -243,3 +243,29 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Result: 0 lint errors (`npm run lint`), 0 type errors (`npm run typecheck`), 209/209 tests passed (`npm run test`), 41/41 routes compiled cleanly (`npm run build`).
 
 
+
+## 2026-09-21 | Paarth | Antigravity
+- Changed: Added witty loading jokes to the "Starting playback" screen in `StreamingTheaterModal`:
+  1. Created `LOADING_JOKES` constant (50 entries) and `useLoadingJoke` cycling hook in `native-player.tsx`. Hook picks a random joke and cycles every 4 seconds with a 400ms CSS fade transition while the loading state is active.
+  2. Integrated joke cycling into `StreamingTheaterModal` loading overlay (replaces static "Starting playback" text) and into `NativePlayer` buffering spinner overlay.
+  3. User-supplied additional jokes across 7 categories: Director/Cinema, Binge-Watching, Classic Movie Line Parodies, Purist Tech Humor, Pirate/Nautical, Tech/Meta, Audience Teasing.
+- Files: `src/features/streaming/components/native-player.tsx`, `src/features/streaming/components/streaming-theater-modal.tsx`.
+- Result: 0 lint errors, 0 type errors.
+
+## 2026-09-21 | Paarth | Antigravity
+- Changed: Refactored loading joke system per user spec — one static joke per session, shimmer animation, no mid-video joke:
+  1. Replaced cycling `useLoadingJoke` hook with `pickLoadingJoke()` — picks one random joke once per modal open, never cycles.
+  2. Joke shown only during initial "Starting playback" loading phase (`!directSrc && !embedSrc && open`). Disappears the moment the stream URL resolves. Zero joke during mid-video buffering (scrubbing, seeking, rebuffering) — plain spinner only.
+  3. Removed "Starting playback" label. Joke is now the sole loading indicator text, sized at 17.5px.
+  4. Added `@keyframes joke-shimmer-sweep` and `.joke-shimmer` CSS class to `globals.css`: correctly calculated `background-position: 200% → -100%` with `background-size: 200%` produces a genuine left-to-right brightness glint sweep through the static letters using `background-clip: text`.
+- Files: `src/features/streaming/components/native-player.tsx`, `src/features/streaming/components/streaming-theater-modal.tsx`, `src/app/globals.css`.
+- Result: 0 lint errors, 0 type errors.
+
+## 2026-09-21 | Paarth | Antigravity
+- Changed: Expanded loading jokes to 200 total, categorized by media type, and wired `mediaType` prop to joke picker:
+  1. Restructured `LOADING_JOKES` from `readonly string[]` to `readonly { text: string; for: "movie" | "tv" | "both" }[]` with 74 "both", 61 "movie", and 65 "tv" entries.
+  2. Added 150 new jokes across all three pools: director references (Kubrick, Lynch, Wes Anderson, Bay, Burton, Cameron, Spielberg, Scott, Jackson, Coens), cinema culture, sequels/reboots, genre-specific (horror, heist, romance, thriller), awards/prestige cinema, skip intro/are-you-still-watching, cancelled shows/cliffhangers, character deaths, showrunner drama, binge-watching episode culture, spin-offs, streaming-specific TV, episode runtime humor, TV tropes, quote parodies (Fight Club, Dirty Dancing, A Few Good Men, etc.), server/CDN meta-humor, audience meta-humor, purist/technical, and pirate/heist vibe.
+  3. Updated `pickLoadingJoke(mediaType?: "movie" | "tv")` to filter the pool — movies draw from 135 jokes (movie + both), TV draws from 139 jokes (tv + both).
+  4. `StreamingTheaterModal` now passes its `mediaType` prop into both `pickLoadingJoke` calls (initial state and `useEffect([open, mediaType])`).
+- Files: `src/features/streaming/components/native-player.tsx`, `src/features/streaming/components/streaming-theater-modal.tsx`.
+- Result: 0 lint errors, 0 type errors.
