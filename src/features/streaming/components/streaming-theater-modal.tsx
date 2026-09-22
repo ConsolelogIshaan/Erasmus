@@ -54,12 +54,15 @@ import {
 } from "@/features/library/actions/library-actions";
 import { cn } from "@/lib/utils";
 import { stillUrl } from "@/lib/media/image";
+import { buildRelayUrl } from "@/lib/streaming/relay";
 
+/**
+ * Wraps an upstream URL in the active relay.
+ * Uses the Cloudflare Worker when NEXT_PUBLIC_HLS_RELAY_URL is set, otherwise
+ * the local /api/stream/hls route (unchanged default behaviour).
+ */
 function relayUrl(url: string, referer?: string) {
-  if (url.startsWith("/api/stream/hls")) return url;
-  const query = new URLSearchParams({ url });
-  if (referer) query.set("referer", referer);
-  return `/api/stream/hls?${query.toString()}`;
+  return buildRelayUrl(url, referer);
 }
 
 interface StreamingTheaterModalProps {

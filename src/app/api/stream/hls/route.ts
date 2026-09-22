@@ -2,6 +2,7 @@ import dns from "node:dns";
 try { dns.setServers(["8.8.8.8", "1.1.1.1", "9.9.9.9"]); } catch {}
 import { NextResponse } from "next/server";
 import { isSrtText, srtToVtt } from "@/lib/streaming/subtitles";
+import { HLS_RELAY_BASE } from "@/lib/streaming/relay";
 
 export const runtime = "nodejs";
 
@@ -200,7 +201,9 @@ export async function GET(request: Request) {
     /\.(mp4|m4s|ts)$/i.test(path) ||
     isHtmlMediaSegment ||
     isObfuscatedSegment;
-  const relay = "/api/stream/hls";
+  // Child playlists/segments are rewritten to the active relay: the Cloudflare
+  // Worker when NEXT_PUBLIC_HLS_RELAY_URL is set, else this same local route.
+  const relay = HLS_RELAY_BASE;
 
   const playlistResponse = (text: string) =>
     new NextResponse(rewritePlaylist(text, target.href, relay, referer), {
