@@ -200,4 +200,22 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
     expect(res.servers[0]?.url).toContain("hakunaymatata.com");
     expect(res.servers[0]?.kind).toBe("file");
   }, 15000);
+
+  it("extracts direct stream for Overcompensating on Polaris server", async () => {
+    const res = await extractDirectStream({
+      type: "tv",
+      tmdbId: "247619",
+      season: 1,
+      episode: 1,
+      serverId: "polaris",
+      title: "Overcompensating",
+      year: "2025",
+    });
+    expect(res.ok).toBe(true);
+    expect(res.servers.length).toBeGreaterThan(0);
+    expect(["Polaris", "Bastion"]).toContain(res.servers[0]?.name);
+    expect(res.servers[0]?.url).toContain(".m3u8");
+    expect(res.captions?.length).toBeGreaterThan(0);
+  }, 25000);
 });
+

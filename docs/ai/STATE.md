@@ -1,16 +1,22 @@
 # STATE
 
 Updated: 2026-09-26
-Git: `origin/main` (Local changes pending push approval)
+Git: `main` (Rebased on origin/main, local changes pending push approval)
 
 ## Priority
-Eliminating Vercel Fast Origin Transfer bandwidth consumption ($0 cost) while maintaining 100% stable playback and zero quality degradation across all servers (Lisbon, Nebula, etc.).
+Eliminating Vercel Fast Origin Transfer bandwidth consumption ($0 cost) while maintaining 100% stable playback and zero quality degradation across all servers (Lisbon, Nebula, Polaris, etc.).
 
 ## Working
+- **Polaris Server Direct Playback & Bingr Resolver Hardening**:
+  - Fixed premature request timeout in `src/lib/streaming/bingr-stream.ts` where Polaris (`s70` - Hakunaymatata upstream) was previously capped at 2.8s (`AbortSignal.timeout(2800)`); increased timeout to 12s for targeted requests and 8s for fallbacks, matching Bingr's client architecture.
+  - Whitelisted `hakunaymatata.com` in `checkIsDirectCors` (`bingr-stream.ts`) and `isDirectCdnSegment` (`src/app/api/stream/hls/route.ts`), preventing unnecessary Vercel proxying on open CDN segments.
+  - Added intelligent audio language priority in `resolveBingrStream` so English audio is prioritized over alternate audio dubs when multiple tracks are returned.
+  - Expanded cascade candidate depth from 2 to 3 servers so Polaris is included in automated fallbacks when Aphelion and Bastion have 0 sources.
+  - Verified working playback extraction for *Overcompensating* (TMDB ID 247619) with 1080p fMP4 HLS master playlist, direct CORS, and synced subtitles.
 - **Vercel Media Chunk Shield & Scrubbing Optimization**:
   - **Strict Media Chunk Protection**: Cloudflare Worker (`erasmus-hls-relay.erasmustv.workers.dev`) strictly blocks video media segments (`.m4s`, `.ts`, `.mp4`) from falling back to Vercel when the tunnel is alive (`isTunnelAlive: true`).
   - **30s Tunnel Timeout**: Raised from 7s to 30s to allow parallel 4K segment downloads during scrubbing over residential connections without artificial aborts.
-  - **Direct CDN Segment Whitelisting**: `relay/erasmus-relay.mjs` incorporates `isDirectCdnSegment()` to preserve direct URLs for open CORS CDNs (`keenanchor.top`, etc.). 4K segments from Lisbon download directly from the CDN to the client in ~600ms with 0 bytes on Vercel, 0 on Worker, and 0 on residential tunnel.
+  - **Direct CDN Segment Whitelisting**: `relay/erasmus-relay.mjs` incorporates `isDirectCdnSegment()` to preserve direct URLs for open CORS CDNs (`keenanchor.top`, `hakunaymatata.com`, etc.). 4K segments from Lisbon download directly from the CDN to the client in ~600ms with 0 bytes on Vercel, 0 on Worker, and 0 on residential tunnel.
   - **Player Buffer Optimization**: `native-player.tsx` tuned to `maxMaxBufferLength: 60s` and `maxBufferSize: 60MB` (from 180s/200MB). Makes scrubbing significantly faster and eliminates up to 75% of wasted abandoned chunks while preserving 100% full 4K bitrate and quality.
 - **Universal Multi-Cour Anime & TV Alternate Coordinate Resolution**:
   - **Jujutsu Kaisen S1 E25 to E47 (e.g. S1 E28 "Hidden Inventory 4")**: Fixed playback failure across all 24-episode cour anime.
@@ -25,7 +31,7 @@ Eliminating Vercel Fast Origin Transfer bandwidth consumption ($0 cost) while ma
   - **KV State with In-Memory Caching**: Active tunnel URL stored in Cloudflare KV namespace `RELAY_CONFIG` and cached in isolate memory.
   - **Default Worker Integration**: `src/lib/streaming/relay.ts` defaults `HLS_RELAY_BASE` to `https://erasmus-hls-relay.erasmustv.workers.dev`.
 - **Original Streaming Infrastructure (100% Preserved & Verified)**:
-  - Lisbon (`isPrimary: true`), Sakura, Nebula, Solara, Athens, Joy, Castle, Canaias, and all Bingr clusters remain completely intact and active.
+  - Lisbon (`isPrimary: true`), Sakura, Nebula, Solara, Athens, Joy, Castle, Canaias, Polaris, and all Bingr clusters remain completely intact and active.
   - Complete backups safely preserved in `c:/Users/Administrator/Documents/BACKUP/`.
 - **Web App Core**:
   - Next.js 16 (Turbopack), React 19, Instrument Sans typeface, Discover (`/discover`) default home.
@@ -35,6 +41,7 @@ Eliminating Vercel Fast Origin Transfer bandwidth consumption ($0 cost) while ma
 - Local relay daemon running in background on port `8443` with `isDirectCdnSegment()` and client abort handling.
 - Active tunnel registered with Worker: `https://with-handled-occupational-kinda.trycloudflare.com` (`isTunnelAlive: true`).
 - Verification: End-to-end stream test passed, direct 4K chunk fetch in 619ms with CORS `*`, lint passed (0 errors), build succeeded (41/41 routes).
+- Polaris playback fix for *Overcompensating* (TMDB ID 247619) verified and integrated into test suite.
 - Strictly local commit prepared; NO git push performed per `AGENTS.md`.
 
 ## Active Verification Benchmark
@@ -43,8 +50,9 @@ Eliminating Vercel Fast Origin Transfer bandwidth consumption ($0 cost) while ma
 - **Monitoring Goal:** Confirm that Vercel Fast Origin Transfer bandwidth stays frozen at 7.06 GB during active streaming and scrubbing.
 
 ## Key locations
-- Web repo: `c:/Users/Administrator/Documents/Argus/Argus` (branch: `main`)
+- Web repo: `/Users/paarthsharma/Developer/GitHub/Erasmus` / `c:/Users/Administrator/Documents/Argus/Argus` (branch: `main`)
 - Standalone Relay: `relay/erasmus-relay.mjs`
 - Cloudflare Worker: `relay/cloudflare-worker/worker.js` & `c:/Users/Administrator/erasmus-hls-relay/worker.js`
 - Auto-Sync: `relay/sync-tunnel-url.mjs`
 - Pre-scrub fix backup: `c:/Users/Administrator/Documents/BACKUP/pre_scrub_relay_optimization_backup/`
+- Verified backups: `c:/Users/Administrator/Documents/BACKUP/stream_fix_backups/`

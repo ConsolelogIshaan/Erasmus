@@ -112,6 +112,7 @@ export function checkIsDirectCors(url: string): boolean {
       host.includes("shadowmoonwanderer.lol") ||
       host.includes("vidrock.ru") ||
       host.includes("fodcyy.com") ||
+      host.includes("hakunaymatata.com") ||
       host.includes("imdb-video.media-imdb.com")
     );
   } catch {
@@ -417,8 +418,8 @@ export async function resolveBingrStream(input: {
       candidateKeys.push(key);
     }
   }
-  // Limit cascade to at most 2 servers to keep latency strictly under 3s
-  const activeCandidates = candidateKeys.slice(0, 2);
+  // Cascade through target server and healthy fallbacks
+  const activeCandidates = candidateKeys.slice(0, 3);
 
   for (const srvKey of activeCandidates) {
     // Handle anime clusters in cascade
@@ -444,6 +445,9 @@ export async function resolveBingrStream(input: {
     const srvConfig = SERVER_MAP[srvKey];
     if (!srvConfig) continue;
 
+    // Upstream scrapers (e.g. Polaris/s70) require 4-8s to resolve manifests; give explicit target 12s, fallback 8s
+    const fetchTimeout = srvKey === targetServerId ? 12000 : 8000;
+
     try {
       let data: BingrStreamResponse | null = null;
 
@@ -458,7 +462,7 @@ export async function resolveBingrStream(input: {
             Origin: "https://bingr.one",
             Accept: "application/json",
           },
-          signal: AbortSignal.timeout(2800),
+          signal: AbortSignal.timeout(fetchTimeout),
         });
         if (res.status === 429) {
           bingrCooldownUntil = Date.now() + 25_000;
@@ -497,7 +501,7 @@ export async function resolveBingrStream(input: {
             Accept: "application/json",
           },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(2800),
+          signal: AbortSignal.timeout(fetchTimeout),
         });
 
         if (res.status === 429) {
@@ -511,7 +515,20 @@ export async function resolveBingrStream(input: {
       }
 
       if (data?.sources && data.sources.length > 0) {
-        const source = data.sources[0];
+        // Prioritize English audio stream if multiple tracks are returned
+        const englishSource = data.sources.find((s) => {
+          const lang = (s.language || "").toLowerCase();
+          const name = (s.name || "").toLowerCase();
+          const label = (s.label || "").toLowerCase();
+          return (
+            lang === "en" ||
+            lang === "eng" ||
+            lang.includes("english") ||
+            name.includes("english") ||
+            label.includes("english")
+          );
+        });
+        const source = englishSource || data.sources[0];
         if (!source || !source.url) continue;
 
         const directUrl = unwrapDirectStreamUrl(source.url);

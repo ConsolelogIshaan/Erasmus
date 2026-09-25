@@ -105,6 +105,7 @@ function isDirectCdnSegment(rawUrl: string): boolean {
       host.includes("solarpanelcleaning") ||
       host.includes("shegu.st") ||
       host.includes("keenanchor.top") ||
+      host.includes("hakunaymatata.com") ||
       host.includes("cloudflare") ||
       host.includes("cloudfront") ||
       host.includes("fastly") ||

@@ -554,4 +554,13 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 
 
 
-
+## 2026-09-25 | Paarth | Antigravity
+- Changed: Diagnosed and resolved playback failure for *Overcompensating* (TMDB ID 247619) on Polaris server (`s70` - Hakunaymatata upstream):
+  1. Identified Root Cause: Upstream Polaris resolvers on `api.bingr.one` require 4.1s to 7.3s to scrape and construct the fMP4 master playlist from upstream CDNs. `resolveBingrStream` in `src/lib/streaming/bingr-stream.ts` previously had a hardcoded `signal: AbortSignal.timeout(2800)` (2.8 seconds). Because 2.8s < 4.5s+, every single Polaris request was forcefully terminated with an uncaught `TimeoutError`, returning `null` and failing silently into broken embed fallbacks.
+  2. Increased Timeout: Updated `resolveBingrStream` to allocate up to 12s for targeted requests (`srvKey === targetServerId`) and 8s for automated fallbacks, aligning directly with Bingr's own frontend client (`Watch-3_L5o0Os.js` and `3x2-YVY_SGVt.js`) which waits 10–12s.
+  3. Direct CORS Whitelisting: Added `host.includes("hakunaymatata.com")` to `checkIsDirectCors` in `bingr-stream.ts` and `isDirectCdnSegment` in `src/app/api/stream/hls/route.ts` so all media chunks load directly in the browser with 0 Vercel bandwidth consumption.
+  4. Audio Prioritization: Added stream track filtering in `resolveBingrStream` so English audio streams are prioritized over alternate language dubs (Hindi, Portuguese, etc.) when multiple sources are returned.
+  5. Expanded Cascade Fallbacks: Expanded fallback candidate slice from 2 to 3 servers (`candidateKeys.slice(0, 3)`), enabling automated fallback to Polaris when Aphelion and Bastion return 0 sources.
+  6. Verified Playback & Added Regression Test: Tested live extraction for *Overcompensating* returning a verified 1080p fMP4 HLS stream (`dash-hls-bridge.*.workers.dev` master playlist and `sacdn.hakunaymatata.com` segments with CORS `*`), synced subtitles, and added automated test to `src/lib/streaming/direct-stream.test.ts`.
+- Files: `src/lib/streaming/bingr-stream.ts`, `src/app/api/stream/hls/route.ts`, `src/lib/streaming/direct-stream.test.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Branch `fix/polaris-stream`. All 11 tests in `direct-stream.test.ts` passed (including *Overcompensating* on Polaris), 0 TypeScript errors (`npm run typecheck`), 0 ESLint errors (`npm run lint`), all 41 routes compiled successfully (`npm run build`).
