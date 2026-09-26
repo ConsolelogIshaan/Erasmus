@@ -629,15 +629,15 @@ export function NativePlayer({
         enableWebVTT: true,
         startFragPrefetch: true,
         progressive: true,
-        maxBufferLength: 60,
-        maxMaxBufferLength: 180,
-        maxBufferSize: 200 * 1000 * 1000,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        maxBufferSize: 60 * 1000 * 1000,
         maxBufferHole: 0.5,
         highBufferWatchdogPeriod: 2,
         nudgeOffset: 0.1,
         nudgeMaxRetry: 10,
         lowLatencyMode: false,
-        backBufferLength: 90,
+        backBufferLength: 30,
       });
       hlsRef.current = hls;
       hls.loadSource(activeSrc);

@@ -165,6 +165,15 @@ const worker = {
       return jsonResponse({ error: "missing url query parameter" }, 400);
     }
 
+    const isPlaylist = rawTarget.includes(".m3u8") || rawTarget.includes("/playlist");
+    const isMediaChunk = !isPlaylist && (
+      /\.(m4s|ts|mp4|html|bin)(\?|$)/i.test(rawTarget) ||
+      rawTarget.includes("/seg-") ||
+      rawTarget.includes("/init-") ||
+      rawTarget.includes("video_") ||
+      rawTarget.includes("audio_")
+    );
+
     const activeTunnel = await getActiveTunnel(env);
     const now = Date.now();
     const isTunnelAlive = Boolean(activeTunnel && (now - cachedPing < HEARTBEAT_EXPIRY_MS));
@@ -182,8 +191,9 @@ const worker = {
         forwardHeaders.set("X-Forwarded-Host", requestUrl.host);
         forwardHeaders.set("X-Forwarded-Proto", "https");
 
+        // 30s timeout gives parallel 4K scrubbing chunks ample time over residential connection
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 7000); // 7s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
 
         const tunnelRes = await fetch(tunnelTargetUrl.toString(), {
           method: request.method,
@@ -201,12 +211,25 @@ const worker = {
             headers: resHeaders,
           });
         }
+
+        // If tunnel returned an error status for a media chunk while tunnel is alive:
+        // Do NOT dump heavy media segments onto Vercel! Return error so player retries on tunnel.
+        if (isMediaChunk) {
+          return new Response(null, {
+            status: tunnelRes.status,
+            headers: CORS_HEADERS,
+          });
+        }
       } catch (err) {
-        console.warn("[Worker] Tunnel forward attempt failed, failing over to Vercel fallback:", err);
+        console.warn("[Worker] Tunnel forward attempt failed:", err);
+        // If it was a heavy video chunk, strictly protect Vercel from multi-megabyte burst
+        if (isMediaChunk) {
+          return jsonResponse({ error: "tunnel media chunk timeout", details: err.message }, 504);
+        }
       }
     }
 
-    // Path 2: Safe Fallback to Vercel (Guarantees uninterrupted playback if PC is off)
+    // Path 2: Safe Fallback to Vercel (Only for playlists or when home PC is genuinely offline/asleep)
     try {
       const fallbackUrl = `${VERCEL_FALLBACK_BASE}${requestUrl.search}`;
       const forwardHeaders = new Headers(request.headers);

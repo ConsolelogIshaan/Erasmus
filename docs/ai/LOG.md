@@ -522,6 +522,31 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   - `npm run lint`: 0 errors.
   - `npm run build`: Production build succeeded across all 41 routes.
 
+### 2026-09-26: Scrubbing Optimization & Vercel Media Chunk Shield
+- **Problem Statement:** During basic scrubbing and testing, Fast Origin Transfer on Vercel climbed by ~0.69 GB (from 6.37 GB to 7.06 GB). Forensic investigation showed that:
+  1. ~160 MB was normal platform API and server-rendered page traffic (~8,000 invocations).
+  2. ~530 MB was large 4K video segments (10.5 MB each) that fell back to Vercel `/api/stream/hls`. When the user scrubbed, Hls.js requested 3–4 chunks simultaneously, exceeding the Worker's artificial 7s abort timeout. The Worker caught the abort and silently dumped the multi-megabyte chunks into Vercel fallback, where each chunk was double-billed (inbound + outbound = 21 MB/chunk).
+  3. `relay/erasmus-relay.mjs` was blindly proxying all segments through the tunnel even when hosted on open CORS CDNs (`keenanchor.top`).
+  4. Hls.js was configured to greedily buffer up to 180s (200 MB) of video on every scrub.
+- **Implementation:**
+  1. In `relay/cloudflare-worker/worker.js` and `erasmus-hls-relay/worker.js`:
+     - Raised tunnel timeout from 7s to 30s to comfortably handle concurrent 4K chunks over residential connections.
+     - Strictly banned media chunk (`.m4s`, `.ts`, `.mp4`) fallback to Vercel when `isTunnelAlive: true`. If a chunk is canceled or times out during a scrub, it returns 504 so Hls.js retries locally rather than dumping gigabytes onto Vercel.
+     - Deployed with KV binding `RELAY_CONFIG` to `erasmus-hls-relay.erasmustv.workers.dev` via wrangler.
+  2. In `relay/erasmus-relay.mjs`:
+     - Added `isDirectCdnSegment()` to whitelist open CORS CDN hosts (`keenanchor.top`, `solarpanelcleaning`, `shegu.st`, `rousav.tech`, etc.). Open CDN chunks now download directly from the CDN to the browser with zero relay overhead and zero Vercel usage.
+     - Added clean client abort handling (`req.on('close')`) to cancel upstream readers immediately when a user seeks.
+     - Restarted daemon on port 8443.
+  3. In `src/features/streaming/components/native-player.tsx`:
+     - Optimized Hls.js buffer from 180s/200MB to 60s/60MB. Seeking/scrubbing is faster and prevents downloading 200MB of abandoned chunks, while maintaining full 4K bitrate and zero quality degradation.
+- **Files:** `relay/cloudflare-worker/worker.js`, `relay/erasmus-relay.mjs`, `src/features/streaming/components/native-player.tsx`, `erasmus-hls-relay/worker.js`, `erasmus-hls-relay/wrangler.toml`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- **Verification:**
+  - Worker status verified live: `isTunnelAlive: true`, `secondsSincePing: 8`.
+  - Direct CDN test passed: 10.45 MB 4K segment from `keenanchor.top` fetched in 619ms with CORS `*` and 0 relay bytes.
+  - `npm run lint`: 0 errors.
+  - `npm run build`: Production build succeeded across all 41 routes.
+  - Local commit only; NO git push performed per strict `AGENTS.md` rule.
+
 
 
 
