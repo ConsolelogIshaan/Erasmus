@@ -452,6 +452,31 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   - Trusted full backup created at `c:/Users/Administrator/Documents/BACKUP/trusted_backup_cinejoy_pipeline_20260926/`.
   - Pushed to `origin/main` with explicit user authorization.
 
+### 2026-09-26: Zero-Vercel Video Relay Verified via Self-Hosted Cloudflare Tunnel
+- **Problem Statement:**
+  - Vercel's free Hobby plan allocates only 10 GB/month for "Fast Origin Transfer" bandwidth.
+  - High-bitrate movies stream ~6 GB/movie on Lisbon and ~1.63 GB/movie on Nebula, depleting Vercel's monthly quota in 1.6 to 6 movies.
+  - Reliance Jio residential ISP uses IPv4 Carrier-Grade NAT (CGNAT), preventing standard router port forwarding or DuckDNS.
+  - Cloudflare Workers failed because VidFast actively blocks Cloudflare datacenter egress IPs.
+- **Architectural Solution:**
+  - Self-hosted video relay server on local PC running behind a free Cloudflare Tunnel (`cloudflared`).
+  - Cloudflare Tunnel connects via outbound QUIC/HTTP2 tunnel to Delhi edge (`del02`), effortlessly traversing Jio CGNAT with no open inbound router ports.
+  - Browser/client requests hit the Cloudflare HTTPS domain and stream down the tunnel to local port `8443`.
+  - Local PC fetches the video chunks from VidFast/Hakuna Matata using the user's Reliance Jio residential IP connection, completely avoiding VidFast's datacenter blocks.
+- **Implementation & Live Testing:**
+  1. Downloaded `cloudflared` Windows binary to `C:/Users/Administrator/bin/cloudflared.exe`.
+  2. Built standalone high-performance relay server in `relay/erasmus-relay.mjs` handling playlist rewriting, byte-range streaming, CORS headers, VidFast referer injection, and Hakuna Matata ExoPlayer headers.
+  3. Started relay daemon and launched tunnel to `https://should-samples-gas-dawn.trycloudflare.com`.
+  4. Executed live end-to-end verification with VidFast movie 969681:
+     - Master M3U8 resolved and rewritten with HTTP 200 OK.
+     - Sub-playlist loaded with HTTP 200 OK.
+     - Video chunk (`seg-1-s1080p-v1-a1.m4s`) successfully streamed with HTTP 206 Partial Content.
+     - Total Vercel Fast Origin Transfer bandwidth used: **0.00 GB**.
+- **Verification:**
+  - `npm run lint`: 0 errors.
+  - Code kept cleanly separated in `relay/erasmus-relay.mjs` with zero risk to main Next.js app.
+
+
 
 
 
