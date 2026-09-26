@@ -353,7 +353,7 @@ export async function resolveCinejoyStream(input: {
   // If TV and primary coordinates produced no stream, evaluate smart alternate cour/season coordinates
   if (input.type === "tv" && !input.isFallback) {
     const alternates = getAlternateTvCoordinates(input.season ?? 1, input.episode ?? 1);
-    for (const alt of alternates.slice(0, 3)) {
+    for (const alt of alternates.slice(0, 5)) {
       try {
         const altHit = await resolveCinejoyStream({
           ...input,
@@ -708,7 +708,7 @@ export async function resolveCinejoyClusterStream(input: {
   // Smart alternate cour fallback for TV
   if (input.type === "tv" && !input.isFallback) {
     const alternates = getAlternateTvCoordinates(input.season ?? 1, input.episode ?? 1);
-    for (const alt of alternates.slice(0, 3)) {
+    for (const alt of alternates.slice(0, 5)) {
       try {
         const altHit = await resolveCinejoyClusterStream({
           ...input,

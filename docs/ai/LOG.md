@@ -507,6 +507,21 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - **Result:** Any Vercel deployment automatically compiles with the Cloudflare Worker smart router out of the box, with zero manual dashboard steps required. Overridable via `NEXT_PUBLIC_HLS_RELAY_URL=local` if ever needed.
 - **Verification:** `npm run lint` passed (0 errors), `npm run build` passed (41/41 routes).
 
+### 2026-09-26: Universal Multi-Cour Anime & TV Alternate Coordinate Resolution
+- **Problem Statement:** Episodes of 24-episode anime series (e.g. Jujutsu Kaisen S1 E25 to E47, Attack on Titan, Demon Slayer, etc.) failed with "no stream" / 400 Bad Request. TMDB groups these episodes under Season 1 with absolute numbering (e.g. JJK S1 E28 "Hidden Inventory 4"), but streaming providers catalog them by broadcast seasons (e.g. S2 E4). In `getAlternateTvCoordinates()`, Season 3 was erroneously queried before Season 2, and `slice(0, 5)` dropped the valid Season 2 coordinate (`cour-2-split-24`).
+- **Implementation:**
+  1. Updated `getAlternateTvCoordinates()` in `src/lib/streaming/vidfast-direct.ts`: prioritized `cour-2-split-24`, `cour-2-split-25`, and `cour-2-split-26` as top candidates for `episode > 24`, followed by 12-episode cour splits (`cour-12-split`) and longer multi-season splits (`episode > 36, 48, 60, 72`).
+  2. Fixed reverse mappings for `season > 1` (mapping S2/S3 back to absolute S1 numbering when providers store full catalogs under Season 1).
+  3. Expanded alternate evaluation window in `src/lib/streaming/vidfast-direct.ts` (from 5 to 7) and `src/lib/streaming/cinejoy-stream.ts` (from 3 to 5).
+- **Files:** `src/lib/streaming/vidfast-direct.ts`, `src/lib/streaming/cinejoy-stream.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- **Verification:**
+  - Tested live resolution with `npx tsx`:
+    - Jujutsu Kaisen S1 E28 -> resolved automatically to Season 2 Episode 4 on `vRapid` (4K HLS).
+    - Jujutsu Kaisen S1 E25 -> resolved automatically to Season 2 Episode 1 on `vRapid`.
+    - Solo Leveling S1 E13 -> resolved automatically to Season 2 Episode 1 on `vRapid`.
+  - `npm run lint`: 0 errors.
+  - `npm run build`: Production build succeeded across all 41 routes.
+
 
 
 

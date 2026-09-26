@@ -164,6 +164,19 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
     expect(res25.servers[0]?.url).toContain(".m3u8");
   }, 25000);
 
+  it("extracts direct stream for Jujutsu Kaisen S1 E28 via cour-2-split-24 fallback", async () => {
+    const res = await extractDirectStream({
+      type: "tv",
+      tmdbId: "95479",
+      season: 1,
+      episode: 28,
+      serverId: "lisbon",
+    });
+    expect(res.ok).toBe(true);
+    expect(res.servers.length).toBeGreaterThan(0);
+    expect(res.servers[0]?.url).toContain(".m3u8");
+  }, 20000);
+
   it("extracts direct stream for Cinejoy pipeline cj-nebula with high-speed edge stream", async () => {
     const res = await extractDirectStream({
       type: "movie",

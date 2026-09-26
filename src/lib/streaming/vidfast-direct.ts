@@ -61,57 +61,81 @@ export function getAlternateTvCoordinates(
   };
 
   if (season === 1) {
+    // 1. Multi-cour anime split (e.g. 24-episode season: Jujutsu Kaisen, Demon Slayer, Attack on Titan, MHA)
+    // When episode > 24, the primary reality on streaming hosts is Season 2 (Episode - 24)
+    if (episode > 24) {
+      add(2, episode - 24, "cour-2-split-24");
+      add(2, episode - 25, "cour-2-split-25");
+      add(2, episode - 26, "cour-2-split-26");
+      add(3, episode - 24, "cour-3-split-24");
+    }
+    // 2. Single-cour anime split (e.g. 12-episode season: Solo Leveling, Spy x Family, Chainsaw Man)
     if (episode > 12) {
-      // 12-episode cour split (standard for split-cour anime, e.g. Solo Leveling, Spy x Family)
       add(2, episode - 12, "cour-12-split");
-      // 13-episode cour split
       add(2, episode - 13, "cour-13-split");
     }
-    if (episode > 24) {
-      add(3, episode - 24, "cour-3-split-24");
-      add(3, episode - 25, "cour-3-split-25");
-      add(3, episode - 26, "cour-3-split-26");
-      add(2, episode - 24, "cour-2-split-24");
-    }
+    // 3. Multi-season 12-ep or 24-ep splits for longer series
     if (episode > 36) {
+      add(3, episode - 36, "cour-3-split-36");
+      add(2, episode - 36, "cour-2-split-36");
       add(4, episode - 36, "cour-4-split-36");
-      add(4, episode - 39, "cour-4-split-39");
+    }
+    if (episode > 48) {
+      add(3, episode - 48, "cour-3-split-48");
+      add(4, episode - 48, "cour-4-split-48");
+      add(5, episode - 48, "cour-5-split-48");
+    }
+    if (episode > 60) {
+      add(3, episode - 60, "cour-3-split-60");
+      add(4, episode - 60, "cour-4-split-60");
+      add(5, episode - 60, "cour-5-split-60");
+      add(6, episode - 60, "cour-6-split-60");
+    }
+    if (episode > 72) {
+      add(4, episode - 72, "cour-4-split-72");
     }
   } else {
     // Season > 1: Host may store continuous episodes under Season 1
     if (season === 2) {
-      add(1, episode + 12, "s1-cour12-absolute");
-      add(1, episode + 13, "s1-cour13-absolute");
       add(1, episode + 24, "s1-cour24-absolute");
       add(1, episode + 25, "s1-cour25-absolute");
       add(1, episode + 26, "s1-cour26-absolute");
+      add(1, episode + 12, "s1-cour12-absolute");
+      add(1, episode + 13, "s1-cour13-absolute");
       add(1, episode + 52, "s1-cour52-absolute");
       add(2, episode + 52, "s2-tmdb52-absolute");
-      if (episode > 52) {
-        add(2, episode - 52, "s2-rel52-relative");
+      if (episode > 24) {
+        add(2, episode - 24, "s2-rel24-relative");
         add(1, episode, "s1-absolute");
       }
     }
     if (season === 3) {
+      add(1, episode + 48, "s1-cour48-absolute");
+      add(1, episode + 36, "s1-cour36-absolute");
+      add(2, episode + 24, "s2-cour24-absolute");
+      add(1, episode + 24, "s1-cour24-absolute");
       add(1, episode + 104, "s1-cour104-absolute");
       add(3, episode + 104, "s3-tmdb104-absolute");
-      if (episode > 104) {
-        add(3, episode - 104, "s3-rel104-relative");
+      if (episode > 24) {
+        add(3, episode - 24, "s3-rel24-relative");
         add(1, episode, "s1-absolute");
       }
     }
     if (season === 4) {
+      add(1, episode + 72, "s1-cour72-absolute");
+      add(1, episode + 48, "s1-cour48-absolute");
+      add(2, episode + 48, "s2-cour48-absolute");
       add(1, episode + 158, "s1-cour158-absolute");
       add(4, episode + 158, "s4-tmdb158-absolute");
-      if (episode > 158) {
-        add(4, episode - 158, "s4-rel158-relative");
+      if (episode > 24) {
+        add(4, episode - 24, "s4-rel24-relative");
         add(1, episode, "s1-absolute");
       }
     }
-    add(1, (season - 1) * 12 + episode, `s1-calc-12x${season - 1}`);
-    add(1, (season - 1) * 13 + episode, `s1-calc-13x${season - 1}`);
     add(1, (season - 1) * 24 + episode, `s1-calc-24x${season - 1}`);
+    add(1, (season - 1) * 12 + episode, `s1-calc-12x${season - 1}`);
     add(1, (season - 1) * 25 + episode, `s1-calc-25x${season - 1}`);
+    add(1, (season - 1) * 13 + episode, `s1-calc-13x${season - 1}`);
     add(1, episode, "s1-same-episode");
     add(season - 1, episode, "season-minus-1");
   }
@@ -453,7 +477,7 @@ export async function resolveVidfastDirectStream(input: {
   const alternates = getAlternateTvCoordinates(input.season ?? 1, input.episode ?? 1);
   let lastDebug = primary.debug || "";
 
-  for (const alt of alternates.slice(0, 5)) {
+  for (const alt of alternates.slice(0, 7)) {
     const altRes = await resolveVidfastDirectStreamSingle({
       ...input,
       season: alt.season,
