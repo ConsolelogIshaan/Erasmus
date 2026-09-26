@@ -501,6 +501,13 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   - `npm run lint`: 0 errors.
   - `npm run build`: Production build succeeded across all 41 routes with 0 errors.
 
+### 2026-09-26: Set Cloudflare Worker as Default Relay Base in relay.ts
+- **Objective:** Eliminate dependency on manual Vercel dashboard environment variable configuration by setting `CLOUDFLARE_HLS_RELAY` (`https://erasmus-hls-relay.erasmustv.workers.dev`) directly as the default in `src/lib/streaming/relay.ts`.
+- **Files:** `src/lib/streaming/relay.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- **Result:** Any Vercel deployment automatically compiles with the Cloudflare Worker smart router out of the box, with zero manual dashboard steps required. Overridable via `NEXT_PUBLIC_HLS_RELAY_URL=local` if ever needed.
+- **Verification:** `npm run lint` passed (0 errors), `npm run build` passed (41/41 routes).
+
+
 
 
 

@@ -13,6 +13,7 @@ Eliminating Vercel Fast Origin Transfer bandwidth consumption ($0 cost) while ma
   - **Zero Vercel Redeployments**: The Cloudflare Worker URL (`https://erasmus-hls-relay.erasmustv.workers.dev`) is permanent and never changes.
   - **Automatic Dynamic Target Sync**: On PC boot or restart, `relay/sync-tunnel-url.mjs` extracts the new quick tunnel URL from `relay/tunnel.log` and securely registers it with the Worker via `POST /set-target` with authentication.
   - **KV State with In-Memory Caching**: Active tunnel URL is stored in Cloudflare KV namespace `RELAY_CONFIG` and cached in worker isolate memory for 0ms lookup latency.
+  - **Default Worker Integration**: `src/lib/streaming/relay.ts` directly defaults `HLS_RELAY_BASE` to `https://erasmus-hls-relay.erasmustv.workers.dev`, ensuring zero manual dashboard env var dependencies across all builds.
   - **Safe Automatic Fallback**: If the user's PC is sleeping, offline, or tunnel times out, the Worker seamlessly falls back to Vercel `/api/stream/hls`, guaranteeing playback NEVER halts.
 - **Original Streaming Infrastructure (100% Preserved & Verified)**:
   - Lisbon (`isPrimary: true`), Sakura, Nebula, Solara, Athens, Joy, Castle, Canaias, and all Bingr clusters remain completely intact and active.

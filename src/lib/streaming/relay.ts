@@ -23,25 +23,32 @@
  *   requires no code revert and no redeploy of application logic.
  */
 
-/** Local Next.js relay route. Always the fallback, never removed. */
+/** Local Next.js relay route. */
 export const LOCAL_HLS_RELAY = "/api/stream/hls";
+
+/** Permanent Cloudflare Worker smart router (auto-routes through residential PC tunnel when online, falls back to Vercel when offline). */
+export const CLOUDFLARE_HLS_RELAY = "https://erasmus-hls-relay.erasmustv.workers.dev";
 
 function resolveRelayBase(): string {
   const raw = process.env.NEXT_PUBLIC_HLS_RELAY_URL?.trim();
-  if (!raw) return LOCAL_HLS_RELAY;
-  try {
-    const url = new URL(raw);
-    // https only — a http relay would be blocked as mixed content in the browser.
-    if (url.protocol !== "https:") return LOCAL_HLS_RELAY;
-    // Strip trailing slashes so `${base}?url=...` concatenates cleanly.
-    return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
-  } catch {
-    return LOCAL_HLS_RELAY;
+  if (raw === "local") return LOCAL_HLS_RELAY;
+  if (raw) {
+    try {
+      const url = new URL(raw);
+      // https only — a http relay would be blocked as mixed content in the browser.
+      if (url.protocol === "https:") {
+        return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+      }
+    } catch {
+      // Fall through to default Cloudflare worker
+    }
   }
+  return CLOUDFLARE_HLS_RELAY;
 }
 
-/** Active relay base: the Cloudflare Worker when configured, else the local route. */
+/** Active relay base: the Cloudflare Worker smart router by default, or overridden via env. */
 export const HLS_RELAY_BASE = resolveRelayBase();
+
 
 /** True when a URL already points at a relay and must not be double-wrapped. */
 export function isRelayUrl(url: string): boolean {
