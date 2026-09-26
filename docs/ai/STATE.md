@@ -26,10 +26,13 @@ Eliminating Vercel Fast Origin Transfer bandwidth consumption ($0 cost) while ma
 ## Current Status
 - Local relay daemon running in background on port `8443` (`task-1610`).
 - Cloudflare Tunnel active with public endpoint: `https://should-samples-gas-dawn.trycloudflare.com` (`task-1619`).
+- Windows Startup Shortcut Installed: `ErasmusRelay.lnk` installed into `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`, silently launching `relay/run-silent.vbs` on boot.
+- Auto-Sync Script: `relay/sync-tunnel-url.mjs` automatically writes current active tunnel URL to `relay/CURRENT_TUNNEL_URL.txt` and syncs `.env.local`.
 - Verification: End-to-end stream test passed, lint passed (0 errors), build stable.
 
 ## Key locations
 - Web repo: `c:/Users/Administrator/Documents/Argus/Argus` (branch: `main`)
 - Standalone Relay: `relay/erasmus-relay.mjs`
+- Silent Launcher: `relay/run-silent.vbs` & `relay/start-relay.bat`
 - Trusted push backup: `c:/Users/Administrator/Documents/BACKUP/trusted_backup_cloudflare_tunnel_relay_20260926/`
 - Previous push backup: `c:/Users/Administrator/Documents/BACKUP/trusted_backup_cinejoy_pipeline_20260926/`

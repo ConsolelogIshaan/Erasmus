@@ -69,3 +69,8 @@ next-env.d.ts
 
 # Extractor runtime
 vendor/
+
+# Relay runtime logs
+relay/*.log
+relay/CURRENT_TUNNEL_URL.txt
+

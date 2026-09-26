@@ -476,6 +476,19 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   - `npm run lint`: 0 errors.
   - Code kept cleanly separated in `relay/erasmus-relay.mjs` with zero risk to main Next.js app.
 
+### 2026-09-26: Windows Startup Automation & Tunnel URL Auto-Sync Configured
+- **Objective:** Enable the video relay and Cloudflare Tunnel to launch silently in the background whenever Windows starts up, with zero manual terminal commands required.
+- **Implementation:**
+  1. `relay/start-relay.bat`: Launches `node relay/erasmus-relay.mjs` and `cloudflared.exe` in the background, redirecting logs cleanly to `relay/*.log`.
+  2. `relay/run-silent.vbs`: VBScript wrapper that executes `start-relay.bat` with window style `0` (completely hidden/silent, zero black CMD console popups).
+  3. `ErasmusRelay.lnk`: Installed into Windows user startup directory (`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`), triggering silent startup on boot.
+  4. `relay/sync-tunnel-url.mjs`: Auto-detects the active Cloudflare Tunnel URL from logs, writes it to `relay/CURRENT_TUNNEL_URL.txt` for easy reference, and updates `NEXT_PUBLIC_HLS_RELAY_URL` in `.env.local` automatically.
+  5. `.gitignore`: Added `relay/*.log` and `relay/CURRENT_TUNNEL_URL.txt` to prevent runtime files from entering git.
+- **Verification:**
+  - Startup shortcut verified at `C:\Users\Administrator\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\ErasmusRelay.lnk`.
+  - `npm run lint`: 0 errors.
+
+
 
 
 
