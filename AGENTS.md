@@ -31,9 +31,11 @@ Streaming/playback is currently frozen and stable. Do NOT work on or modify stre
 - Changing provider order or server prioritization (VidFast primary, Cinejoy secondary). An earlier unapproved change caused latency regressions.
 - Changes to `/api/stream/hls`, `/api/stream/direct`, `vidfast-direct.ts`, `cinejoy-stream.ts`, `direct-stream.ts`, `native-player.tsx`, or `streaming-theater-modal.tsx`.
 - Adding paid services or new dependencies (project goal: zero paid infrastructure).
+- Pushing to remote (`git push`). Always ask first and wait for explicit confirmation.
 
 ### Never
 - Work on or modify streaming/playback unless explicitly instructed by the user.
+- Push to git remote (`git push`) under ANY circumstances unless the user explicitly and directly commands you to push. All work, commits, tests, lints, and builds must remain strictly local until explicit user instruction is given.
 - Add iframe embeds (ad/redirect behavior).
 - Commit secrets or `.env` files.
 - Force-push or rewrite shared history.
