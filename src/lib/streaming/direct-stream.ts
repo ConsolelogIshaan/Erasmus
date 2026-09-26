@@ -7,6 +7,7 @@ if (typeof process !== "undefined" && process.env) {
 
 import {
   resolveCinejoyStream,
+  resolveCinejoyClusterStream,
   type CinejoyCaption,
 } from "@/lib/streaming/cinejoy-stream";
 import { resolveVidfastDirectStream } from "@/lib/streaming/vidfast-direct";
@@ -14,6 +15,7 @@ import {
   resolveBingrStream,
   BINGR_SERVERS,
 } from "@/lib/streaming/bingr-stream";
+import { isCinejoyServer } from "@/lib/streaming/stream-resolver";
 import { getMovie, getTvShow } from "@/lib/media/catalog";
 
 export interface DirectServer {
@@ -60,6 +62,7 @@ export async function extractDirectStream(input: {
   const started = Date.now();
   let debugLog = "";
   const isBingrServer = BINGR_SERVERS.includes(effectiveServerId.toLowerCase());
+  const isCinejoy = isCinejoyServer(effectiveServerId);
 
   let title = input.title;
   let year = input.year;
@@ -94,6 +97,40 @@ export async function extractDirectStream(input: {
   };
 
   try {
+    // 0. If a Cinejoy server is explicitly requested, try Cinejoy cluster first
+    if (isCinejoy) {
+      try {
+        const enriched = await getEnriched();
+        const cjHit = await resolveCinejoyClusterStream({
+          ...enriched,
+          serverId: effectiveServerId,
+        });
+        if (cjHit?.url) {
+          const result: DirectStreamResult = {
+            ok: true,
+            referer: cjHit.referer,
+            captions: cjHit.captions,
+            servers: [
+              {
+                name: cjHit.serverName,
+                url: cjHit.url,
+                kind: cjHit.kind,
+                is4K: cjHit.is4K,
+                hdUrl: cjHit.hdUrl,
+                fourKUrl: cjHit.fourKUrl,
+                isDirectCors: cjHit.isDirectCors,
+                ms: Date.now() - started,
+              },
+            ],
+          };
+          extractCache.set(cacheKey, { at: Date.now(), result });
+          return result;
+        }
+      } catch (err) {
+        debugLog += `cinejoy-cluster: ${err instanceof Error ? err.message : "failed"}; `;
+      }
+    }
+
     // 1. If a Bingr server is explicitly requested, try Bingr cluster first
     if (isBingrServer) {
       try {

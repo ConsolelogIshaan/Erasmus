@@ -2318,3 +2318,81 @@
 #main-content::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.35);
 }
+
+/* ---------------------------------------------------------------------------
+   Search Panel Apple-Style Liquid Glass Material
+   Strictly scoped to the search panel container background.
+   Zero page-wide effects, zero backdrop modifications to surrounding page.
+--------------------------------------------------------------------------- */
+.search-panel-liquid-glass {
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    /* Top edge specular downlight sheen */
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.22),
+    /* Faint side prism refraction */
+    inset 1px 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset -1px 0 1px 0 rgba(255, 255, 255, 0.06),
+    /* Subtle bottom grounding */
+    inset 0 -1.5px 1px 0 rgba(255, 255, 255, 0.03),
+    /* Soft internal optical glow */
+    inset 0 0 30px 0 rgba(255, 255, 255, 0.02),
+    /* Atmospheric ambient occlusion depth (soft, broad, separates panel from page) */
+    0 24px 60px -12px rgba(0, 0, 0, 0.65),
+    0 12px 24px -8px rgba(0, 0, 0, 0.40);
+}
+
+.search-panel-glass-base {
+  /* Translucent optical tint: subtle white sheen + low dark tint (75%+ light transmission) */
+  background-color: rgba(18, 20, 26, 0.42);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.03) 30%,
+    rgba(255, 255, 255, 0.01) 100%
+  );
+
+  /* Optical blur (28px) + 135% saturation boost + tuned brightness/contrast */
+  -webkit-backdrop-filter: blur(28px) saturate(135%) brightness(102%) contrast(105%);
+  backdrop-filter: blur(28px) saturate(135%) brightness(102%) contrast(105%);
+  will-change: backdrop-filter;
+  transform: translateZ(0);
+}
+
+@supports (backdrop-filter: url(#panel-glass-refraction)) {
+  .search-panel-glass-base {
+    -webkit-backdrop-filter: url(#panel-glass-refraction) blur(28px) saturate(135%) brightness(102%) contrast(105%);
+    backdrop-filter: url(#panel-glass-refraction) blur(28px) saturate(135%) brightness(102%) contrast(105%);
+  }
+}
+
+.search-panel-glass-specular {
+  pointer-events: none;
+  background:
+    /* Directional ambient specular sheen sweeping across panel from top-left */
+    linear-gradient(135deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 30%, transparent 60%),
+    /* Soft volumetric lens curvature highlight */
+    radial-gradient(130% 90% at 50% -5%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.015) 45%, transparent 75%);
+  mix-blend-mode: screen;
+  opacity: 0.95;
+}
+
+.search-panel-glass-noise {
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 140px 140px;
+  mix-blend-mode: overlay;
+  opacity: 0.015;
+}
+
+/* ---------------------------------------------------------------------------
+   AdaptiveLiquidGlass — GPU compositing hints for the dynamic refraction layer.
+   Prevents jitter/lag from the live backdrop-filter sampling during scroll.
+--------------------------------------------------------------------------- */
+.liquid-glass-compositing {
+  will-change: backdrop-filter, transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  contain: layout style paint;
+}

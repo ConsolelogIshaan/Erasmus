@@ -6,7 +6,9 @@ import { Command as CommandPrimitive } from "cmdk";
 import { Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Dialog, DialogOverlay, DialogPortal, DialogTitle } from "@/components/ui/dialog";
+import { AdaptiveLiquidGlass } from "@/components/ui/adaptive-liquid-glass";
 
 /**
  * Command palette primitives built on cmdk.
@@ -33,6 +35,27 @@ type CommandDialogProps = DialogProps & {
   wide?: boolean;
 };
 
+/** The app's actual scrollable region (see AppShell). Falls back to the document if absent. */
+function getScrollContainer(): HTMLElement {
+  return (document.getElementById("main-content") as HTMLElement | null) ?? document.documentElement;
+}
+
+/** Forwards wheel deltas from the dialog overlay to the page's real scroll container. */
+function forwardScrollToPage(event: React.WheelEvent<HTMLDivElement>) {
+  getScrollContainer().scrollBy({ top: event.deltaY, left: event.deltaX });
+}
+
+let lastTouchY: number | null = null;
+/** Forwards single-finger touch scrolling from the dialog overlay to the page's real scroll container. */
+function forwardTouchScrollToPage(event: React.TouchEvent<HTMLDivElement>) {
+  const touch = event.touches[0];
+  if (!touch) return;
+  if (lastTouchY !== null) {
+    getScrollContainer().scrollBy({ top: lastTouchY - touch.clientY });
+  }
+  lastTouchY = touch.clientY;
+}
+
 function CommandDialog({
   children,
   className,
@@ -41,38 +64,88 @@ function CommandDialog({
   ...props
 }: CommandDialogProps) {
   return (
-    <Dialog {...props}>
-      <DialogContent
-        style={{
-          position: "fixed",
-          left: "50%",
-          top: "50%",
-          transform: "translate(-50%, -50%)",
-        }}
-        className={cn(
-          "overflow-hidden border-0 p-0 sm:rounded-2xl",
-          wide ? "w-[min(100%-2rem,56rem)] max-w-4xl" : "w-[min(100%-2rem,36rem)] sm:max-w-xl",
-          /* Frosted panel — matches translucent top bar */
-          "bg-background/70 shadow-xl backdrop-blur-xl supports-[backdrop-filter]:bg-background/55",
-          "dark:bg-black/55 dark:supports-[backdrop-filter]:bg-black/45",
-          "ring-1 ring-border/40 dark:ring-white/10",
-          /* Hide default dialog close — Esc / overlay dismiss */
-          "[&>button.absolute]:hidden",
-          className,
-        )}
-      >
-        <DialogTitle className="sr-only">Command menu</DialogTitle>
-        {/*
-          shouldFilter=false: media results are ranked by our API / fuzzy layer.
-          cmdk's local filter would hide near-matches for typos (e.g. "inceptioon").
-        */}
-        <Command
-          shouldFilter={shouldFilter}
-          className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-14 [&_[cmdk-item]]:px-3 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5"
+    // Non-modal: Radix skips its body-scroll lock and pointer-blocking
+    // wrapper entirely, so the page behind the panel keeps scrolling exactly
+    // like it does when the search box is closed. Dismissal (overlay click,
+    // Escape, outside pointerdown) still works via onOpenChange/onInteractOutside.
+    <Dialog modal={false} {...props}>
+      <DialogPortal>
+        {/* Standard dismiss overlay: minimal transparent dimming, NO page blur, NO page modification.
+            pointer-events left enabled so clicking it still dismisses the panel in non-modal mode.
+            Wheel/touch input is forwarded to the page's real scroll container (#main-content)
+            so scrolling while the dialog is open feels identical to scrolling with it closed —
+            the overlay would otherwise absorb those events since it has no scrollable content itself. */}
+        <DialogOverlay
+          className="bg-black/25 backdrop-blur-none"
+          onWheel={forwardScrollToPage}
+          onTouchStart={() => {
+            lastTouchY = null;
+          }}
+          onTouchMove={forwardTouchScrollToPage}
+          onTouchEnd={() => {
+            lastTouchY = null;
+          }}
+        />
+
+        {/* SEARCH PANEL CONTAINER: Apple-Style Adaptive Liquid Glass Material */}
+        <DialogPrimitive.Content
+          onOpenAutoFocus={(event) => {
+            // Keep the default "focus the search input" behavior, but do it
+            // without Radix fighting the page's own scroll position.
+            event.preventDefault();
+            (event.currentTarget as HTMLElement)
+              .querySelector<HTMLInputElement>("input")
+              ?.focus({ preventScroll: true });
+          }}
+          onCloseAutoFocus={(event) => {
+            // Non-modal dialogs otherwise try to restore focus in a way that
+            // can yank scroll position back on close.
+            event.preventDefault();
+          }}
+          style={{
+            position: "fixed",
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%, -50%)",
+          }}
+          className={cn(
+            "relative isolate z-50 overflow-hidden sm:rounded-2xl outline-none",
+            "dialog-content-motion",
+            wide ? "w-[min(100%-2rem,56rem)] max-w-4xl" : "w-[min(100%-2rem,36rem)] sm:max-w-xl",
+            "search-panel-liquid-glass",
+            className,
+          )}
         >
-          {children}
-        </Command>
-      </DialogContent>
+          {/*
+            ===================================================================
+            ADAPTIVE GLASS LAYER (Strictly scoped to the search panel body)
+            Dynamically samples + refracts whatever is rendered behind the
+            panel (posters, backdrops) in real time via backdrop-filter.
+            Sits behind foreground content; never affects it.
+            ===================================================================
+          */}
+          <AdaptiveLiquidGlass
+            className="absolute inset-0 -z-10 rounded-[inherit]"
+            radius="inherit"
+          >
+            {null}
+          </AdaptiveLiquidGlass>
+
+          {/*
+            ===================================================================
+            FOREGROUND CONTENT (Search Input, Trending Header, Poster Cards)
+            Sits above glass layer at z-10, completely unaffected, sharp & opaque.
+            ===================================================================
+          */}
+          <DialogTitle className="sr-only">Command menu</DialogTitle>
+          <Command
+            shouldFilter={shouldFilter}
+            className="relative z-10 [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-14 [&_[cmdk-item]]:px-3 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5"
+          >
+            {children}
+          </Command>
+        </DialogPrimitive.Content>
+      </DialogPortal>
     </Dialog>
   );
 }

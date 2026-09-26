@@ -3,12 +3,14 @@ import {
   ALL_STREAMING_SERVERS,
   BINGR_EMBED_SERVERS,
   BINGR_STREAMING_SERVERS,
+  CINEJOY_STREAMING_SERVERS,
   STREAMING_SERVERS,
   TOTAL_STREAMING_SERVERS,
   buildStreamUrl,
   getPlaybackQueue,
   getSmartStreamingOptions,
   getStreamingOptions,
+  isCinejoyServer,
   isEmbedServer,
 } from "./stream-resolver";
 
@@ -215,7 +217,7 @@ describe("Hidden multi-source playback engine", () => {
       "vidbolt",
       "vidrift",
     ]);
-    expect(TOTAL_STREAMING_SERVERS.length).toBe(21);
+    expect(TOTAL_STREAMING_SERVERS.length).toBe(25);
     expect(isEmbedServer("filmu")).toBe(true);
     expect(isEmbedServer("vidy")).toBe(true);
     expect(isEmbedServer("cinezo")).toBe(true);
@@ -223,6 +225,23 @@ describe("Hidden multi-source playback engine", () => {
     expect(isEmbedServer("vidrift")).toBe(true);
     expect(isEmbedServer("lisbon")).toBe(false);
     expect(isEmbedServer("aphelion")).toBe(false);
+  });
+
+  it("exposes CINEJOY_STREAMING_SERVERS and validates isCinejoyServer", () => {
+    expect(CINEJOY_STREAMING_SERVERS.length).toBe(4);
+    expect(CINEJOY_STREAMING_SERVERS.map((s) => s.id)).toEqual([
+      "cj-lisbon",
+      "cj-nebula",
+      "cj-athens",
+      "cj-shegu",
+    ]);
+    expect(isCinejoyServer("cj-lisbon")).toBe(true);
+    expect(isCinejoyServer("cj-nebula")).toBe(true);
+    expect(isCinejoyServer("cj-athens")).toBe(true);
+    expect(isCinejoyServer("cj-shegu")).toBe(true);
+    expect(isCinejoyServer("lisbon")).toBe(false);
+    expect(isCinejoyServer("aphelion")).toBe(false);
+    expect(isCinejoyServer("filmu")).toBe(false);
   });
 
   it("builds correct embed URLs for all 5 embed providers", () => {

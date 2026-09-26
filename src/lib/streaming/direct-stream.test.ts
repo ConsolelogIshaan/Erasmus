@@ -163,4 +163,28 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
     expect(res25.servers.length).toBeGreaterThan(0);
     expect(res25.servers[0]?.url).toContain(".m3u8");
   }, 25000);
+
+  it("extracts direct stream for Cinejoy pipeline cj-nebula with high-speed edge stream", async () => {
+    const res = await extractDirectStream({
+      type: "movie",
+      tmdbId: "550",
+      serverId: "cj-nebula",
+    });
+    expect(res.ok).toBe(true);
+    expect(res.servers.length).toBeGreaterThan(0);
+    expect(res.servers[0]?.url).toBeTruthy();
+    expect(res.servers[0]?.name).toContain("Nebula");
+  }, 15000);
+
+  it("extracts clean Hakuna Matata stream for Spider-Man on cj-nebula without watermark", async () => {
+    const res = await extractDirectStream({
+      type: "movie",
+      tmdbId: "969681",
+      serverId: "cj-nebula",
+    });
+    expect(res.ok).toBe(true);
+    expect(res.servers.length).toBeGreaterThan(0);
+    expect(res.servers[0]?.url).toContain("hakunaymatata.com");
+    expect(res.servers[0]?.kind).toBe("file");
+  }, 15000);
 });

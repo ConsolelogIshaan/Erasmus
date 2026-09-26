@@ -36,6 +36,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "dist/**",
     "node_modules/**",
+    "vendor/**",
+    "my-app/**",
     "next-env.d.ts",
     "src/types/database.ts",
   ]),

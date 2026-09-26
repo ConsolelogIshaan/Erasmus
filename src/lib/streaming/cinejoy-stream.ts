@@ -7,7 +7,10 @@ if (typeof process !== "undefined" && process.env) {
 
 import { STREAMING_SERVERS } from "@/lib/streaming/stream-resolver";
 import { getMediaProvider } from "@/lib/media/providers";
-import { getAlternateTvCoordinates } from "@/lib/streaming/vidfast-direct";
+import {
+  getAlternateTvCoordinates,
+  resolveVidfastDirectStream,
+} from "@/lib/streaming/vidfast-direct";
 
 const ENC_API = "https://enc-dec.app/api";
 const SHEGU = "https://api.shegu.st";
@@ -88,6 +91,10 @@ export interface CinejoyStreamHit {
   referer: string;
   captions: CinejoyCaption[];
   serverName: string;
+  is4K?: boolean;
+  hdUrl?: string;
+  fourKUrl?: string;
+  isDirectCors?: boolean;
 }
 
 function b64urlDecode(data: string): Buffer {
@@ -349,6 +356,361 @@ export async function resolveCinejoyStream(input: {
     for (const alt of alternates.slice(0, 3)) {
       try {
         const altHit = await resolveCinejoyStream({
+          ...input,
+          season: alt.season,
+          episode: alt.episode,
+          isFallback: true,
+        });
+        if (altHit && !altHit.url.includes("lol.movieboxnoob.cc")) {
+          return altHit;
+        }
+      } catch {}
+    }
+  }
+
+  return null;
+}
+
+export async function resolveVidlinkStream(input: {
+  type: "movie" | "tv";
+  tmdbId: string;
+  season?: number;
+  episode?: number;
+  serverName?: string;
+}): Promise<CinejoyStreamHit | null> {
+  try {
+    const encRes = await fetch(`${ENC_API}/enc-vidlink?text=${encodeURIComponent(input.tmdbId)}`, {
+      headers: { "User-Agent": SHEGU_HEADERS["User-Agent"] },
+      signal: AbortSignal.timeout(3500),
+    });
+    if (!encRes.ok) return null;
+    const encJson = (await encRes.json()) as { status?: number; result?: string };
+    if (encJson.status !== 200 || !encJson.result) return null;
+
+    const encKey = encJson.result;
+    const isTv = input.type === "tv";
+    const s = input.season ?? 1;
+    const e = input.episode ?? 1;
+    const apiUrl = isTv
+      ? `https://vidlink.pro/api/b/tv/${encKey}/${s}/${e}`
+      : `https://vidlink.pro/api/b/movie/${encKey}`;
+
+    const vidRes = await fetch(apiUrl, {
+      headers: {
+        "User-Agent": SHEGU_HEADERS["User-Agent"],
+        Origin: "https://vidlink.pro",
+        Referer: "https://vidlink.pro/",
+      },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!vidRes.ok) return null;
+    const vidJson = (await vidRes.json()) as {
+      stream?: {
+        playlist?: string;
+        qualities?: Record<string, { url?: string; type?: string; codecName?: string }>;
+        captions?: Array<{ url?: string; file?: string; language?: string; label?: string }>;
+      };
+      tracks?: Array<{ url?: string; file?: string; language?: string; label?: string }>;
+      captions?: Array<{ url?: string; file?: string; language?: string; label?: string }>;
+    };
+
+    const streamObj = vidJson.stream;
+    if (!streamObj) return null;
+
+    const q = streamObj.qualities;
+    // Vidlink provides HLS playlists or direct MP4 streams (e.g. pristine 1080p from Hakuna Matata CDN)
+    let webPlayableUrl: string | undefined = streamObj.playlist;
+    let isWebHls = Boolean(streamObj.playlist);
+
+    if (!webPlayableUrl && q) {
+      const candidateTiers = ["2160", "1080", "720", "480", "360"];
+      for (const tier of candidateTiers) {
+        const item = q[tier];
+        if (item?.url) {
+          webPlayableUrl = item.url;
+          isWebHls = item.url.includes(".m3u8");
+          break;
+        }
+      }
+    }
+
+    if (!webPlayableUrl) {
+      return null;
+    }
+
+    const streamUrl = webPlayableUrl;
+
+    const rawCaptions = streamObj.captions || vidJson.tracks || vidJson.captions || [];
+    const captions: CinejoyCaption[] = rawCaptions
+      .map((c) => {
+        const url = c.url || c.file || "";
+        const language = c.language || c.label || "en";
+        const label = formatCaptionLabel(c.label || language, language, url);
+        return { label, language, url };
+      })
+      .filter((c) => Boolean(c.url));
+
+    const is4K = Boolean(q?.["2160"]);
+    const isFile = !isWebHls && streamUrl.includes(".mp4");
+    const isHakuna = streamUrl.toLowerCase().includes("hakunaymatata");
+
+    return {
+      url: streamUrl,
+      kind: isFile ? "file" : "hls",
+      referer: isHakuna ? "" : "https://vidlink.pro/",
+      captions,
+      serverName: input.serverName || "Nebula (Cinejoy Edge)",
+      is4K,
+      hdUrl: q?.["1080"]?.url || q?.["720"]?.url || streamUrl,
+      fourKUrl: q?.["2160"]?.url,
+      isDirectCors: false,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveVidloveStream(input: {
+  type: "movie" | "tv";
+  tmdbId: string;
+  season?: number;
+  episode?: number;
+  serverName?: string;
+  source?: string;
+}): Promise<CinejoyStreamHit | null> {
+  try {
+    const isTv = input.type === "tv";
+    const s = input.season ?? 1;
+    const e = input.episode ?? 1;
+    const base = isTv
+      ? `https://api.vidlove.cc/tv?id=${encodeURIComponent(input.tmdbId)}&season=${s}&episode=${e}&mode=json`
+      : `https://api.vidlove.cc/movie?id=${encodeURIComponent(input.tmdbId)}&mode=json`;
+    const url = input.source ? `${base}&sources=${encodeURIComponent(input.source)}` : base;
+
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": SHEGU_HEADERS["User-Agent"],
+        Referer: "https://player.vidlove.cc/",
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(3500),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      source?: { url?: string; label?: string };
+      subtitles?: Array<{ file?: string; url?: string; label?: string; language?: string }>;
+    };
+
+    const streamUrl = json.source?.url;
+    if (!streamUrl) return null;
+
+    // Filter out known 3rd-party scrapers that burn betting watermarks into video frames (e.g. 4RABET / whysosigmabro)
+    if (streamUrl.includes("whysosigmabro.cfd")) {
+      return null;
+    }
+
+    const captions: CinejoyCaption[] = (json.subtitles || [])
+      .map((s) => {
+        const u = s.file || s.url || "";
+        const lang = s.language || s.label || "und";
+        const label = formatCaptionLabel(s.label || lang, lang, u);
+        return { label, language: lang, url: u };
+      })
+      .filter((c) => Boolean(c.url));
+
+    return {
+      url: streamUrl,
+      kind: streamUrl.includes(".mp4") ? "file" : "hls",
+      referer: "https://player.vidlove.cc/",
+      captions,
+      serverName: input.serverName || "Cinejoy Cloud",
+      is4K: false,
+      isDirectCors: false,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveCinejoyClusterStream(input: {
+  type: "movie" | "tv";
+  tmdbId: string;
+  serverId: string;
+  season?: number;
+  episode?: number;
+  title?: string;
+  year?: string;
+  imdbId?: string;
+  isFallback?: boolean;
+}): Promise<CinejoyStreamHit | null> {
+  const normId = input.serverId.toLowerCase();
+
+  switch (normId) {
+    case "cj-nebula": {
+      // 1. Vidlink pristine edge stream (Hakuna Matata 1080p clean master - same as TV app)
+      const vidlinkHit = await resolveVidlinkStream({
+        type: input.type,
+        tmdbId: input.tmdbId,
+        season: input.season,
+        episode: input.episode,
+        serverName: "Nebula (Cinejoy Edge)",
+      });
+      if (vidlinkHit) return vidlinkHit;
+
+      // 2. Vidlove edge CDN fallback
+      const vidloveHit = await resolveVidloveStream({
+        type: input.type,
+        tmdbId: input.tmdbId,
+        season: input.season,
+        episode: input.episode,
+        serverName: "Nebula (Cinejoy Edge)",
+      });
+      if (vidloveHit) return vidloveHit;
+
+      // 3. Vidfast fallback
+      const vfRes = await resolveVidfastDirectStream({ ...input, serverId: "nebula" });
+      if (vfRes.hit?.url) {
+        return {
+          url: vfRes.hit.url,
+          kind: vfRes.hit.kind,
+          referer: vfRes.hit.referer,
+          captions: [],
+          serverName: "Nebula (Cinejoy 4K)",
+          is4K: vfRes.hit.is4K,
+          hdUrl: vfRes.hit.hdUrl,
+          fourKUrl: vfRes.hit.fourKUrl,
+          isDirectCors: false,
+        };
+      }
+      break;
+    }
+
+    case "cj-lisbon": {
+      // 1. Flagship 4K Master HLS ladder (Vidfast vRapid/vBlaze)
+      const vfRes = await resolveVidfastDirectStream({ ...input, serverId: "lisbon" });
+      if (vfRes.hit?.url) {
+        return {
+          url: vfRes.hit.url,
+          kind: vfRes.hit.kind,
+          referer: vfRes.hit.referer,
+          captions: [],
+          serverName: "Lisbon (Cinejoy 4K)",
+          is4K: vfRes.hit.is4K,
+          hdUrl: vfRes.hit.hdUrl,
+          fourKUrl: vfRes.hit.fourKUrl,
+          isDirectCors: false,
+        };
+      }
+
+      // 2. Vidlove cloud fallback
+      const vidloveHit = await resolveVidloveStream({
+        type: input.type,
+        tmdbId: input.tmdbId,
+        season: input.season,
+        episode: input.episode,
+        serverName: "Lisbon (Cinejoy Cloud)",
+      });
+      if (vidloveHit) return vidloveHit;
+
+      // 3. Vidlink mirror fallback
+      const vidlinkHit = await resolveVidlinkStream({
+        type: input.type,
+        tmdbId: input.tmdbId,
+        season: input.season,
+        episode: input.episode,
+        serverName: "Lisbon (Cinejoy Mirror)",
+      });
+      if (vidlinkHit) return vidlinkHit;
+      break;
+    }
+
+    case "cj-athens": {
+      // 1. 4K UHD Direct rip (Vidfast vFast)
+      const vfRes = await resolveVidfastDirectStream({ ...input, serverId: "athens" });
+      if (vfRes.hit?.url) {
+        return {
+          url: vfRes.hit.url,
+          kind: vfRes.hit.kind,
+          referer: vfRes.hit.referer,
+          captions: [],
+          serverName: "Athens (Cinejoy 4K)",
+          is4K: vfRes.hit.is4K,
+          hdUrl: vfRes.hit.hdUrl,
+          fourKUrl: vfRes.hit.fourKUrl,
+          isDirectCors: false,
+        };
+      }
+
+      // 2. Vidlove cloud fallback
+      const vidloveHit = await resolveVidloveStream({
+        type: input.type,
+        tmdbId: input.tmdbId,
+        season: input.season,
+        episode: input.episode,
+        serverName: "Athens (Cinejoy Cloud)",
+      });
+      if (vidloveHit) return vidloveHit;
+
+      // 3. Vidlink mirror fallback
+      const vidlinkHit = await resolveVidlinkStream({
+        type: input.type,
+        tmdbId: input.tmdbId,
+        season: input.season,
+        episode: input.episode,
+        serverName: "Athens (Cinejoy Mirror)",
+      });
+      if (vidlinkHit) return vidlinkHit;
+      break;
+    }
+
+    case "cj-shegu":
+    default: {
+      // 1. Encrypted Shegu binary gateway (api.shegu.st/g)
+      try {
+        const sheguHit = await resolveCinejoyServer({ ...input, serverId: "lisbon" });
+        if (sheguHit && !sheguHit.url.includes("lol.movieboxnoob.cc")) {
+          return {
+            ...sheguHit,
+            serverName: "Shegu (Cinejoy Core)",
+          };
+        }
+      } catch {}
+
+      // 2. Vidlove edge cloud fallback
+      const vidloveHit = await resolveVidloveStream({
+        type: input.type,
+        tmdbId: input.tmdbId,
+        season: input.season,
+        episode: input.episode,
+        serverName: "Shegu (Cinejoy Cloud)",
+      });
+      if (vidloveHit) return vidloveHit;
+
+      // 3. Vidfast fallback
+      const vfRes = await resolveVidfastDirectStream({ ...input, serverId: "lisbon" });
+      if (vfRes.hit?.url) {
+        return {
+          url: vfRes.hit.url,
+          kind: vfRes.hit.kind,
+          referer: vfRes.hit.referer,
+          captions: [],
+          serverName: "Shegu (Cinejoy 4K)",
+          is4K: vfRes.hit.is4K,
+          hdUrl: vfRes.hit.hdUrl,
+          fourKUrl: vfRes.hit.fourKUrl,
+          isDirectCors: false,
+        };
+      }
+      break;
+    }
+  }
+
+  // Smart alternate cour fallback for TV
+  if (input.type === "tv" && !input.isFallback) {
+    const alternates = getAlternateTvCoordinates(input.season ?? 1, input.episode ?? 1);
+    for (const alt of alternates.slice(0, 3)) {
+      try {
+        const altHit = await resolveCinejoyClusterStream({
           ...input,
           season: alt.season,
           episode: alt.episode,

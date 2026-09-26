@@ -160,14 +160,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "invalid url" }, { status: 400 });
   }
 
+  const isHakuna = target.hostname.toLowerCase().includes("hakunaymatata");
   const { referer, origin } = refererFor(search.get("referer"));
   const range = request.headers.get("range");
-  const upstreamHeaders: Record<string, string> = {
-    Referer: referer,
-    Origin: origin,
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-  };
+  const upstreamHeaders: Record<string, string> = isHakuna
+    ? {
+        "User-Agent": "ExoPlayer/1.5.1 (Linux; Android TV)",
+      }
+    : {
+        Referer: referer,
+        Origin: origin,
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+      };
   if (range) upstreamHeaders.Range = range;
 
   const upstream = await fetch(target, {

@@ -6,6 +6,7 @@ import { Check, GripVertical, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   TOTAL_STREAMING_SERVERS,
+  isCinejoyServer,
   isEmbedServer,
   type StreamServer,
 } from "@/lib/streaming/stream-resolver";
@@ -30,7 +31,8 @@ export function ServersModal({
 }: ServersModalProps) {
   if (!open) return null;
 
-  const directServers = servers.filter((s) => !isEmbedServer(s.id));
+  const cinejoyServers = servers.filter((s) => isCinejoyServer(s.id));
+  const directServers = servers.filter((s) => !isEmbedServer(s.id) && !isCinejoyServer(s.id));
   const embedServers = servers.filter((s) => isEmbedServer(s.id));
 
   const renderServerItem = (server: StreamServer) => {
@@ -126,6 +128,22 @@ export function ServersModal({
               </div>
               <ul className="space-y-0.5">
                 {directServers.map(renderServerItem)}
+              </ul>
+            </div>
+          )}
+
+          {cinejoyServers.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between px-2 pb-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-cyan-400">
+                  Cinejoy Pipeline (Direct & Zero-Buffer Beta)
+                </span>
+                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300">
+                  New
+                </span>
+              </div>
+              <ul className="space-y-0.5">
+                {cinejoyServers.map(renderServerItem)}
               </ul>
             </div>
           )}

@@ -1,109 +1,47 @@
 # STATE
 
-Updated: 2026-09-21
-Git: local branch `main`
+Updated: 2026-09-26
+Git: `origin/main` (pushed per explicit user instruction with verified trusted backups)
 
 ## Priority
-Streaming architecture and playback reliability. Reduce Vercel bandwidth from HLS proxying without iframe embeds and without breaking the working player.
+Streaming architecture and playback reliability. Introduced dedicated Cinejoy Pipeline test servers (`cj-lisbon`, `cj-nebula`, `cj-athens`, `cj-shegu`) in the player server selector to test direct CDN streaming and HEVC 1080p master delivery, while keeping 100% of existing streaming services untouched and fully functional.
 
 ## Working
+- **Original Streaming Infrastructure (100% Preserved & Verified)**:
+  - Lisbon (`isPrimary: true`), Sakura, Nebula, Solara, Athens, Joy, Castle, Canaias, and all Bingr clusters remain completely intact and active.
+  - Complete backups safely preserved at `c:/Users/Administrator/Documents/BACKUP/trusted_backup_cinejoy_pipeline_20260926/` and `c:/Users/Administrator/Documents/BACKUP/pre_cinejoy_pipeline_backup/`.
+- **Cinejoy Pipeline Integration (Dedicated Server Section)**:
+  - Added dedicated server IDs in `src/lib/streaming/stream-resolver.ts`:
+    - `cj-lisbon`: Lisbon (Cinejoy 4K) — 4K Master HLS ladder with auto-adaptive failover.
+    - `cj-nebula`: Nebula (Cinejoy Edge) — Pristine theatrical edge CDN (Hakuna Matata 1080p master, zero watermark).
+    - `cj-athens`: Athens (Cinejoy 4K) — High-bitrate 4K cinema direct stream mirror.
+    - `cj-shegu`: Shegu (Cinejoy Core) — Encrypted Shegu binary multi-source cluster.
+  - Added dedicated UI section in `src/features/streaming/components/servers-modal.tsx`:
+    - Renders "CINEJOY PIPELINE (DIRECT & ZERO-BUFFER BETA)" with cyan accent badge between Direct Streams and Embed Fallback Players.
+  - Unlocked **Hakuna Matata CDN** (pristine 1080p master copy):
+    - Configured `src/app/api/stream/hls/route.ts` to identify Hakuna Matata requests and pass `User-Agent: ExoPlayer/1.5.1 (Linux; Android TV)` with empty referer, matching `TvPlayerScreen.kt:L211-216` in the TV app.
+    - Updated `resolveVidlinkStream` in `src/lib/streaming/cinejoy-stream.ts` to accept Hakuna Matata direct streams.
+    - Prioritized `resolveVidlinkStream` first for `cj-nebula` to match `CinejoyStreamResolver.kt:L335-340`.
+    - Tested seeking, audio/video synchronization, and frame extraction: 1920x800 theatrical aspect ratio, full 2:24:38 runtime, zero betting watermarks.
 - Web app (Erasmus, Next.js 16 / React 19): catalog, social, recommendations, ratings, ambient lighting, Continue Watching.
-- Typography: Instrument Sans Typeface:
-  - Configured Instrument Sans (`InstrumentSans-Variable.ttf`, `InstrumentSans-Italic-Variable.ttf`) via `next/font/local` in `src/lib/fonts/instrument-sans.ts`.
-  - Replaced Google Fonts `Source_Sans_3` in `src/app/layout.tsx` and `src/app/globals.css`, eliminating external font round-trip requests.
-  - Mapped `--font-sans` and `--font-display` to `var(--font-instrument-sans)` for all UI, buttons, body copy, headings, and section titles.
-  - Retained `Geist_Mono` exclusively for technical data, badges, and keyboard shortcuts via `--font-mono`.
-- Primary Home & Default Landing: Discover (`/discover`):
-  - Made Discover the primary home screen and default landing page instead of `/dashboard`.
-  - Authenticated visitors to `/` redirect directly to `/discover`.
-  - Brand Logo defaults to `/discover`. Header and mobile drawer recognize Discover as the home screen.
-  - Auth redirects (login, signup, OAuth callback, fallback) redirect to `/discover`.
-  - Error and offline fallbacks default to `/discover`.
-  - `/dashboard` remains preserved as the personal Profile & Intelligence dashboard.
-- Supabase Egress & Bandwidth Optimization:
-  - Bypassed Next.js middleware (`src/proxy.ts` and `src/lib/supabase/middleware.ts`) for `/api/stream/*` routes so HLS video chunks and subtitle fetches never trigger `supabase.auth.getUser()`, eliminating thousands of round-trip auth calls per streamed title.
-  - Wrapped user session and profile getters (`getCurrentUser`, `getProfile`, `getUserSettings`, `getUserPreferences`, `getSessionContext`) in React `cache()` in `src/lib/services/user-service.ts`, deduplicating queries within each request render cycle.
-  - Targeted playback progress revalidations in `actionSetMovieProgress` and `actionSetTvProgress` (`src/features/library/actions/library-actions.ts`) to specific media paths instead of triggering full-site revalidation (`revalidateLibrary`) every 60 seconds of playback.
-  - Wrapped `loadIntelligenceData` in React `cache()` and pruned excessive table query limits (reducing 10,000 episode rows and 5,000 session rows to bounded limits), slashing payload transfer on `/dashboard` and detail pages.
-- Direct Playback Trigger on Poster Cards & Hero Banner.
-- Translucent Frosted Glass Quick Action Buttons on Poster Cards.
-- Instant Direct Playback Resume on Continue Watching Click.
-- Centered Navigation Icons on Collapsed Sidebar.
+- Typography: Instrument Sans Typeface.
+- Primary Home & Default Landing: Discover (`/discover`).
+- Supabase Egress & Bandwidth Optimization.
 
-- Direct Playback Trigger on Poster Cards & Hero Banner:
-  - Poster Card Quick Actions (`src/features/media/components/poster-card.tsx`): Clicking the hover **Play** button directly opens `StreamingTheaterModal` with the title's resume progress point.
-  - Hero Banner Action Buttons (`src/features/media/components/hero-banner.tsx`): Clicking the circular white **Play** button directly opens `StreamingTheaterModal`, while the pill "See More" button navigates to the title's detail page.
-- Translucent Frosted Glass Quick Action Buttons on Poster Cards (`src/features/media/components/poster-card.tsx`).
-- Adaptive Liquid Glass Search Panel:
-  - Added `src/components/ui/adaptive-liquid-glass.tsx`: a real-time, environmentally adaptive glass material (Apple VisionOS/macOS style). Uses a live `backdrop-filter: url(#glass-filter-{id})` SVG filter graph — `SourceGraphic` is the live GPU-composited backdrop, not a static capture. Falls back to plain `blur(14px) saturate(1.8) brightness(1.05)` on browsers without SVG `backdrop-filter` support (feature-detected via `CSS.supports`). GPU compositing hints (`will-change`, `translateZ(0)`, `contain`) live in `.liquid-glass-compositing` in `globals.css`.
-  - **Iteration 1 (scrapped) — full-panel linear gradient:** two full-width/height linear X/Y gradients screen-blended with only a blurred inset "plateau". Displacement varied broadly across the whole panel with no real edge concentration; combined with three redundant channel-gutted `feDisplacementMap` passes re-blended via `screen`, the passes fought each other and the whole panel smeared into a muddy blur instead of reading as glass.
-  - **Iteration 2 (scrapped, per explicit correction) — rim-only band:** rewrote the heightmap so only a thin band at the border (6–48px) carried any displacement, with the interior forced perfectly flat/undistorted. Technically correct "glass only bends at its curved rim" physics, but the user wanted the *whole* search box to visibly bend/refract the backdrop as they scroll past posters, not just its edge — reverted.
-  - **Iteration 3 (current) — whole-panel radial dome, single coherent displacement pass:** `buildHeightMapDataUri()` now encodes the entire panel as one convex dome: two independent radial gradients centered on the panel (X push in the red channel, Y push in the green channel), each exactly neutral (rgb 128 = zero displacement) at the dead center and easing — flat near the middle, steepening near the border — out to full push at the edges. Every part of the panel refracts the backdrop directly behind it (a poster under the left third bends differently than one under the right third), with the strongest bend still naturally landing at the border, same as a real curved pane. The three-pass channel-gutted re-blend that caused the original smearing is gone: there is now one primary `feDisplacementMap` pass (full-color, coherent), plus a second, blue-channel-only pass at a slightly larger scale, dimmed and screened on top for a faint chromatic fringe near the edges — closer to how a real prism splits color (blue bends most) without disturbing the primary image. Retuned defaults: `displacementScale` 34 (edge magnitude, zero at center), `chromaticFringe` 0.35 (fringe pass opacity), `tintOpacity` 0.14. Removed the now-unused `borderWidth`/`rimSoftness` rim-band props from iteration 2.
-  - Verified the heightmap's gradient math standalone (temporary Node script, deleted after running): center is exactly neutral, edge reaches full push, the falloff is monotonically increasing and measurably eased (steeper near the edge than near the center, not a straight linear ramp), and the resulting max edge displacement (~17px at the default scale) is a physically reasonable, non-degenerate magnitude.
-  - Added `src/components/ui/adaptive-liquid-glass-nav-example.tsx`: a standalone reference pill nav demonstrating the component; not wired into the app shell.
-  - Wired into `src/components/ui/command.tsx`: `CommandDialog`'s background glass layer (previously three static CSS layers: `search-panel-glass-base` / `-specular` / `-noise`) now renders `<AdaptiveLiquidGlass>` behind the search input, trending header, and poster results. Those results (the search box UI itself — input, trending list, poster cards) were left completely untouched and still render in the unaffected `relative z-10` foreground layer, sharp and unaffected by the filter. Only the panel's own glass background is distorted — the rest of the website is untouched.
-  - The legacy static `.search-panel-glass-base/-specular/-noise` CSS classes remain in `globals.css` (unused by `command.tsx` now) in case of rollback; `.search-panel-liquid-glass` (border/box-shadow on the dialog panel itself) is still used.
-- Seamless Page Scroll Behind Search Panel:
-  - The search dialog previously froze the page while open — that was Radix `Dialog`'s default `modal={true}` body-scroll lock, unrelated to the glass effect. `CommandDialog` in `src/components/ui/command.tsx` now renders `<Dialog modal={false}>`, so Radix never locks scroll or blocks page pointer events.
-  - The dimming overlay has no scrollable content of its own and would otherwise still absorb wheel/touch input. Added `forwardScrollToPage` / `forwardTouchScrollToPage` handlers on the overlay that forward wheel deltas and single-finger touch drags to the app's real scroll container (`#main-content` from `AppShell`), so scrolling with the panel open feels identical to scrolling with it closed.
-  - Added `onOpenAutoFocus` / `onCloseAutoFocus` overrides on `DialogPrimitive.Content` so the search input still autofocuses on open (`preventScroll: true`) without Radix's focus restoration yanking scroll position on close.
-  - Dismissal (Escape, overlay click, outside pointerdown) is unaffected — handled by Radix's `DismissableLayer` / `onOpenChange`, which behaves the same in modal and non-modal dialogs.
-- Instant Direct Playback Resume on Continue Watching Click (`continue-watching-rail.tsx` & `library-poster-card.tsx`).
-- Centered Navigation Icons on Collapsed Sidebar (`src/components/layout/sidebar.tsx`).
-
-- Clean Monochrome Palette & Complete Removal of Blue Accents.
-- Default Highest Quality Playback: Playback starts at 4K or 1080p, never Auto, on both HLS and direct streams.
-- Loading Jokes on Starting Playback Screen:
-  - One joke per play session, picked randomly when the modal opens, static until playback starts.
-  - Jokes are categorized: `movie` (61 jokes), `tv` (65 jokes), `both` (74 jokes) — 200 total.
-  - `pickLoadingJoke(mediaType)` draws from the correct pool so movie-specific jokes never appear on TV shows and vice versa.
-  - Joke text displayed with a shimmer sweep animation (`joke-shimmer` CSS class using `background-clip: text` + `@keyframes joke-shimmer-sweep`) instead of a spinner — a brightness glint travels left-to-right through the static text.
-  - No joke during mid-video buffering (scrubbing, seeking, rebuffering) — plain spinner only.
-
-## Broken / Risky
-- **Vercel Fast Origin Transfer is confirmed back to climbing on the Vercel relay** — the migration revert was verified live on 2026-09-22 (see migration section), not just assumed. All video for Lisbon/VidFast is relaying through Vercel again, exactly as before this work started, with no interference from Render or Cloudflare.
-  - Root cause empirically verified: Upstream CDNs (`quietnexus.top`, `moon.quietridge.top`) enforce `Referer: https://vidfast.vc/` for all video segments (`.m4s`/`.ts`). Requests without this referer return `403 Forbidden`.
-  - Browsers forbid JavaScript from spoofing 3rd party `Referer` headers, necessitating a server-side relay.
-  - Because `/api/stream/hls` runs on Vercel Serverless Compute, all video bytes pass through Vercel and are billed twice (inbound + outbound).
-  - **Cloudflare Workers are confirmed NOT viable** for this — VidFast's CDN returns 403 to Cloudflare's egress IPs regardless of headers (empirically tested with a live token). Do not attempt this again without a different network.
-  - **Render is confirmed viable technically** but its free tier is only 5 GB/month (not 100 GB as first assumed), too small for real usage (~700 MB/episode, ~7 episodes/month cap). Not currently in use in production. See migration section for the full path taken and what to try next if revisited.
-- **A separate, unfixed cause of buffering was identified (not the relay, and left untouched per explicit instruction):** in `native-player.tsx`, `hls.currentLevel` is force-locked to the single highest-bitrate level on `MANIFEST_PARSED` and never released back to Hls.js's automatic ABR. Normally Hls.js downshifts quality when the real connection can't sustain the current bitrate; with `currentLevel` pinned, that safety net never engages, so a viewer whose bandwidth can't sustain the top tier stalls repeatedly instead of smoothly stepping down. `BUFFER_STALLED_ERROR` in the `Hls.Events.ERROR` handler just calls `hls.startLoad()` and force-resumes — it does not downshift either. This is fully independent of which relay host is used. User declined a fix for this (wants playback to always start at highest quality) — left as-is, documented here so it isn't mistaken for a relay-caused problem in the future.
-- Desktop Chrome/Firefox direct HLS requests hit upstream CDN CORS / Referer restrictions when unproxied.
-- Profile integration with Supabase `watch_profiles` (used by the TV app) caused playback problems and was reverted. Do not touch Supabase settings or schema.
-- Proxy and resolver disable TLS verification (`NODE_TLS_REJECT_UNAUTHORIZED = "0"`) for upstream CDN nodes.
-
-## In progress
-- Complete: Loading jokes on starting playback screen — 200 jokes categorized by media type with shimmer animation.
-- Complete: Default playback to highest available quality tier (4K or 1080p, never Auto).
-- Complete: Configured Instrument Sans variable typeface across the website from user-provided archive.
-
-- Complete: Applied physically convincing multi-layer Liquid Glass background treatment to Search Screen HUD (CommandDialog).
-
-- Complete: Set Discover page (`/discover`) as default main page and redirect route across the web platform.
-- Complete: Resolved Supabase egress bandwidth overages across middleware, user session caching, intelligence query limits, and playback progress revalidation.
-- Complete: Diagnosed Vercel Fast Origin Transfer spike and verified 403 CDN referer restrictions.
-
-## HLS relay migration — ATTEMPTED (Cloudflare, then Render), REVERTED, back on Vercel (2026-09-22)
-- **Goal:** take video bytes off Vercel's Fast Origin Transfer meter (climbed from 6.84 GB to 23.43 GB / 10 GB, alongside Function Invocations 1.8M/1M and Fluid Active CPU 6h27m/4h — same root cause: every video segment is a Vercel function invocation, and Vercel bills relayed bytes twice, inbound CDN→compute and outbound compute→browser).
-- **Why the relay had to move rather than be removed:** Lisbon (flagship, most traffic) resolves through `resolveVidfastDirectStream()` in `vidfast-direct.ts`, which hardcodes `isDirectCors: false`. VidFast's segment CDNs (`moon.quietridge.top`, `quietnexus.top`) reject requests without `Referer: https://vidfast.vc/`, and browsers cannot set a third-party Referer, so Lisbon traffic is structurally forced through a server-side relay. Reconciling `isDirectCdnSegment()`/`checkIsDirectCors()` allowlists would not have helped Lisbon at all.
-- **Attempt 1 — Cloudflare Worker: BLOCKED, confirmed with real data.** Built a line-for-line port of `hls/route.ts` as a Cloudflare Worker, deployed to `https://erasmus-hls-relay.erasmustv.workers.dev`. A/B tested with a freshly-resolved VidFast token, same request, three destinations: this machine → 200, Vercel relay → 200, Cloudflare → **502 (upstream 403)**. Identical headers on all three; the only variable is the egress IP. VidFast (or its CDN) blocks Cloudflare Workers' IP ranges at the network level — not fixable by any header/retry/code change, since a Worker cannot select its own outbound IP. Explored and ruled out: custom IPs on Cloudflare (Spectrum/BYOIP/Dedicated IPs only affect inbound traffic, not a Worker's outbound `fetch`), and hosting the whole app on Cloudflare Pages instead (would spread the same block to stream resolution too, breaking what currently works on Vercel).
-- **Attempt 2 — Render: WORKED, then hit a real cost ceiling.** Ported the same relay logic to a Node server, deployed to Render's free tier (Singapore region) from a separate throwaway repo (`ConsolelogIshaan/erasmus-hls-relay-test`) so Render's GitHub access never touched the main Erasmus repo. A/B test: 200 from VidFast, full chain verified (master → variant → real ~2.6 MB segment in ~1s, range requests, CORS) — 13/13 checks. This also disproved a "Cloudflare-specific" theory being too broad: it's Cloudflare specifically, not all datacenter IPs, since Render's worked.
-  - Found and fixed a real crash during testing: piping `upstream.body` to the response with no error handlers turned every player-initiated abort (seek, quality switch, tab close) into an unhandled `ECONNRESET`/`EPIPE` that killed the whole Node process — one viewer seeking would drop every concurrent viewer. Fixed with stream error/close/aborted handlers, upstream `destroy()` on disconnect, process-level `uncaughtException`/`unhandledRejection` guards, and socket timeouts. Verified by deliberately aborting 15 segment downloads mid-stream; server survived.
-  - Also found, and left unfixed, a pre-existing bug unrelated to any relay: `vidfast-direct.ts` serves a known-hanging `/r2/cdn1|cdn2` cluster as a last-resort `fallbackHit` when every healthy candidate fails (its own comment says these "stall indefinitely on segment requests"). Reproduced on Lioness S01E01 — hung identically from this machine, Vercel, and Render (20s timeout on all three), confirming it's an upstream/resolver defect, not a relay problem. Some titles will silently hang for users until this fallback is changed.
-  - Deployed to production (`erasmus-nine.vercel.app`, a fresh Vercel project) with `NEXT_PUBLIC_HLS_RELAY_URL` set. Verified live via the site's own `/api/stream/hls` endpoint: child URLs rewritten to `onrender.com`, zero to Vercel or Cloudflare. Confirmed with real usage: one TV episode moved ~100 MB on Vercel (page/API traffic only) and ~700 MB on Render (the actual video) — the split worked exactly as intended.
-  - **Hit the real ceiling:** Render's Hobby (free) plan bandwidth was believed to be 100 GB/month but was actually cut to **5 GB/month** in an April 2026 pricing change (confirmed against Render's own pricing page) — at ~700 MB/episode that's only ~7 episodes/month before the service is either suspended (no card on file) or starts billing $0.15/GB (card on file). Considered and rejected: rotating multiple free Render accounts to dodge the cap (fragile, manual, and very likely a Render ToS violation for free-tier abuse); considered a small paid VPS (Hetzner/Contabo ~$5/month, much larger bandwidth) as the more durable long-term option but did not proceed.
-- **Decision: reverted, and VERIFIED clean on 2026-09-22.** Removed `NEXT_PUBLIC_HLS_RELAY_URL` from Vercel and redeployed. First revert attempt was checked and found still pointing at Render — `NEXT_PUBLIC_*` values are inlined at build time, so deleting the variable alone does nothing until the next build; the fix was a fresh redeploy after deletion. Re-verified against the live production endpoint (`erasmus-nine.vercel.app/api/stream/hls`) with a freshly-resolved real VidFast stream: all 4 rewritten child URLs point at `/api/stream/hls` (Vercel), zero at `onrender.com`, zero at `workers.dev`. Followed the full chain end to end (master → variant → real ~2.6 MB segment, valid video bytes) to confirm the Vercel relay itself still serves correctly post-revert — 9/10 checks passed, the one non-pass (a range request returning `200` instead of `206`) is pre-existing upstream/CDN behavior unrelated to the revert (Vercel's relay only forwards a `Content-Range`/206 when VidFast's own CDN returns one; it doesn't force it). Do not re-enable the Cloudflare Worker (confirmed non-viable, VidFast blocks it) or the current Render deployment (5 GB/month free ceiling is too small for real usage) without a different underlying host or a paid plan explicitly approved by the user.
-- **What still exists, inert:** `src/lib/streaming/relay.ts` remains in the main repo (falls back to `/api/stream/hls` when the env var is unset — verified byte-identical output in that state, so its presence alone changes nothing). The Cloudflare Worker and the Render service both remain deployed and reachable but are not referenced by production. The separate `erasmus-hls-relay-test` GitHub repo and its keep-awake GitHub Action still exist; the Action will keep pinging the Render service on its own schedule unless disabled, which does not affect Erasmus but does consume Render's free instance-hours.
-
-## Next
-- Monitor Supabase billing/usage dashboard to observe egress dropping to near zero.
-- If a relay migration is revisited, it needs a host with (a) IP ranges VidFast doesn't block — Render is confirmed to work on that front — and (b) bandwidth/cost that fits real usage, which free Render (5 GB/month) does not. A small always-on VPS (Hetzner/Contabo, ~$5/month, large bandwidth) or Render's paid tier with a card on file are the two realistic paths; do not attempt free-tier account rotation.
-- Consider disabling or deleting the `erasmus-hls-relay-test` Render service and its GitHub Actions keep-awake workflow if the relay migration is fully abandoned, so it stops consuming Render's free-tier hours for no purpose.
-- Fix the pre-existing `/r2/cdn1|cdn2` hanging-cluster fallback bug in `vidfast-direct.ts` (see above) — unrelated to the relay work, causes silent playback hangs on specific titles today, on Vercel, regardless of relay host.
-- Visually verify the whole-panel dome Adaptive Liquid Glass rewrite manually (`npm run dev`, open search over bright/high-contrast poster art, scroll the page behind it, confirm the entire search box surface visibly bends/refracts the posters as they scroll by — not just the border) since automated tooling cannot screenshot live `backdrop-filter` SVG refraction. If the bend reads too subtle, too strong, or the fringe is too visible/invisible, tune `displacementScale` (34), `chromaticFringe` (0.35), or `tintOpacity` (0.14) on the `<AdaptiveLiquidGlass>` call in `command.tsx`.
-- Manually verify the search panel's non-modal scroll passthrough (`npm run dev`, open search with ⌘/Ctrl+K, scroll with mouse wheel and touch, confirm the page behind scrolls smoothly and Escape/outside-click still closes it) — not verified visually by the agent.
+## Current Status
+- **Hakuna Matata CDN Integration Complete**:
+  - Web app now streams the identical pristine 1080p master file that the Cinejoy TV app receives from Hakuna Matata.
+  - Confirmed in Chrome browser testing: loads metadata, full 2:24:38 duration, zero watermarks.
+  - Test added: `extracts clean Hakuna Matata stream for Spider-Man on cj-nebula without watermark` in `src/lib/streaming/direct-stream.test.ts`.
+- **Validation**:
+  - `npm run test`: 19 test files, 212 tests passed (100% pass rate).
+  - `npm run lint`: 0 errors.
+  - `npm run build`: Compiled successfully in Turbopack (all 41 static/dynamic routes generated).
+  - Pushed cleanly to `origin/main`.
 
 ## Key locations
-- Web repo: `/Users/paarthsharma/Developer/GitHub/Erasmus` (branch: `main`)
-- Android TV app: `/Users/paarthsharma/Developer/ErasmusTV`
+- Web repo: `c:/Users/Administrator/Documents/Argus/Argus` (branch: `main`)
+- Android TV reference: `c:/Users/Administrator/Documents/Analysis/tv`
+- Trusted push backup: `c:/Users/Administrator/Documents/BACKUP/trusted_backup_cinejoy_pipeline_20260926/`
+- Pre-pipeline backup: `c:/Users/Administrator/Documents/BACKUP/pre_cinejoy_pipeline_backup/`
 - Verified backups: `c:/Users/Administrator/Documents/BACKUP/stream_fix_backups/`

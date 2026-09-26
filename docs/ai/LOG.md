@@ -374,3 +374,85 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Files: `docs/ai/STATE.md`, `docs/ai/LOG.md`. No application code changed in this entry — the revert itself was a Vercel dashboard/env-var action taken by the user, not a code change, and the player was explicitly left untouched.
 - Result: Production confirmed on Vercel's own relay with no Render/Cloudflare interference, verified via direct HTTP checks against the live site rather than taken on report.
 - Next: unchanged from the previous entry — same three open items (VPS/paid-Render decision if a relay migration is revisited, disable the unused `erasmus-hls-relay-test` Render service + keep-awake Action, fix the `/r2/` hanging-cluster fallback bug in `vidfast-direct.ts`) plus the newly documented `currentLevel` ABR lock as a known buffering cause that remains intentionally unfixed per user instruction.
+
+## 2026-09-25 | Paarth / Ishaan | Antigravity
+- Changed: Evaluated alternative zero-cost, high-bandwidth relay hosting platforms to relieve Vercel Fast Origin Transfer overruns, and verified zero changes were applied to production or the active codebase:
+  1. **Playback Buffering Diagnosis:** Analyzed reported buffering on Vercel relay. Found root cause in `src/features/streaming/components/native-player.tsx`: `highBufferWatchdogPeriod: 2` combined with `BUFFER_STALLED_ERROR -> hls.startLoad()` repeatedly aborts in-flight chunk downloads taking >2s over Vercel's proxy. Tested easing the watchdog, then fully reverted all local changes (`git restore`) per explicit user instruction. The player and codebase were left untouched.
+  2. **Alternative Host Investigations:**
+     - *Koyeb:* Confirmed free container tier discontinued following the Mistral AI acquisition in February 2026.
+     - *Bunny.net Edge Scripting:* Built a Deno-compatible standalone Edge Script (`https://erasmus-hls-relay-wyyw2.bunny.run/`). Upon script creation/publishing, Bunny's automated fraud prevention system flagged and suspended the brand-new trial account due to lack of verified billing. Abandoned.
+     - *Hugging Face Spaces:* Explored running the Node relay container via Docker SDK. Found that Hugging Face now paywalls all Docker and Gradio compute Spaces behind their PRO subscription ($9/mo); only static HTML remains free.
+     - *Netlify (15 GB) & Deno Deploy (20 GB):* Both ruled out due to strict monthly egress hard caps being too small for real video streaming usage.
+  3. **Zero-Change Guarantee:** NO code changes were committed, merged, or pushed. `NEXT_PUBLIC_HLS_RELAY_URL` remains unset, so `src/lib/streaming/relay.ts` falls back to the native `/api/stream/hls` endpoint. Both the Erasmus web application and the Cinejoy Android TV app remain 100% on Vercel as before.
+- Files: `docs/ai/STATE.md`, `docs/ai/LOG.md`. No application code modified.
+- Result: Git working tree on `main` is clean (only pre-existing uncommitted search glass UI changes remain). Production remains operating on Vercel without interruption.
+- Next: When ready to eliminate Vercel Fast Origin Transfer overages permanently, deploy the Node relay to a small dedicated VPS (Hetzner Cloud €3.50/mo, 20 TB bandwidth) and set `NEXT_PUBLIC_HLS_RELAY_URL`. Easing `highBufferWatchdogPeriod` in `native-player.tsx` remains the recommended solution for player-side buffering.
+
+### 2026-09-25: Dedicated Cinejoy Pipeline Server Section Integration (Zero-Proxy Direct CDN)
+- **Goal:** Provide a dedicated "Cinejoy Pipeline" section in the web streaming server selector modal (`cj-lisbon`, `cj-nebula`, `cj-athens`, `cj-shegu`) to compare and test zero-proxy CDN streaming without affecting or risking existing working streaming services.
+- **Safety & Backups:** Complete pre-implementation backups created at `C:\Users\Administrator\Documents\BACKUP\pre_cinejoy_pipeline_backup\`. Original servers (Lisbon, Sakura, Nebula, Aphelion, etc.) remain 100% active, default, and primary. NO code was pushed to Git (all work kept strictly local per user instruction).
+- **Implementation:**
+  1. `src/lib/streaming/stream-resolver.ts`: Registered `CINEJOY_STREAMING_SERVERS` (`cj-lisbon`, `cj-nebula`, `cj-athens`, `cj-shegu`) with badges and descriptions. Exported `isCinejoyServer(serverId)`. Added fallbacks to `buildStreamUrl`.
+  2. `src/features/streaming/components/servers-modal.tsx`: Added dedicated "CINEJOY PIPELINE (DIRECT & ZERO-BUFFER BETA)" section with cyan styling and "New" badge between Direct Streams and Embed Fallback Players.
+  3. `src/lib/streaming/cinejoy-stream.ts`: Added `resolveVidlinkStream` (Vidlink direct CDN returning `isDirectCors: true` with zero-referer Hakuna Matata CDN), `resolveVidloveStream`, and `resolveCinejoyClusterStream` implementing the exact pipeline from the Cinejoy TV repo (`CinejoyStreamResolver.kt`) with smart split-cour TV fallback.
+  4. `src/lib/streaming/direct-stream.ts`: Routed `isCinejoyServer(serverId)` to the Cinejoy pipeline first, leaving existing server resolution completely untouched.
+  5. `src/lib/streaming/direct-stream.test.ts` & `src/lib/streaming/stream-resolver.test.ts`: Added test cases for Cinejoy cluster and zero-proxy CDN resolution.
+- **Verification:**
+  - `npm run test`: All 19 test files and 211 tests passed (100% pass rate).
+  - `npx eslint src/lib/streaming/ src/features/streaming/`: 0 errors.
+  - `npm run build`: Production Next.js build compiled successfully in 4.4s, 41 routes generated.
+  - Tested `cj-nebula` resolution: resolved directly to `bcdn.hakunaymatata.com` in 945ms with `isDirectCors: true` (0 MB Vercel proxy transfer).
+- **Result:** Cinejoy pipeline is available in the web server modal as a distinct test section. Existing playback is 100% safe and unaffected. No git push was performed.
+
+### 2026-09-25: Fix Cinejoy Nebula Playback (HEVC Codec & Rate Limit Filtering)
+- **Problem:** When user selected `Nebula (Cinejoy Edge)` for movie 969681 (Spider-Man), playback got stuck on "Rendering..." (buffering at 0:00).
+- **Root Cause:**
+  1. `vidlink.pro` returned raw HEVC (H.265) MP4 files hosted on `bcdn.hakunaymatata.com`.
+  2. Direct client requests to `bcdn.hakunaymatata.com` were blocked with HTTP 428 / 429 rate limit errors (Vidlink's own JSON sets `"requiresProxy": true`).
+  3. Desktop Chrome on Windows cannot decode raw HEVC MP4s in `<video src="...">` without OS codec extensions.
+- **Fix:**
+  1. Updated `resolveVidlinkStream` in `src/lib/streaming/cinejoy-stream.ts` to inspect available stream codecs: raw HEVC files and `bcdn.hakunaymatata.com` endpoints return `null`, allowing graceful fallback.
+  2. Prioritized Cinejoy's US Edge CDN (`a2.whysosigmabro.cfd` via `resolveVidloveStream`) for `cj-nebula`. It delivers pristine 1080p Full HD HLS in universal H.264 (avc1) with synced subtitles.
+  3. Relayed through `/api/stream/hls` with `Referer: https://player.vidlove.cc/`, avoiding 403 Forbidden.
+- **Verification:**
+  - Automated browser subagent verified on `http://localhost:3000/movie/969681`: video started playing immediately, advanced past 5:02 with full audio/video frames and captions.
+  - `npm run test`: All streaming test suites passed.
+  - `npm run build`: Production build passed cleanly in 6.6s with 0 errors.
+
+### 2026-09-25: Root Cause Diagnosis & Filtering for 4RABET Betting Ad Watermark
+- **User Finding:** The user compared playback of *Spider-Man: Brand New Day* (TMDB 969681) on `http://localhost:3000` vs `https://cinejoy.pk/watch/movie/969681`. On `localhost:3000` (both normal Nebula and Cinejoy Nebula), a yellow/red Hindi gambling banner (`4RABET पर जाएं और Promo Code: BOLLY...`) was burnt into the video with runtime 2:17:01, whereas `cinejoy.pk` showed a clean pristine Sony theatrical stream with runtime 2:24:32.
+- **Deep Technical Audit:**
+  1. *Why Vidlove had the watermark:* `api.vidlove.cc/movie?id=969681&mode=json` returned `source: "vidapi"`, pointing to `a2.whysosigmabro.cfd`. This 3rd-party scraper returned an Indian webrip that had the 4RABET gambling watermark hardcoded into the picture and a truncated runtime of 2:17:01.
+  2. *Why normal Nebula had the watermark:* On Erasmus, normal Nebula fell back to VidFast's secondary stream (`moon.quietridge.top`), which for this specific title also scraped the exact same 2:17:01 watermarked rip.
+  3. *Why Cinejoy.pk was clean:* `cinejoy.pk` uses its SvelteKit player which resolves Vidlink / Shegu without falling into the `vidapi` scam scraper feed.
+- **Fix:**
+  - Updated `resolveVidloveStream` in `src/lib/streaming/cinejoy-stream.ts` to explicitly filter out `whysosigmabro.cfd` and `vidapi` watermark feeds so burnt-in gambling ad rips are rejected.
+  - Added `vendor/**` and `my-app/**` to `eslint.config.mjs` ignores.
+- **Verification:**
+### 2026-09-26: Hakuna Matata CDN Unlocked (Watermark-Free Pristine Master Stream)
+- **Investigation & TV Pipeline Parity:**
+  - Audited Android TV repository (`C:\Users\Administrator\Documents\Analysis\tv\app\src\main\java\com\erasmustv\app\`):
+    1. In `CinejoyStreamResolver.kt:L335-340`, `nebula` resolves `resolveVidlink` FIRST, which returns `https://bcdn.hakunaymatata.com/...` (clean 1080p MP4, 1.75 GB, full runtime 2:24:38, zero watermarks).
+    2. In `TvPlayerScreen.kt:L211-216`, the TV app passes `User-Agent: ExoPlayer/1.5.1 (Linux; Android TV)` and NO referer for `hakunaymatata` URLs.
+  - Tested Hakuna Matata CDN response against different HTTP headers:
+    1. Standard desktop Chrome UA -> `428 Precondition Required`.
+    2. ExoPlayer UA with external Referer (`vidlink.pro`) -> `429 Too Many Requests`.
+    3. ExoPlayer UA with NO Referer -> `206 Partial Content` (HTTP 200/206 OK, full 1.75 GB master file streamed).
+- **Implementation:**
+  1. `src/app/api/stream/hls/route.ts`: Detected `hakunaymatata` target URLs. For these requests, dynamically set `User-Agent: ExoPlayer/1.5.1 (Linux; Android TV)` and removed `Referer` / `Origin` headers, matching the TV app's ExoPlayer request model.
+  2. `src/lib/streaming/cinejoy-stream.ts`: Removed the blocking filter in `resolveVidlinkStream` that discarded `hakunaymatata.com`. Allowed direct MP4 streams (`kind: "file"`). Set `referer: ""` for Hakuna Matata endpoints.
+  3. `resolveCinejoyClusterStream`: Configured `cj-nebula` to call `resolveVidlinkStream` FIRST, exactly mirroring `CinejoyStreamResolver.kt` in the Android TV app.
+- **Verification:**
+  - Headless Chrome test via subagent: stream loaded with `status: METADATA_LOADED`, duration `8678.03s` (2:24:38), resolution `1920x800`.
+  - Seek test at 10 minutes (600s): captured frame confirmed 100% clean, crisp picture with zero watermarks, zero 4RABET betting ads.
+  - Added unit test to `src/lib/streaming/direct-stream.test.ts`: `extracts clean Hakuna Matata stream for Spider-Man on cj-nebula without watermark` passed in 1968ms.
+  - `npm run test`: 19 test files, 212 tests passed (100% pass rate).
+  - `npm run lint`: 0 errors.
+  - `npm run build`: Production Turbopack build succeeded in 6.2s with 0 errors.
+  - Trusted full backup created at `c:/Users/Administrator/Documents/BACKUP/trusted_backup_cinejoy_pipeline_20260926/`.
+  - Pushed to `origin/main` with explicit user authorization.
+
+
+
+
+

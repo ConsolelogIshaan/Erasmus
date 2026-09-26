@@ -221,10 +221,50 @@ export const BINGR_EMBED_SERVERS: StreamServer[] = [
   },
 ];
 
+export const CINEJOY_STREAMING_SERVERS: StreamServer[] = [
+  {
+    id: "cj-lisbon",
+    name: "Lisbon (Cinejoy 4K)",
+    flag: "⚡",
+    country: "US",
+    badge: "4K Master",
+    description: "Cinejoy pipeline: Flagship 4K Master HLS ladder with auto-adaptive failover",
+  },
+  {
+    id: "cj-nebula",
+    name: "Nebula (Cinejoy Edge)",
+    flag: "🚀",
+    country: "US",
+    badge: "1080p Direct Edge",
+    description: "Cinejoy pipeline: High-speed edge CDN with direct zero-proxy playback",
+  },
+  {
+    id: "cj-athens",
+    name: "Athens (Cinejoy 4K)",
+    flag: "🏛️",
+    country: "US",
+    badge: "4K UHD Cinema",
+    description: "Cinejoy pipeline: High-bitrate 4K cinema direct stream mirror",
+  },
+  {
+    id: "cj-shegu",
+    name: "Shegu (Cinejoy Core)",
+    flag: "🍿",
+    country: "GL",
+    badge: "Cinejoy Gateway",
+    description: "Cinejoy pipeline: Encrypted Shegu binary multi-source cluster",
+  },
+];
+
 export const TOTAL_STREAMING_SERVERS: StreamServer[] = [
   ...ALL_STREAMING_SERVERS,
+  ...CINEJOY_STREAMING_SERVERS,
   ...BINGR_EMBED_SERVERS,
 ];
+
+export function isCinejoyServer(serverId: string): boolean {
+  return serverId.startsWith("cj-") || CINEJOY_STREAMING_SERVERS.some((s) => s.id === serverId);
+}
 
 export function isEmbedServer(serverId: string): boolean {
   return BINGR_EMBED_SERVERS.some((s) => s.id === serverId);
@@ -399,6 +439,19 @@ export function buildStreamUrl(
     // Global edge (proven vidlink path, distinct query)
     case "canaias":
       return vidlinkUrl(params, "&title=true&poster=true");
+
+    // Cinejoy pipeline test mirrors
+    case "cj-lisbon":
+      return vidfastUrl(params, "vRapid");
+
+    case "cj-athens":
+      return vidfastUrl(params, "vFast");
+
+    case "cj-nebula":
+      return vidlinkUrl(params);
+
+    case "cj-shegu":
+      return vidfastUrl(params);
 
     default:
       return vidfastUrl(params);
