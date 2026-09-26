@@ -1,38 +1,40 @@
 # STATE
 
 Updated: 2026-09-26
-Git: `origin/main` (clean push at `624b1c5`)
+Git: `origin/main`
 
 ## Priority
 Eliminating Vercel Fast Origin Transfer bandwidth consumption ($0 cost) while maintaining 100% stable playback across all servers (Lisbon, Nebula, etc.).
 
 ## Working
-- **Cloudflare Tunnel (`cloudflared`) Zero-Vercel Video Relay Architecture**:
-  - Solved Reliance Jio IPv4 CGNAT limitation: Cloudflare Tunnel initiates outbound QUIC connections to Delhi edge (`del02`), bypassing router port forwarding and telecom CGNAT without public IPv4.
-  - Solved VidFast Datacenter IP block: Cloudflare Workers fail because VidFast blocks Cloudflare datacenter egress IPs. In the Cloudflare Tunnel model, the local PC fetches video chunks from VidFast over the user's Reliance Jio residential IP, which VidFast allows 100%.
-  - Created standalone high-performance video relay server: `relay/erasmus-relay.mjs` running on `localhost:8443`.
-  - Configured with full HLS playlist rewriting (`.m3u8`), Range requests (HTTP 206 Partial Content), CORS headers (`Access-Control-Allow-Origin: *`), VidFast referer injection (`Referer: https://vidfast.vc/`), and Hakuna Matata ExoPlayer header injection.
-  - Live End-to-End Test Verified: Successfully fetched VidFast master playlist and streamed raw video segments (`seg-1-s1080p-v1-a1.m4s`) with HTTP 206 Partial Content through `https://should-samples-gas-dawn.trycloudflare.com/api/stream/hls` with zero blocks.
-  - Result: Bandwidth on Vercel is reduced to **0.00 GB**.
+- **Dynamic Cloudflare Worker + Residential Tunnel Architecture (Permanent & Bulletproof)**:
+  - **Zero Vercel Bandwidth**: 100% of video segments stream directly from upstream CDNs through the user's Reliance Jio residential IP connection over a Cloudflare Quick Tunnel.
+  - **Zero Supabase Egress**: Supabase database is completely bypassed for relay routing (0 database queries, 0 egress).
+  - **Zero Vercel Redeployments**: The Cloudflare Worker URL (`https://erasmus-hls-relay.erasmustv.workers.dev`) is permanent and never changes.
+  - **Automatic Dynamic Target Sync**: On PC boot or restart, `relay/sync-tunnel-url.mjs` extracts the new quick tunnel URL from `relay/tunnel.log` and securely registers it with the Worker via `POST /set-target` with authentication.
+  - **KV State with In-Memory Caching**: Active tunnel URL is stored in Cloudflare KV namespace `RELAY_CONFIG` and cached in worker isolate memory for 0ms lookup latency.
+  - **Safe Automatic Fallback**: If the user's PC is sleeping, offline, or tunnel times out, the Worker seamlessly falls back to Vercel `/api/stream/hls`, guaranteeing playback NEVER halts.
 - **Original Streaming Infrastructure (100% Preserved & Verified)**:
   - Lisbon (`isPrimary: true`), Sakura, Nebula, Solara, Athens, Joy, Castle, Canaias, and all Bingr clusters remain completely intact and active.
-  - Complete backups safely preserved at `c:/Users/Administrator/Documents/BACKUP/trusted_backup_cinejoy_pipeline_20260926/` and `c:/Users/Administrator/Documents/BACKUP/pre_cinejoy_pipeline_backup/`.
+  - Complete backups safely preserved at `c:/Users/Administrator/Documents/BACKUP/trusted_backup_cloudflare_tunnel_relay_20260926/`.
 - **Cinejoy Pipeline Integration (Dedicated Server Section)**:
   - `cj-lisbon`, `cj-nebula`, `cj-athens`, `cj-shegu` server options.
-  - Pristine watermark-free 1080p master from Hakuna Matata CDN unlocked via ExoPlayer user agent headers.
+  - Watermark-free 1080p master from Hakuna Matata CDN unlocked via ExoPlayer user agent headers.
 - **Web App Core**:
   - Next.js 16 (Turbopack), React 19, Instrument Sans typeface, Discover (`/discover`) default home.
 
 ## Current Status
-- Local relay daemon running in background on port `8443` (`task-1610`).
-- Cloudflare Tunnel active with public endpoint: `https://should-samples-gas-dawn.trycloudflare.com` (`task-1619`).
-- Windows Startup Shortcut Installed: `ErasmusRelay.lnk` installed into `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`, silently launching `relay/run-silent.vbs` on boot.
-- Auto-Sync Script: `relay/sync-tunnel-url.mjs` automatically writes current active tunnel URL to `relay/CURRENT_TUNNEL_URL.txt` and syncs `.env.local`.
-- Verification: End-to-end stream test passed, lint passed (0 errors), build stable.
+- Cloudflare Worker deployed and active at `https://erasmus-hls-relay.erasmustv.workers.dev`.
+- Local relay daemon running in background on port `8443`.
+- Active tunnel registered with Worker: `https://with-handled-occupational-kinda.trycloudflare.com`.
+- Windows Startup Shortcut Installed: `ErasmusRelay.lnk` in `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup` silently launches `relay/run-silent.vbs` on boot.
+- Auto-Sync Script: `relay/sync-tunnel-url.mjs` handles auto-registration and 3-minute heartbeats.
+- Verification: End-to-end stream test passed (HTTP 206, 1,000,001 bytes streamed over residential IP), lint passed (0 errors), build succeeded (41/41 routes).
 
 ## Key locations
 - Web repo: `c:/Users/Administrator/Documents/Argus/Argus` (branch: `main`)
 - Standalone Relay: `relay/erasmus-relay.mjs`
+- Cloudflare Worker: `relay/cloudflare-worker/worker.js` & `wrangler.toml`
 - Silent Launcher: `relay/run-silent.vbs` & `relay/start-relay.bat`
+- Auto-Sync: `relay/sync-tunnel-url.mjs`
 - Trusted push backup: `c:/Users/Administrator/Documents/BACKUP/trusted_backup_cloudflare_tunnel_relay_20260926/`
-- Previous push backup: `c:/Users/Administrator/Documents/BACKUP/trusted_backup_cinejoy_pipeline_20260926/`

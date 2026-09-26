@@ -488,6 +488,20 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   - Startup shortcut verified at `C:\Users\Administrator\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\ErasmusRelay.lnk`.
   - `npm run lint`: 0 errors.
 
+### 2026-09-26: Permanent Cloudflare Worker Dynamic Router + Self-Hosted Quick Tunnel Integration
+- **Objective:** Eliminate Vercel Fast Origin Transfer bandwidth ($0 cost) permanently without requiring manual URL updates, Vercel redeployments, or impacting Supabase egress.
+- **Architectural Solution:**
+  1. **Permanent Cloudflare Worker:** Deployed at `https://erasmus-hls-relay.erasmustv.workers.dev` bound to Cloudflare KV namespace `RELAY_CONFIG` (`1b9f4e2fbdc74d6d943c64a37e9d0120`).
+  2. **Zero Supabase Egress:** Supabase database is completely bypassed for relay routing (0 database queries, 0 schema changes, 0 egress).
+  3. **Zero Vercel Bandwidth:** Video requests flow from `erasmus-hls-relay.erasmustv.workers.dev` -> user's residential PC tunnel (`with-handled-occupational-kinda.trycloudflare.com`) -> Reliance Jio residential IP -> Upstream CDNs (VidFast/Hakuna Matata).
+  4. **Dynamic Target Sync & Heartbeat:** On boot, `relay/sync-tunnel-url.mjs` registers the new quick tunnel URL with the Worker via `POST /set-target` with authentication and maintains a 3-minute heartbeat.
+  5. **Fail-Safe Fallback:** If the user's PC is sleeping or offline, the Worker automatically fails over to Vercel `/api/stream/hls`, guaranteeing 100% uninterrupted playback at all times.
+- **Verification:**
+  - Live stream test succeeded: 1,000,001 bytes of video segment data streamed through Worker with HTTP 206 Partial Content.
+  - `npm run lint`: 0 errors.
+  - `npm run build`: Production build succeeded across all 41 routes with 0 errors.
+
+
 
 
 

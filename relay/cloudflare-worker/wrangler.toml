@@ -1,0 +1,10 @@
+name = "erasmus-hls-relay"
+main = "worker.js"
+compatibility_date = "2025-09-01"
+
+[observability]
+enabled = true
+
+[[kv_namespaces]]
+binding = "RELAY_CONFIG"
+id = "1b9f4e2fbdc74d6d943c64a37e9d0120"
