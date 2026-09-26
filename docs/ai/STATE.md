@@ -32,6 +32,12 @@ Eliminating Vercel Fast Origin Transfer bandwidth consumption ($0 cost) while ma
 - Auto-Sync Script: `relay/sync-tunnel-url.mjs` handles auto-registration and 3-minute heartbeats.
 - Verification: End-to-end stream test passed (HTTP 206, 1,000,001 bytes streamed over residential IP), lint passed (0 errors), build succeeded (41/41 routes).
 
+## Active Verification Benchmark
+- **Baseline Timestamp:** 2026-09-26 11:33 AM IST
+- **Baseline Vercel Fast Origin Transfer:** 6.37 GB / 10 GB
+- **Monitoring Goal:** Confirm that Vercel Fast Origin Transfer bandwidth stays frozen at 6.37 GB during active streaming.
+
+
 ## Key locations
 - Web repo: `c:/Users/Administrator/Documents/Argus/Argus` (branch: `main`)
 - Standalone Relay: `relay/erasmus-relay.mjs`
