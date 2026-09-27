@@ -6,6 +6,7 @@ import {
   Heart,
   Home,
   Settings,
+  Search,
   Target,
   Tv,
   User,
@@ -29,6 +30,7 @@ export interface NavItem {
 }
 
 export const MAIN_NAV: readonly NavItem[] = [
+  { title: "Search", href: ROUTES.search, icon: Search, description: "Search the catalog" },
   {
     title: "Discover",
     href: ROUTES.discover,

@@ -25,7 +25,8 @@ import { backdropUrl } from "@/lib/media/image";
 
 export const metadata: Metadata = {
   title: "Anime",
-  description: "Explore trending, popular, and acclaimed Japanese animation series and films on Erasmus",
+  description:
+    "Explore trending, popular, and acclaimed Japanese animation series and films on Erasmus",
 };
 
 export const revalidate = 900;
@@ -44,7 +45,7 @@ export default async function AnimeBrowsePage({ searchParams }: PageProps) {
 
   if (!configured) {
     return (
-      <div className="content-container-fullbleed pt-[calc(var(--header-height)+1.5rem)]">
+      <div className="content-container-fullbleed pt-[calc(var(--header-height)+3rem)]">
         <CatalogConfigBanner />
       </div>
     );
@@ -54,14 +55,14 @@ export default async function AnimeBrowsePage({ searchParams }: PageProps) {
   const pageParam = typeof params.page === "string" ? Number(params.page) || 1 : 1;
   const hasFilters = Boolean(
     params.genre ||
-      params.year ||
-      params.rating ||
-      params.language ||
-      params.sort ||
-      params.type ||
-      params.explore === "true" ||
-      section ||
-      pageParam > 1,
+    params.year ||
+    params.rating ||
+    params.language ||
+    params.sort ||
+    params.type ||
+    params.explore === "true" ||
+    section ||
+    pageParam > 1,
   );
 
   const flatParams: Record<string, string | undefined> = {};
@@ -82,7 +83,7 @@ export default async function AnimeBrowsePage({ searchParams }: PageProps) {
           mediaType: activeType,
           voteCountGte: isTopRated ? 30 : 0,
           sortBy: isTopRated ? "vote_average.desc" : "popularity.desc",
-        })
+        }),
       ),
     ]);
 
@@ -101,15 +102,16 @@ export default async function AnimeBrowsePage({ searchParams }: PageProps) {
     }
 
     return (
-      <div className="relative w-full min-h-dvh">
+      <div className="relative min-h-dvh w-full">
         <h1 className="sr-only">Anime Catalog</h1>
 
-        <div className="content-container-fullbleed space-y-8 pb-16 pt-[calc(var(--header-height)+1.5rem)]">
+        <div className="content-container-fullbleed space-y-8 pt-[calc(var(--header-height)+3rem)] pb-16">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-section-title">Explore All Anime</h2>
-              <p className="text-meta mt-1 text-muted-foreground">
-                Showing page {result.page} of {result.totalPages} ({result.totalResults.toLocaleString()} total titles available)
+              <p className="text-meta text-muted-foreground mt-1">
+                Showing page {result.page} of {result.totalPages} (
+                {result.totalResults.toLocaleString()} total titles available)
               </p>
             </div>
             <Button asChild variant="outline" size="sm">
@@ -167,30 +169,27 @@ export default async function AnimeBrowsePage({ searchParams }: PageProps) {
 
   // Default view: Exact Discover Page layout with curated anime rows & hero banner
   return (
-    <div className="relative w-full min-h-dvh">
+    <div className="relative min-h-dvh w-full">
       <h1 className="sr-only">Anime — Japanese animation series and cinema on Erasmus</h1>
 
       {"error" in discoveryData && discoveryData.error ? (
-        <div className="content-container-fullbleed pt-[calc(var(--header-height)+1.5rem)]">
+        <div className="content-container-fullbleed pt-[calc(var(--header-height)+3rem)]">
           <div
-            className="animate-fade-up rounded-xl border-0 bg-destructive/12 px-4 py-3 text-sm text-destructive"
+            className="animate-fade-up bg-destructive/12 text-destructive rounded-xl border-0 px-4 py-3 text-sm"
             role="alert"
           >
             <p className="font-medium">Catalog temporarily unavailable</p>
-            <p className="mt-1 text-muted-foreground">{discoveryData.error}</p>
+            <p className="text-muted-foreground mt-1">{discoveryData.error}</p>
           </div>
         </div>
       ) : null}
 
       {heroItems.length > 0 ? <HeroBanner items={heroItems} intervalMs={6000} /> : null}
 
-      <div className="content-container-fullbleed space-y-10 pb-16 pt-6">
+      <div className="content-container-fullbleed space-y-10 pt-6 pb-16">
         <Suspense fallback={<Skeleton className="h-12 w-full rounded-xl" />}>
           <ScrollReveal delay={0.05}>
-            <GenreChips
-              genres={discoveryData.genres}
-              basePath="/anime"
-            />
+            <GenreChips genres={discoveryData.genres} basePath="/anime" />
           </ScrollReveal>
         </Suspense>
 
@@ -207,12 +206,15 @@ export default async function AnimeBrowsePage({ searchParams }: PageProps) {
         </div>
 
         {/* Bottom Catalog Explorer Access */}
-        <div className="pt-6 border-t border-border/40">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="border-border/40 border-t pt-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-semibold tracking-tight">Looking for all 11,400+ anime titles?</h3>
-              <p className="text-sm text-muted-foreground">
-                Browse through every Japanese animation series, OVA, and film provided by the catalog with custom filters.
+              <h3 className="text-lg font-semibold tracking-tight">
+                Looking for all 11,400+ anime titles?
+              </h3>
+              <p className="text-muted-foreground text-sm">
+                Browse through every Japanese animation series, OVA, and film provided by
+                the catalog with custom filters.
               </p>
             </div>
             <Button asChild>

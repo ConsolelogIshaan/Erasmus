@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 
 import { SHORTCUTS } from "@/constants/shortcuts";
-import { useUI } from "@/providers/ui-provider";
+import { ROUTES } from "@/constants/routes";
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -19,7 +19,6 @@ function isTypingTarget(target: EventTarget | null): boolean {
  */
 export function useKeyboardShortcuts() {
   const router = useRouter();
-  const { setCommandOpen, commandOpen } = useUI();
   const chordRef = React.useRef<string | null>(null);
   const chordTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -33,15 +32,16 @@ export function useKeyboardShortcuts() {
     }
 
     function onKeyDown(event: KeyboardEvent) {
-      // ⌘K / Ctrl+K always toggles command palette (even from inputs, Raycast-style)
+      // Search is available from inputs through the explicit keyboard shortcut.
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setCommandOpen((open) => !open);
+        router.push(ROUTES.search);
+        document.getElementById("catalog-search")?.focus();
         clearChord();
         return;
       }
 
-      if (isTypingTarget(event.target) || commandOpen) {
+      if (isTypingTarget(event.target)) {
         clearChord();
         return;
       }
@@ -49,7 +49,8 @@ export function useKeyboardShortcuts() {
       // "/" opens search
       if (event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey) {
         event.preventDefault();
-        setCommandOpen(true);
+        router.push(ROUTES.search);
+        document.getElementById("catalog-search")?.focus();
         clearChord();
         return;
       }
@@ -81,5 +82,5 @@ export function useKeyboardShortcuts() {
       window.removeEventListener("keydown", onKeyDown);
       clearChord();
     };
-  }, [commandOpen, router, setCommandOpen]);
+  }, [router]);
 }

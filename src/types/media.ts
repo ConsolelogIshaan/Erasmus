@@ -323,6 +323,8 @@ export interface SearchResultItem {
 
 export interface SearchResponse {
   query: string;
+  page?: number;
+  totalPages?: number;
   results: SearchResultItem[];
   totalResults: number;
   /** Hook for future AI search results in the same contract. */
