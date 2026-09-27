@@ -75,7 +75,7 @@ export function LandingHero({ posters = [] }: { posters?: ShowcasePoster[] }) {
       <div className="absolute bottom-8 left-1/2 hidden -translate-x-1/2 lg:block">
         <a
           href="#premise"
-          className="lx-rise group flex flex-col items-center gap-2 rounded-sm px-2 py-1"
+          className="lx-rise group flex flex-col items-center gap-2 rounded-md px-2 py-1"
           style={{ animationDelay: "780ms" }}
         >
           <span className="landing-mono transition-colors duration-200 group-hover:text-white/75">

@@ -65,7 +65,7 @@ function TomatoIcon({ score }: { score: number | null }) {
  */
 function ImdbBadge() {
   return (
-    <span className="inline-flex items-center justify-center rounded-[3px] bg-[#F5C518] px-1.5 py-0.5 text-[10px] font-black leading-none tracking-tight text-black shadow-sm select-none">
+    <span className="inline-flex items-center justify-center rounded-md bg-[#F5C518] px-1.5 py-0.5 text-[10px] font-black leading-none tracking-tight text-black shadow-sm select-none">
       IMDb
     </span>
   );

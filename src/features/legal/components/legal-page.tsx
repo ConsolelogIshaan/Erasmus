@@ -86,7 +86,7 @@ export function LegalPage({ title, lede, sections, pendingReview }: LegalPagePro
                   </span>
                   <a
                     href={`#${section.id}`}
-                    className="rounded-sm text-xs leading-6 text-white/55 transition-colors duration-200 hover:text-white/90 focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
+                    className="rounded-md text-xs leading-6 text-white/55 transition-colors duration-200 hover:text-white/90 focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
                   >
                     {section.title}
                   </a>
@@ -143,7 +143,7 @@ export function LegalCrossLink({ href, label }: { href: string; label: string })
   return (
     <Link
       href={href}
-      className="rounded-sm text-white/90 underline decoration-white/25 underline-offset-4 transition-colors duration-200 hover:decoration-white/60"
+      className="rounded-md text-white/90 underline decoration-white/25 underline-offset-4 transition-colors duration-200 hover:decoration-white/60"
     >
       {label}
     </Link>

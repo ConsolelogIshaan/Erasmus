@@ -55,7 +55,7 @@ const STATUS_BADGE: Record<QuickStatus, string> = {
 
 /** Height and styling for hover action buttons */
 const actionBtnClass =
-  "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-xs font-semibold backdrop-blur-xl transition-all duration-200 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50";
+  "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-full text-xs font-semibold backdrop-blur-xl transition-all duration-200 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50";
 
 /** Smooth settle — no snappy bounce that fights the layout. */
 const popTransition = {
@@ -207,11 +207,11 @@ export function PosterCard({
         />
 
         {rank != null ? (
-          <span className="pointer-events-none absolute top-0 left-0 z-[1] rounded-br-lg bg-black/80 px-2 py-1 font-mono text-xs font-semibold text-white tabular-nums backdrop-blur-sm">
+          <span className="pointer-events-none absolute top-0 left-0 z-[1] rounded-br-xl bg-black/80 px-2.5 py-1 font-mono text-xs font-semibold text-white tabular-nums backdrop-blur-sm">
             {rank}
           </span>
         ) : item.voteAverage != null && item.voteAverage > 0 ? (
-          <div className="pointer-events-none absolute top-2 left-2 z-[1] inline-flex items-center gap-1 rounded-md bg-black/65 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+          <div className="pointer-events-none absolute top-2 left-2 z-[1] inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
             <Star className="fill-primary text-primary h-3 w-3" aria-hidden="true" />
             {formatVote(item.voteAverage)}
           </div>
@@ -222,7 +222,7 @@ export function PosterCard({
           <span
             className={cn(
               "pointer-events-none absolute bottom-1.5 left-1.5 z-[1] inline-flex items-center",
-              "gap-1 rounded bg-[#f5c518] px-1.5 py-0.5 text-[10px] font-bold text-black",
+              "gap-1 rounded-full bg-[#f5c518] px-2 py-0.5 text-[10px] font-bold text-black",
               "transition-opacity duration-200 ease-out",
               showActions ? "opacity-0" : "opacity-100",
             )}
@@ -246,7 +246,7 @@ export function PosterCard({
                 duration: reduceMotion ? 0.01 : 0.18,
                 ease: [0.22, 1, 0.36, 1],
               }}
-              className="pointer-events-none absolute top-2 right-2 z-[1] rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
+              className="pointer-events-none absolute top-2 right-2 z-[1] rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
             >
               {STATUS_BADGE[lastStatus as QuickStatus]}
             </motion.div>

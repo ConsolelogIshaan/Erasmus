@@ -24,7 +24,7 @@ export function MediaShelfTabs({ tabs }: { tabs: ShelfTab[] }) {
           href={tab.href}
           aria-current={tab.active ? "page" : undefined}
           className={cn(
-            "focus-visible:ring-ring inline-flex items-center rounded-sm border px-3 py-1.5",
+            "focus-visible:ring-ring inline-flex items-center rounded-full border px-3.5 py-1.5",
             "text-xs font-medium transition-colors duration-200",
             "focus-visible:ring-2 focus-visible:outline-none",
             tab.active

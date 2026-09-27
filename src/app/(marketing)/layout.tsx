@@ -63,7 +63,7 @@ export default async function MarketingLayout({
                 <a
                   key={section.href}
                   href={section.href}
-                  className="landing-mono rounded-sm transition-colors duration-200 hover:text-white/80"
+                  className="landing-mono rounded-md transition-colors duration-200 hover:text-white/80"
                 >
                   {section.label}
                 </a>
@@ -73,13 +73,13 @@ export default async function MarketingLayout({
             <nav aria-label="Legal" className="flex flex-wrap gap-x-6 gap-y-2">
               <Link
                 href={ROUTES.privacy}
-                className="landing-mono rounded-sm transition-colors duration-200 hover:text-white/80"
+                className="landing-mono rounded-md transition-colors duration-200 hover:text-white/80"
               >
                 Privacy Policy
               </Link>
               <Link
                 href={ROUTES.terms}
-                className="landing-mono rounded-sm transition-colors duration-200 hover:text-white/80"
+                className="landing-mono rounded-md transition-colors duration-200 hover:text-white/80"
               >
                 Terms of Service
               </Link>

@@ -3,13 +3,12 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Boxy panel surface — hairline border, near-square corners, and the corner
- * tick from the landing page's instrument panels.
+ * Refined panel surface — hairline border, elegant rounded corners.
  */
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & { corner?: boolean }
->(({ className, corner = true, ...props }, ref) => (
+>(({ className, corner = false, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(

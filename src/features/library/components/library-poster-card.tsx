@@ -244,12 +244,12 @@ export function LibraryPosterCard({
               {/* Top-left badges (favorite / pinned) */}
               <div className="absolute left-2 top-2 flex items-center gap-1 z-10">
                 {entry.is_favorite ? (
-                  <span className="inline-flex rounded-md bg-black/65 p-1 text-primary backdrop-blur-sm">
+                  <span className="inline-flex rounded-full bg-black/65 p-1 text-primary backdrop-blur-sm">
                     <Heart className="h-3 w-3 fill-current" aria-label="Favorite" />
                   </span>
                 ) : null}
                 {entry.is_pinned ? (
-                  <span className="inline-flex rounded-md bg-black/65 p-1 text-white backdrop-blur-sm">
+                  <span className="inline-flex rounded-full bg-black/65 p-1 text-white backdrop-blur-sm">
                     <Pin className="h-3 w-3" aria-label="Pinned" />
                   </span>
                 ) : null}
@@ -259,7 +259,7 @@ export function LibraryPosterCard({
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-2.5 pb-2 pt-6 z-10 flex items-center justify-between">
                 <Badge
                   variant="secondary"
-                  className="h-5 max-w-[80%] truncate px-1.5 text-[10px] bg-black/75 backdrop-blur-md border border-white/10 text-white shadow-sm"
+                  className="h-5 max-w-[80%] truncate px-2 text-[10px] bg-black/75 backdrop-blur-md border border-white/10 text-white shadow-sm"
                 >
                   {badgeText}
                 </Badge>
@@ -267,7 +267,7 @@ export function LibraryPosterCard({
 
               {/* Full-width bottom edge progress bar */}
               {showProgress && progress > 0 && progress < 100 ? (
-                <div className="absolute inset-x-0 bottom-0 h-1 bg-black/60 z-20 overflow-hidden">
+                <div className="absolute inset-x-0 bottom-0 h-1 bg-black/60 z-20 overflow-hidden rounded-b-xl">
                   <div
                     className="h-full bg-primary shadow-[0_0_8px_rgba(var(--primary),0.8)]"
                     style={{ width: `${progress}%` }}
@@ -311,12 +311,12 @@ export function LibraryPosterCard({
 
               <div className="absolute left-1.5 top-1.5 flex flex-col gap-1 z-10">
                 {entry.is_favorite ? (
-                  <span className="inline-flex rounded-md bg-black/65 p-1 text-primary backdrop-blur-sm">
+                  <span className="inline-flex rounded-full bg-black/65 p-1 text-primary backdrop-blur-sm">
                     <Heart className="h-3 w-3 fill-current" aria-label="Favorite" />
                   </span>
                 ) : null}
                 {entry.is_pinned ? (
-                  <span className="inline-flex rounded-md bg-black/65 p-1 text-white backdrop-blur-sm">
+                  <span className="inline-flex rounded-full bg-black/65 p-1 text-white backdrop-blur-sm">
                     <Pin className="h-3 w-3" aria-label="Pinned" />
                   </span>
                 ) : null}

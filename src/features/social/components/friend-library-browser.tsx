@@ -157,7 +157,7 @@ function FilterChip({ label, count, active, onSelect }: FilterChipProps) {
       aria-selected={active}
       onClick={onSelect}
       className={cn(
-        "focus-visible:ring-ring inline-flex shrink-0 items-center gap-1.5 rounded-sm border px-2.5 py-1.5",
+        "focus-visible:ring-ring inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5",
         "text-xs font-medium transition-colors duration-200",
         "focus-visible:ring-2 focus-visible:outline-none",
         active

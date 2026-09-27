@@ -18,19 +18,19 @@
 --------------------------------------------------------------------------- */
 :root {
   /*
-   * Radii — boxy by design. The landing page's instrument-panel language
-   * (hairline borders, razor corners) is the product language too, so the
-   * scale is deliberately near-square. `--radius-full` stays round for the
-   * few things that must be: avatars, switches, scrollbar thumbs.
+   * Fluid, elegant radii — harmonious with the floating horizontal pill navbar.
+   * Subtle, refined squircle-like curvature inspired by Apple & Linear design systems:
+   * soft edges that feel tactile, coherent, and premium without being overly rounded.
    */
-  --radius-sm: 2px;
-  --radius-md: 2px;
-  --radius-lg: 3px;
-  --radius-xl: 3px;
-  --radius-2xl: 4px;
-  --radius-3xl: 4px;
+  --radius-xs: 0.25rem;   /* 4px  - micro indicators, tiny highlights */
+  --radius-sm: 0.375rem;  /* 6px  - badges, small tags, kbd keys */
+  --radius-md: 0.5rem;    /* 8px  - inputs, buttons, menu items, tabs */
+  --radius-lg: 0.75rem;   /* 12px - cards, popovers, dropdowns, media rows */
+  --radius-xl: 1rem;      /* 16px - poster cards, preview panels, media tiles */
+  --radius-2xl: 1.25rem;  /* 20px - dialogs, modal sheets, search container, hero cards */
+  --radius-3xl: 1.5rem;   /* 24px - large containers, showcase stages */
   --radius-full: 9999px;
-  --radius: 3px;
+  --radius: 0.75rem;      /* 12px default radius */
 
   --duration-fast: 180ms;
   --duration-normal: 320ms;
@@ -188,12 +188,14 @@
   --font-display:
     var(--font-instrument-sans), "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
 
+  --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
   --radius-2xl: var(--radius-2xl);
   --radius-3xl: var(--radius-3xl);
+  --radius: var(--radius);
 
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
@@ -752,34 +754,35 @@
   .glass-primary {
     background-color: hsl(var(--surface));
     border: 1px solid hsl(var(--surface-border));
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     box-shadow: none;
   }
 
   .glass-secondary {
     background-color: hsl(var(--surface-2));
     border: 1px solid hsl(var(--surface-border));
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     box-shadow: none;
   }
 
   .glass-thin {
     background-color: hsl(var(--surface));
     border: 1px solid hsl(var(--surface-border));
+    border-radius: var(--radius-lg);
     box-shadow: none;
   }
 
   .glass-heavy {
     background-color: hsl(var(--surface));
     border: 1px solid hsl(var(--surface-border));
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-xl);
     box-shadow: var(--shadow-md);
   }
 
   .glass-float {
     background-color: hsl(var(--surface));
     border: 1px solid hsl(var(--surface-border));
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-xl);
     box-shadow: var(--shadow-md);
   }
 
@@ -792,7 +795,7 @@
   .glass-sidebar {
     background-color: hsl(var(--sidebar));
     border: 1px solid hsl(var(--sidebar-border));
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-xl);
     box-shadow: none;
   }
 
@@ -801,7 +804,7 @@
   .clay-glass {
     background-color: hsl(var(--surface));
     border: 1px solid hsl(var(--surface-border));
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     box-shadow: none;
   }
 
@@ -827,7 +830,7 @@
   .glass-command {
     background-color: hsl(var(--background) / 0.82);
     border: 1px solid hsl(var(--border));
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-2xl);
     backdrop-filter: blur(20px) saturate(1.2);
     -webkit-backdrop-filter: blur(20px) saturate(1.2);
     box-shadow: var(--shadow-xl);
@@ -1220,7 +1223,8 @@
     background-color: hsl(var(--surface));
     border: 1px solid hsl(var(--surface-border));
     box-shadow: none;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
     transition:
       transform var(--duration-fast) var(--ease-lux),
       border-color var(--duration-fast) var(--ease-lux),
@@ -1258,28 +1262,12 @@
   }
 
   /*
-   * Corner tick — the precision detail from the landing panels. An L bracket
-   * in the accent colour, sitting on the panel's top-left corner.
-   * Requires a positioned ancestor.
+   * Corner tick — disabled for fluid rounded surfaces to avoid sharp 90° artifacts on curved corners.
    */
   .panel-corner::before,
   .panel-corner::after {
     content: "";
-    position: absolute;
-    top: -1px;
-    left: -1px;
-    background-color: hsl(var(--primary) / 0.65);
-    pointer-events: none;
-  }
-
-  .panel-corner::before {
-    width: 1.125rem;
-    height: 1px;
-  }
-
-  .panel-corner::after {
-    width: 1px;
-    height: 1.125rem;
+    display: none;
   }
 
   /* Hairline grid of cells — used for stat strips, as on the landing panel. */
@@ -1302,7 +1290,7 @@
   }
 
   .nav-pill {
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-full);
     transition:
       background-color var(--duration-normal) var(--ease-lux),
       color var(--duration-normal) var(--ease-lux),
@@ -1940,6 +1928,8 @@
     position: relative;
     isolation: isolate;
     border: 1px solid hsl(0 0% 100% / 0.075);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
     background:
       linear-gradient(
         180deg,
@@ -2016,7 +2006,7 @@
     letter-spacing: 0.01em;
     height: 3rem;
     padding-inline: 1.75rem;
-    border-radius: 2px;
+    border-radius: var(--radius-full);
     transition:
       transform 140ms var(--ease-electric),
       box-shadow 180ms var(--ease-electric),
@@ -2085,6 +2075,8 @@
   .lx-panel {
     position: relative;
     border: 1px solid hsl(0 0% 100% / 0.09);
+    border-radius: var(--radius-2xl);
+    overflow: hidden;
     background:
       linear-gradient(180deg, hsl(0 0% 100% / 0.04), transparent 45%), hsl(0 0% 4%);
     box-shadow: 0 40px 80px -40px hsl(0 0% 0% / 0.9);
@@ -2093,6 +2085,7 @@
   .lx-art {
     position: relative;
     overflow: hidden;
+    border-radius: var(--radius-lg);
     background-image:
       linear-gradient(
         155deg,
@@ -2136,26 +2129,12 @@
     animation: bar-rise 620ms var(--ease-electric) both;
   }
 
-  /* —— Angular corner tick — an instrument detail, not a rounded card —— */
+  /* —— Angular corner tick — disabled to preserve clean rounded corners —— */
 
   .lx-corner::before,
   .lx-corner::after {
     content: "";
-    position: absolute;
-    top: -1px;
-    left: -1px;
-    background-color: hsl(var(--electric) / 0.7);
-    pointer-events: none;
-  }
-
-  .lx-corner::before {
-    width: 1.25rem;
-    height: 1px;
-  }
-
-  .lx-corner::after {
-    width: 1px;
-    height: 1.25rem;
+    display: none;
   }
 
   /* —— Data visuals ——————————————————————————————————————— */

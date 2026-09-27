@@ -26,7 +26,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
           <Logo />
           <Link
             href={ROUTES.home}
-            className="landing-mono rounded-sm transition-colors duration-200 hover:text-white/80"
+            className="landing-mono rounded-md transition-colors duration-200 hover:text-white/80"
           >
             Back to site
           </Link>
@@ -45,13 +45,13 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
           <nav aria-label="Legal" className="flex flex-wrap gap-x-6 gap-y-2">
             <Link
               href={ROUTES.privacy}
-              className="landing-mono rounded-sm transition-colors duration-200 hover:text-white/80"
+              className="landing-mono rounded-md transition-colors duration-200 hover:text-white/80"
             >
               Privacy Policy
             </Link>
             <Link
               href={ROUTES.terms}
-              className="landing-mono rounded-sm transition-colors duration-200 hover:text-white/80"
+              className="landing-mono rounded-md transition-colors duration-200 hover:text-white/80"
             >
               Terms of Service
             </Link>

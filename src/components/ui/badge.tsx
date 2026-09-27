@@ -4,12 +4,12 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 /**
- * Mono status chip — sharp, hairline, uppercase and tracked, matching the
- * "STRONG" / "12-DAY STREAK" tags on the product panels.
+ * Pill status chip — subtle capsule, hairline border, uppercase and tracked,
+ * complementing the floating pill navigation language.
  */
 const badgeVariants = cva(
   [
-    "inline-flex items-center rounded-sm border px-2 py-0.5",
+    "inline-flex items-center rounded-full border px-2.5 py-0.5",
     "font-mono text-[0.625rem] font-medium uppercase tracking-[0.16em]",
     "transition-colors duration-200",
     "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",

@@ -350,18 +350,18 @@ export function HeroBanner({ items, item, intervalMs = 6000, ctaHref }: HeroBann
 
               {/* Badges Row */}
               <div className="flex flex-wrap items-center justify-center gap-2 sm:ml-2 sm:justify-start">
-                <span className="inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold tracking-wider text-white uppercase shadow-sm backdrop-blur-md">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold tracking-wider text-white uppercase shadow-sm backdrop-blur-md">
                   <Sparkles className="h-3 w-3 text-white/80" />
                   Featured
                 </span>
-                <span className="inline-flex items-center rounded-md border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-medium tracking-wider text-white/90 uppercase backdrop-blur-md">
+                <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-medium tracking-wider text-white/90 uppercase backdrop-blur-md">
                   {active.mediaType === "tv" ? "TV Series" : "Movie"}
                 </span>
                 {year ? (
                   <span className="px-1 text-xs font-medium text-white/70">{year}</span>
                 ) : null}
                 {active.voteAverage != null && active.voteAverage > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/30 bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-300 backdrop-blur-md">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/15 px-2.5 py-0.5 text-xs font-semibold text-amber-300 backdrop-blur-md">
                     <Star className="h-3 w-3 fill-amber-300" />
                     {formatVote(active.voteAverage)}
                   </span>

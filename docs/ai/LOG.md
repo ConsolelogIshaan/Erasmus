@@ -1347,7 +1347,6 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
      - `npm run test`: 20/20 test files passed (223/223 tests passed).
      - `npm run build`: 52/52 routes compiled cleanly.
      - Strictly 0 git push without explicit user instruction per `AGENTS.md`.
-
 ## 2026-09-27 9:42 PM IST | Ishaan | Antigravity
 - Optimized: Maximized Bandwidth Utilization ("Juice Internet") & Zero-Buffering Buffer Headroom:
   1. Root Objective:
@@ -1397,3 +1396,29 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   3. Verification:
      - git diff 016aedf src relay package.json: 0 diff lines (exact byte-for-byte match).
      - Strictly 0 git push without explicit user instruction per AGENTS.md.
+
+## 2026-09-27 9:58 PM IST | Paarth | Antigravity
+- Changed: Harmonized app-wide design language with the new floating horizontal pill navbar by replacing the razor-sharp boxy design language (2px–3px corners) with Apple/Linear-tier subtle rounded corners:
+  1. Design Tokens & Global Surfaces (`src/app/globals.css`):
+     - Replaced razor-corner radius overrides (`2px`, `3px`, `4px`) with an Apple-style radius hierarchy: `--radius-xs: 0.25rem` (4px), `--radius-sm: 0.375rem` (6px), `--radius-md: 0.5rem` (8px), `--radius-lg: 0.75rem` (12px), `--radius-xl: 1rem` (16px), `--radius-2xl: 1.25rem` (20px), `--radius-3xl: 1.5rem` (24px), `--radius-full: 9999px`.
+     - Updated Tailwind `@theme inline` mapping to match.
+     - Updated surface utility classes (`.surface-card`, `.glass-*`, `.clay-*`, `.lx-card`, `.lx-panel`) to use fluid squircle radii with hidden overflow.
+     - Disabled pseudo-element corner L-brackets on `.panel-corner` and `.lx-corner` to eliminate sharp 90-degree visual artifacts protruding from curved card corners.
+  2. UI Primitives (`src/components/ui/*`):
+     - `button.tsx`: Updated `buttonVariants` base to `rounded-md` (8px) for a modern, tactile feel.
+     - `input.tsx`: Changed from `rounded-sm` to `rounded-md` (8px), aligning with button height.
+     - `badge.tsx`: Converted mono status badges from `rounded-sm` to pill capsules (`rounded-full px-2.5 py-0.5`).
+     - `kbd.tsx`: Updated key chip corners from `rounded-sm` to `rounded-md`.
+     - `card.tsx`: Updated Card default to `corner={false}` and documented refined rounded surface.
+     - `tabs.tsx`: Styled `TabsList` and `TabsTrigger` as `rounded-full` segmented pill controls.
+  3. Feature Components & Media Cards:
+     - `hero-banner.tsx`: Metadata badges (Featured, TV/Movie, rating) updated to `rounded-full`.
+     - `poster-card.tsx`: Quick action buttons (`actionBtnClass`) updated to `rounded-full`, badges updated to `rounded-full`, rank badge updated to `rounded-br-xl`.
+     - `library-poster-card.tsx`: Favorite/pinned badges updated to `rounded-full`, bottom progress bar container updated with `rounded-b-xl`.
+     - `ratings-display.tsx`: `ImdbBadge` updated to `rounded-md`.
+     - `media-shelf-tabs.tsx`: Shelf tabs updated from `rounded-sm` to `rounded-full px-3.5 py-1.5`.
+     - `friend-library-browser.tsx`: `FilterChip` tabs updated from `rounded-sm` to `rounded-full px-3 py-1.5`.
+     - `landing-hero.tsx`, marketing & legal layouts: Updated inline links and cues to `rounded-md`.
+- Files: `src/app/globals.css`, `src/components/ui/button.tsx`, `src/components/ui/input.tsx`, `src/components/ui/badge.tsx`, `src/components/ui/kbd.tsx`, `src/components/ui/card.tsx`, `src/components/ui/tabs.tsx`, `src/features/media/components/hero-banner.tsx`, `src/features/media/components/poster-card.tsx`, `src/features/library/components/library-poster-card.tsx`, `src/features/media/components/ratings-display.tsx`, `src/features/media/components/media-shelf-tabs.tsx`, `src/features/social/components/friend-library-browser.tsx`, `src/features/marketing/components/landing-hero.tsx`, `src/features/legal/components/legal-page.tsx`, `src/app/(marketing)/layout.tsx`, `src/app/(legal)/layout.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified on `main` branch. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors, 11 warnings), `npm run test` passed (20/20 test files, 223/223 tests passed), `npm run build` compiled all 52 routes cleanly. Committed and pushed to `origin/main` per explicit user command.
+
