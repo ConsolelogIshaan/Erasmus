@@ -175,36 +175,46 @@ const worker = {
     );
 
     // Path 0: Direct Cloudflare Edge Fetch for video media chunks (.ts, .m4s, .mp4)
-    // Upstream CDNs (mintcastle, hunts439kow, quietridge, etc.) serve chunks directly
+    // Upstream CDNs (mintcastle, hunts439kow, quietridge, keenanchor, hakuna, etc.) serve chunks directly
     // when given the provider referer header. Fetching directly from Cloudflare's 330+ datacenter edge
     // gives multi-gigabit delivery and zero buffering, without bottlenecking through residential ISP.
     if (isMediaChunk) {
       try {
         const edgeHeaders = new Headers();
-        edgeHeaders.set(
-          "User-Agent",
-          request.headers.get("User-Agent") ||
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
-        );
-        const ref = requestUrl.searchParams.get("referer") || "https://vidfast.vc/";
-        edgeHeaders.set("Referer", ref);
+        const isHakuna = rawTarget.toLowerCase().includes("hakunaymatata");
+        const ref = requestUrl.searchParams.get("referer") || (isHakuna ? "" : "https://vidfast.vc/");
+        if (isHakuna) {
+          edgeHeaders.set("User-Agent", "ExoPlayer/1.5.1 (Linux; Android TV)");
+        } else {
+          edgeHeaders.set(
+            "User-Agent",
+            request.headers.get("User-Agent") ||
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+          );
+          if (ref) edgeHeaders.set("Referer", ref);
+        }
         const range = request.headers.get("Range");
         if (range) edgeHeaders.set("Range", range);
 
         const edgeCtrl = new AbortController();
-        const edgeTimeoutId = setTimeout(() => edgeCtrl.abort(), 12000);
+        const edgeTimeoutId = setTimeout(() => edgeCtrl.abort(), 15000);
 
         const directRes = await fetch(rawTarget, {
           method: request.method,
           headers: edgeHeaders,
           redirect: "follow",
           signal: edgeCtrl.signal,
+          cf: {
+            cacheEverything: true,
+            cacheTtl: 86400,
+          },
         });
         clearTimeout(edgeTimeoutId);
 
         if (directRes.ok || directRes.status === 206) {
           const resHeaders = new Headers(directRes.headers);
           resHeaders.set("Access-Control-Allow-Origin", "*");
+          resHeaders.set("Cache-Control", "public, max-age=86400, s-maxage=86400, immutable");
           return new Response(directRes.body, {
             status: directRes.status,
             headers: resHeaders,
@@ -274,13 +284,18 @@ const worker = {
     if (isPlaylist) {
       try {
         const edgeHeaders = new Headers();
-        edgeHeaders.set(
-          "User-Agent",
-          request.headers.get("User-Agent") ||
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
-        );
-        const ref = requestUrl.searchParams.get("referer") || "https://vidfast.vc/";
-        edgeHeaders.set("Referer", ref);
+        const isHakuna = rawTarget.toLowerCase().includes("hakunaymatata");
+        const ref = requestUrl.searchParams.get("referer") || (isHakuna ? "" : "https://vidfast.vc/");
+        if (isHakuna) {
+          edgeHeaders.set("User-Agent", "ExoPlayer/1.5.1 (Linux; Android TV)");
+        } else {
+          edgeHeaders.set(
+            "User-Agent",
+            request.headers.get("User-Agent") ||
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+          );
+          if (ref) edgeHeaders.set("Referer", ref);
+        }
 
         const edgeCtrl = new AbortController();
         const edgeTimeoutId = setTimeout(() => edgeCtrl.abort(), 12000);
@@ -290,6 +305,10 @@ const worker = {
           headers: edgeHeaders,
           redirect: "follow",
           signal: edgeCtrl.signal,
+          cf: {
+            cacheEverything: true,
+            cacheTtl: 60,
+          },
         });
         clearTimeout(edgeTimeoutId);
 

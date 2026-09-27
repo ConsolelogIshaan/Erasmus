@@ -26,7 +26,7 @@
 /** Local Next.js relay route. */
 export const LOCAL_HLS_RELAY = "/api/stream/hls";
 
-export const CLOUDFLARE_HLS_RELAY = "https://erasmus-hls-relay.ishaan-jangid1.workers.dev";
+export const CLOUDFLARE_HLS_RELAY = "https://erasmus-hls-relay.erasmustv.workers.dev";
 
 function resolveRelayBase(): string {
   const raw = process.env.NEXT_PUBLIC_HLS_RELAY_URL?.trim();

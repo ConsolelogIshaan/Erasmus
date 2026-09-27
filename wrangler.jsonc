@@ -15,6 +15,6 @@
   },
   "vars": {
     "NEXT_PUBLIC_IS_CLOUDFLARE": "true",
-    "NEXT_PUBLIC_HLS_RELAY_URL": "https://erasmus-hls-relay.ishaan-jangid1.workers.dev"
+    "NEXT_PUBLIC_HLS_RELAY_URL": "https://erasmus-hls-relay.erasmustv.workers.dev"
   }
 }

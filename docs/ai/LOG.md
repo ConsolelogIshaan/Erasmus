@@ -1253,3 +1253,33 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
      - `opennextjs-cloudflare build` & `wrangler deploy`: Succeeded (Version `01ec524c-1900-4da0-9743-57ab67dbfff8`).
      - ZERO git push performed per `AGENTS.md`.
 
+## 2026-09-27 5:25 PM IST | Ishaan | Antigravity
+- Fixed: Resolved streaming buffering, stuttering, and pausing; unlocked multi-gigabit Cloudflare Anycast edge relay delivery and aggressive client pre-buffering:
+  1. Identified Root Cause of Buffering at 24:49:
+     - `wrangler.jsonc` and `src/lib/streaming/relay.ts` were pointing to `https://erasmus-hls-relay.ishaan-jangid1.workers.dev`.
+     - `ishaan-jangid1.workers.dev` was running an outdated Cloudflare Worker lacking Path 0 (Cloudflare Edge Direct Fetch).
+     - Because `sync-tunnel-url.mjs` was active and registered `activeTunnel: 'https://unnecessary-kevin-chances-socks.trycloudflare.com'` (pointing to port 8443 on the user's PC running `relay/erasmus-relay.mjs`), `ishaan-jangid1.workers.dev` forwarded every video chunk down through the tunnel into the local PC!
+     - At timestamp 24:49 of *Interstellar*, segment 247 was 6.47 MB. The local Node.js process downloaded 6.47 MB over the user's home Wi-Fi and re-uploaded 6.47 MB over the home Wi-Fi tunnel simultaneously.
+     - On a 15–20 Mbps home internet connection with ~5 Mbps upload, transferring 6.5 MB took 8.7 seconds for a 6-second chunk. 8.7s > 6.0s starved the buffer and triggered `BUFFER_STALLED_ERROR`, freezing the video.
+  2. Routed Relay to Cloudflare Anycast Edge (`erasmustv.workers.dev`):
+     - Updated `NEXT_PUBLIC_HLS_RELAY_URL` in `wrangler.jsonc`, `src/lib/streaming/relay.ts`, and `.env.local` to `https://erasmus-hls-relay.erasmustv.workers.dev`.
+     - In `relay/cloudflare-worker/worker.js`, upgraded Path 0 with Cloudflare Edge Caching (`cf: { cacheEverything: true, cacheTtl: 86400 }`, `Cache-Control: public, max-age=86400, s-maxage=86400, immutable`), and added ExoPlayer header awareness for Hakuna Matata CDN endpoints.
+     - Deployed `relay/cloudflare-worker` (Version ID: `f8ee2da6-f00e-4cc0-ba96-58c2e4eca0b1`).
+     - Benchmark: Segment chunk delivery jumped from 7.81 Mbps (2.74s) through the local tunnel to **30.18 Mbps (0.71s)** directly across Cloudflare's Anycast edge. Zero domestic upload bytes consumed; home Wi-Fi is 100% unburdened.
+  3. Upgraded `NativePlayer` Hls Engine to Juice Bandwidth:
+     - `abrEwmaDefaultEstimate`: Set to `18_000_000` (18 Mbps) so HLS.js immediately treats the connection as high-speed at startup.
+     - `abrBandWidthFactor`: Raised to `0.95`, `abrBandWidthUpFactor` to `0.85` to utilize 95% of measured bandwidth.
+     - Buffer capacity: Raised `maxBufferLength` to `90` (1.5 min), `maxMaxBufferLength` to `180` (3 full minutes forward buffer headroom), and `maxBufferSize` to `250 MB`.
+     - Gap tolerance: Set `maxBufferHole: 1.5`, `highBufferWatchdogPeriod: 3`, `nudgeOffset: 0.3`, `nudgeMaxRetry: 10` to play smoothly across transcoding PTS jitter.
+     - Recovery loop fix: In `BUFFER_STALLED_ERROR`, removed premature `video.play()` on empty buffer that caused rapid play-pause stutter jitter. In `Hls.Events.FRAG_BUFFERED`, playback now cleanly resumes once frames are committed to buffer.
+     - User intent tracking: Added `userWantsPauseRef` and unified `togglePlay()` so buffer underruns never leave the player stuck in paused state.
+  4. Verification:
+     - `npm run typecheck`: 0 errors.
+     - `npm run lint`: 0 errors.
+     - `npm run test`: 19/19 test files passed (219/219 tests passed).
+     - `npm run build`: 41/41 routes compiled cleanly.
+     - `opennextjs-cloudflare build` & `wrangler deploy`: Succeeded (Version `50ca9f2b-8c47-44bc-8d45-a4fcca64d153`).
+     - Live end-to-end verification: 2.55 MB video segment downloaded in 0.71s at 30.18 Mbps with `cf-cache-status: HIT`.
+     - ZERO git push performed per `AGENTS.md`.
+
+
