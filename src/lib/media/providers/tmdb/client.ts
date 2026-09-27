@@ -160,12 +160,7 @@ async function resilientGet(
       const res = await fetch(url.toString(), {
         headers,
         signal: AbortSignal.timeout(6000),
-        // Cache TMDB JSON responses in Cloudflare edge Anycast cache (5 min TTL)
-        cf: {
-          cacheEverything: true,
-          cacheTtl: 300,
-        },
-      } as RequestInit);
+      });
       return {
         status: res.status,
         statusText: res.statusText,

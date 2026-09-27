@@ -642,20 +642,18 @@ export function NativePlayer({
         enableWebVTT: true,
         startFragPrefetch: true,
         progressive: true,
-        // Aggressive forward buffering to juice connection & eliminate buffering:
-        maxBufferLength: 120, // 2 minutes forward buffer
-        maxMaxBufferLength: 240, // Up to 4 minutes headroom when bandwidth allows
-        maxBufferSize: 180 * 1000 * 1000, // 180 MB MSE buffer ceiling for high-bitrate streams
-        maxBufferHole: 0.8,
-        // Responsive ABR: maximize quality using 95% of measured bandwidth
+        // Aggressive bandwidth & buffer optimization:
+        abrEwmaDefaultEstimate: 18_000_000,
         abrBandWidthFactor: 0.95,
-        abrBandWidthUpFactor: 0.75,
-        abrMaxWithRealBitrate: true,
-        // Safe watchdog: prevents stutter while recovering from decoder hiccups
-        highBufferWatchdogPeriod: 8,
-        nudgeOffset: 0.1,
-        nudgeMaxRetry: 5,
-        fragLoadingTimeOut: 25000,
+        abrBandWidthUpFactor: 0.85,
+        maxBufferLength: 90,
+        maxMaxBufferLength: 180,
+        maxBufferSize: 250 * 1000 * 1000,
+        maxBufferHole: 1.5,
+        highBufferWatchdogPeriod: 3,
+        nudgeOffset: 0.3,
+        nudgeMaxRetry: 10,
+        fragLoadingTimeOut: 20000,
         fragLoadingMaxRetry: 6,
         fragLoadingRetryDelay: 500,
         fragLoadingMaxRetryTimeout: 16000,
@@ -664,7 +662,8 @@ export function NativePlayer({
         levelLoadingTimeOut: 15000,
         levelLoadingMaxRetry: 5,
         lowLatencyMode: false,
-        backBufferLength: 60, // 60s back-buffer for instant rewind
+        backBufferLength: 30,
+        testBandwidth: true,
       });
       hlsRef.current = hls;
       hls.loadSource(activeSrc);
@@ -767,7 +766,7 @@ export function NativePlayer({
             setSelectedQualityTier("auto");
           }
         } else {
-          // Select optimal start level (prefer 1080p, then 720p, or best available)
+          // Select optimal start level (1080p or 720p) for instant, stutter-free startup
           let startIdx = -1;
           for (let i = 0; i < hls.levels.length; i++) {
             const lvl = hls.levels[i];
@@ -782,17 +781,6 @@ export function NativePlayer({
               if (lvl && (lvl.height === 720 || (lvl.height >= 600 && lvl.height < 900))) {
                 startIdx = i;
                 break;
-              }
-            }
-          }
-          if (startIdx < 0 && hls.levels.length > 0) {
-            let maxScore = -1;
-            for (let i = 0; i < hls.levels.length; i++) {
-              const lvl = hls.levels[i];
-              const score = (lvl?.height || 0) * 10000 + (lvl?.bitrate || 0);
-              if (score > maxScore) {
-                maxScore = score;
-                startIdx = i;
               }
             }
           }
@@ -828,7 +816,9 @@ export function NativePlayer({
         }
       });
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
-        setBuffering(false);
+        if (!video.paused) {
+          setBuffering(false);
+        }
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {

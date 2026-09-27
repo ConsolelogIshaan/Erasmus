@@ -1,39 +1,30 @@
 # STATE
 
-Updated: 2026-09-27 9:42 PM IST
-Git: `origin/main` (Clean working tree; verified build, lints, and tests; high-bandwidth buffering & low-latency streaming optimized)
+Updated: 2026-09-27 9:51 PM IST
+Git: `origin/main` (All source code restored to pre-1102 baseline commit `016aedf`; verified typecheck, lint, and tests)
 
 ## Priority
-Streaming/playback is stable, fast, and buffered ahead. Optimized `NativePlayer` to maximize user bandwidth ("juice internet") with high forward buffer headroom, 95% ABR bandwidth utilization, real bitrate estimation, and throttled playback progress persistence to eliminate UI thread frame-drops.
+Streaming/playback restored to the exact known-good working state from commit `016aedf` (before the recent Error 1102 optimizations and buffer experiments), per the user's explicit request.
 
-## Buffering & Bandwidth Optimizations Applied
-1. **Aggressive Forward Buffer Headroom (Zero Buffering)**:
-   - `maxBufferLength: 120` (2 minutes forward buffer).
-   - `maxMaxBufferLength: 240` (up to 4 minutes forward buffer headroom when bandwidth allows).
-   - `maxBufferSize: 180 * 1000 * 1000` (180 MB MSE buffer ceiling to accommodate high-bitrate 1080p and 4K streams).
-   - `backBufferLength: 60` (60 seconds back-buffer for instant, zero-rebuffer rewinds).
-
-2. **Responsive Adaptive Bitrate (Max Quality)**:
-   - `abrBandWidthFactor: 0.95`: Utilizes 95% of measured bandwidth to consistently target highest resolution tiers.
-   - `abrBandWidthUpFactor: 0.75`: Smooth and responsive quality step-ups without waiting for double bandwidth overhead.
-   - `abrMaxWithRealBitrate: true`: Measures actual downloaded segment throughput rather than theoretical manifest values, detecting high-speed connections immediately.
-   - Smart Start Level: Prefers 1080p for instant high-def playback startup, falling back to 720p or highest available stream.
-
-3. **Stutter-Free Watchdog Stability**:
-   - `highBufferWatchdogPeriod: 8` and `nudgeOffset: 0.1`: Gentle 100ms nudge only on genuine decoder stalls, completely immune to the 3-second rapid skip jitter loop.
-   - `maxBufferHole: 0.8`: Tight timestamp gap clearance.
-   - `fragLoadingTimeOut: 25000` with 6 retries and 500ms delay.
-
-4. **Throttled LocalStorage Sync During Playback**:
-   - In `streaming-theater-modal.tsx`, throttled `savePlaybackProgress` from firing 4x/sec (every 250ms `timeupdate`) down to once every 1500ms.
-   - Guaranteed full final position sync on modal close / pause. Eliminates main-thread JSON serialization spikes during video playback.
+## Current State
+- All codebase files in `src/`, `relay/`, and `package.json` are byte-for-byte restored to `016aedf`.
+- HLS relay restored to Account 2 (`https://erasmus-hls-relay.ishaan-jangid1.workers.dev`).
+- `NativePlayer` restored to its original pre-1102 configuration:
+  - `abrEwmaDefaultEstimate: 18_000_000`
+  - `abrBandWidthFactor: 0.95`
+  - `abrBandWidthUpFactor: 0.85`
+  - `maxBufferLength: 90`
+  - `maxMaxBufferLength: 180`
+  - `maxBufferSize: 250 * 1000 * 1000`
+  - `maxBufferHole: 1.5`
+  - `highBufferWatchdogPeriod: 3`
+  - `nudgeOffset: 0.3`
+  - `nudgeMaxRetry: 10`
+  - `testBandwidth: true`
+- All Error 1102 modifications made in `43a4c48`, `4bfb6a2`, and `62070e8` have been reverted.
 
 ---
 
 ## Verification Summary
-- `npm run typecheck`: 0 errors.
-- `npm run lint`: 0 errors (11 pre-existing warnings).
-- `npm run test`: All 20 test files passed (223/223 tests passed, 100% pass rate).
-- `npm run build`: 52/52 routes compiled cleanly.
-- Worker deployed: `erasmus-hls-relay.erasmustv.workers.dev` (Version `bc187618-abdf-4779-a9f6-d5421193a16d`).
-- Strictly 0 git push without explicit user instruction per `AGENTS.md`.
+- `git diff 016aedf src relay package.json`: 0 diff lines (exact match).
+- Zero remote `git push` performed per `AGENTS.md`.

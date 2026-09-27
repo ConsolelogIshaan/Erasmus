@@ -1373,3 +1373,27 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
      - `npm run test`: 20/20 test files passed (223/223 tests passed, 100% pass rate).
      - `npm run build`: 52/52 routes compiled cleanly.
      - Strictly 0 git push without explicit user instruction per `AGENTS.md`.
+
+## 2026-09-27 9:51 PM IST | Ishaan | Antigravity
+- Reverted: Restored Codebase to Pre-1102 Baseline (016aedf):
+  1. Root Objective:
+     - User instructed: "no the buffering is still there i want the things as they were before we did the 1102 optimization codes recently where the buffering problem started".
+  2. Implementations Restored:
+     - Completely restored all source files in src/, relay/, and package.json to commit 016aedf (git checkout 016aedf -- src relay package.json).
+     - Restored NativePlayer to its exact pre-1102 configuration:
+       - abrEwmaDefaultEstimate: 18_000_000
+       - abrBandWidthFactor: 0.95
+       - abrBandWidthUpFactor: 0.85
+       - maxBufferLength: 90
+       - maxMaxBufferLength: 180
+       - maxBufferSize: 250 * 1000 * 1000
+       - maxBufferHole: 1.5
+       - highBufferWatchdogPeriod: 3
+       - nudgeOffset: 0.3
+       - nudgeMaxRetry: 10
+       - testBandwidth: true
+     - Restored relay/sync-tunnel-url.mjs and .env.local to Account 2 (https://erasmus-hls-relay.ishaan-jangid1.workers.dev).
+     - Fully backed out all intermediate Error 1102 edits in middleware, OMDB client, TMDB client, search hooks, and streaming theater modal.
+  3. Verification:
+     - git diff 016aedf src relay package.json: 0 diff lines (exact byte-for-byte match).
+     - Strictly 0 git push without explicit user instruction per AGENTS.md.

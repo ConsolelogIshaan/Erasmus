@@ -75,14 +75,14 @@ export function useMediaSearch(query: string, enabled: boolean) {
     initialPageParam: 1,
     getNextPageParam: (last, _pages, page) =>
       page < Math.min(last.totalPages ?? 1, 500) ? page + 1 : undefined,
-    enabled: enabled && debounced.length >= 2,
+    enabled: enabled && debounced.length >= 1,
     staleTime: 30_000,
   });
 
   const trendingQuery = useQuery({
     queryKey: ["media-trending-search"],
     queryFn: fetchTrending,
-    enabled: enabled && debounced.length < 2,
+    enabled: enabled && debounced.length < 1,
     staleTime: 5 * 60_000,
   });
 
@@ -100,7 +100,7 @@ export function useMediaSearch(query: string, enabled: boolean) {
       query.trim() !== debounced ||
       (searchQuery.isFetching &&
         !searchQuery.isFetchingNextPage &&
-        debounced.length >= 2),
+        debounced.length >= 1),
     isError: searchQuery.isError,
     error: searchQuery.error,
     retry: searchQuery.refetch,
