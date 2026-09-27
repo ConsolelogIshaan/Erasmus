@@ -1,10 +1,10 @@
 # STATE
 
-Updated: 2026-09-27 5:25 PM IST
-Git: `origin/main` (Clean local working tree; verified build, lints, and tests)
+Updated: 2026-09-27 6:00 PM IST
+Git: `origin/main` (Clean local working tree; verified build, lints, tests, and pushed to remote upon explicit user command)
 
 ## Priority
-Zero buffering, zero stuttering, and zero playback freezes; maximizing user bandwidth utilization ("juicing" out 15–30+ Mbps connections with aggressive forward pre-buffering); Cloudflare Anycast edge relay delivery with edge RAM caching; zero domestic upload bandwidth strangulation (bypassing slow local tunnels); 100% clean builds and tests.
+Zero buffering, zero stuttering, and zero playback freezes; maximizing user bandwidth utilization ("juicing" out 15–30+ Mbps connections with aggressive forward pre-buffering); Cloudflare Anycast edge relay delivery with edge RAM caching; zero domestic upload bandwidth strangulation (bypassing slow local tunnels); 100% clean builds, lints, and tests.
 
 ---
 
@@ -26,7 +26,12 @@ Zero buffering, zero stuttering, and zero playback freezes; maximizing user band
    * **Edge Caching**: Configured with `cf: { cacheEverything: true, cacheTtl: 86400 }` and `Cache-Control: public, max-age=86400, s-maxage=86400, immutable`. Video segments hit Cloudflare's Edge RAM cache with `cf-cache-status: HIT`, returning in <15ms with 0 upstream latency!
    * **Status**: 100% OK. Verified delivering video segments at **30.18 Mbps** (0.71s for a 2.55 MB segment).
 
-3. **Database & Auth Backend**:
+3. **Account 2 (`ishaan.jangid1@gmail.com`) — Standby Streaming Relay**:
+   * **URL**: [https://erasmus-hls-relay.ishaan-jangid1.workers.dev](https://erasmus-hls-relay.ishaan-jangid1.workers.dev)
+   * **Role**: Dedicated 100k daily request pool. Currently idling on previous build.
+   * **Roadmap**: Ready to receive the updated `worker.js` via `npx wrangler deploy` once authenticated under `ishaan.jangid1@gmail.com` to restore the 200,000 requests/day dual-account split with identical 30 Mbps cloud delivery.
+
+4. **Database & Auth Backend**:
    * **Provider**: Supabase Cloud (`https://jnxflxtizbezqclxfmzc.supabase.co`).
    * **Role**: Persistent cloud database for watch history, continue watching, ratings, and user profiles. Completely independent of local PC and Vercel.
 
