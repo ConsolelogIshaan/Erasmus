@@ -1,7 +1,7 @@
 # STATE
 
-Updated: 2026-09-27 2:40 PM IST
-Git: `origin/main` (Rebased on latest upstream changes including Gossip Girl 2007 upstream shield and Polaris fixes)
+Updated: 2026-09-27 3:55 PM IST
+Git: `origin/main` (Clean local working tree; verified build and tests)
 
 ## Priority
 Maintaining 100% stable, seamless streaming across all devices; dual-account 200,000 requests/day split ($0 cost); full routing of Lisbon and all streaming servers to Account 2 (`ishaan.jangid1@gmail.com`); permanent elimination of excessive request loops on Cloudflare Workers; zero buffering, zero slideshow freezing, zero detail page crashes.
@@ -13,7 +13,7 @@ Maintaining 100% stable, seamless streaming across all devices; dual-account 200
 ### Cloudflare Deployment Topology (Dual-Account Split: 200,000 Free Requests/Day)
 1. **Account 1 (`shrdsubscriptions@gmail.com`) — Web Application (`erasmus-web`)**:
    * **URL**: [https://erasmus-web.erasmustv.workers.dev](https://erasmus-web.erasmustv.workers.dev)
-   * **Active Version ID**: `5cc30900-9d5e-443f-8334-992314256c99`
+   * **Active Version ID**: `c9074580-f962-4024-80f5-9dd5414b7234`
    * **Role**: Serves the Next.js App Router UI, page SSR, catalog discovery, search, TMDB client caching, and user authentication.
    * **Status**: 100% OK. Fully decoupled from video streaming. Request rate during active playback is ~0 req/min.
 2. **Account 2 (`ishaan.jangid1@gmail.com`) — Primary Streaming Relay (`erasmus-hls-relay`)**:

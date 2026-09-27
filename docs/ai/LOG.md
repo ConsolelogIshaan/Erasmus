@@ -1221,3 +1221,12 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Files: `src/lib/streaming/vidfast-direct.ts`, `src/lib/streaming/direct-stream.ts`, `src/lib/streaming/direct-stream.test.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 - Result: All 17 tests passed in `direct-stream.test.ts`. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run build` compiled all 41 routes successfully. Commits pushed to `origin/main` upon explicit user instruction.
 
+
+
+## 2026-09-27 3:55 PM IST | Ishaan | Antigravity
+- Fixed: 4K Quality Locking & Smooth Playback on 15-20 Mbps Connections.
+  1. Root cause: In native-player.tsx, whenever a single BUFFER_STALLED_ERROR fired, the handler executed `hls.currentLevel = -1`. This forcefully wiped out the user's manual quality selection and allowed HLS.js auto ABR to demote the stream to 1080p, 720p, or 480p.
+  2. In native-player.tsx: Added `selectedQualityTierRef` to guard `BUFFER_STALLED_ERROR`. When `selectedQualityTier !== "auto"`, `hls.currentLevel` is never reset to -1, permanently locking the player on the user's choice (4K/1080p/etc.).
+  3. Expanded buffer headroom: Raised `maxBufferSize` from 60MB to 120MB and `maxBufferLength` from 30s to 60s (`maxMaxBufferLength: 120s`), giving 15-20 Mbps connections ample pre-buffered 4K data so playback never stutters.
+  4. Zero Request Overhead: Chunks are fixed-duration (~6s), so total requests for any movie remain identical (~1,200 chunks). Requests are not increased.
+  5. Verification: npm run typecheck passed (0 errors), npm run lint passed (0 errors), npm run test passed (19/19 files, 217/217 tests), npm run build passed (41/41 routes). Deployed to Cloudflare Workers (Version: c9074580-f962-4024-80f5-9dd5414b7234).

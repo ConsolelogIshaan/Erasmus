@@ -461,6 +461,10 @@ export function NativePlayer({
   const [selectedQualityTier, setSelectedQualityTier] = React.useState<
     "auto" | "4k" | "1080p" | "720p" | "480p" | "360p"
   >(() => "auto");
+  const selectedQualityTierRef = React.useRef(selectedQualityTier);
+  React.useEffect(() => {
+    selectedQualityTierRef.current = selectedQualityTier;
+  }, [selectedQualityTier]);
   const switchTimeRef = React.useRef<number | null>(null);
   const [isMutedAutoplay, setIsMutedAutoplay] = React.useState(false);
   const [streamError, setStreamError] = React.useState<string | null>(null);
@@ -620,9 +624,9 @@ export function NativePlayer({
         enableWebVTT: true,
         startFragPrefetch: true,
         progressive: true,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        maxBufferSize: 60 * 1000 * 1000,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 120,
+        maxBufferSize: 120 * 1000 * 1000,
         maxBufferHole: 0.8,
         highBufferWatchdogPeriod: 8,
         nudgeOffset: 0.2,
@@ -791,9 +795,14 @@ export function NativePlayer({
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
-          if (hls.currentLevel !== -1) {
-            hls.currentLevel = -1;
+          // If the user manually locked a quality tier (e.g. 4K or 1080p),
+          // DO NOT reset currentLevel to -1 (Auto ABR)! Keep the level locked and simply buffer the next chunk.
+          if (selectedQualityTierRef.current === "auto") {
+            if (hls.currentLevel !== -1) {
+              hls.currentLevel = -1;
+            }
           }
+          setBuffering(true);
           hls.startLoad();
           if (video && video.paused) {
             video.play().catch(() => {});
@@ -1185,10 +1194,13 @@ export function NativePlayer({
         setPlayingWidth(lvl.width || 0);
       }
     }
+    setBuffering(true);
+    hls.startLoad();
     setPanel("none");
   };
 
   const selectQualityTier = (tier: "auto" | "4k" | "1080p" | "720p" | "480p" | "360p") => {
+    selectedQualityTierRef.current = tier;
     setSelectedQualityTier(tier);
     const hls = hlsRef.current;
     const video = videoRef.current;

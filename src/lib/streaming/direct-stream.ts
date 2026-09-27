@@ -235,37 +235,39 @@ export async function extractDirectStream(input: {
     }
 
     // 2.6. Vidlink pristine edge fallback for Lisbon and other non-Bingr servers
-    try {
-      const vidlinkHit = await resolveVidlinkStream({
-        type: input.type,
-        tmdbId: input.tmdbId,
-        season: input.season,
-        episode: input.episode,
-        serverName: effectiveServerId === "nebula" ? "Nebula" : "Lisbon (Direct)",
-      });
-      if (vidlinkHit?.url) {
-        const result: DirectStreamResult = {
-          ok: true,
-          referer: vidlinkHit.referer,
-          captions: vidlinkHit.captions,
-          servers: [
-            {
-              name: effectiveServerId === "nebula" ? "Nebula" : (effectiveServerId === "lisbon" ? "Lisbon (Direct)" : vidlinkHit.serverName),
-              url: vidlinkHit.url,
-              kind: vidlinkHit.kind,
-              is4K: vidlinkHit.is4K,
-              hdUrl: vidlinkHit.hdUrl,
-              fourKUrl: vidlinkHit.fourKUrl,
-              isDirectCors: vidlinkHit.isDirectCors,
-              ms: Date.now() - started,
-            },
-          ],
-        };
-        extractCache.set(cacheKey, { at: Date.now(), result });
-        return result;
+    if (!isBingrServer || effectiveServerId === "nebula") {
+      try {
+        const vidlinkHit = await resolveVidlinkStream({
+          type: input.type,
+          tmdbId: input.tmdbId,
+          season: input.season,
+          episode: input.episode,
+          serverName: effectiveServerId === "nebula" ? "Nebula" : "Lisbon (Direct)",
+        });
+        if (vidlinkHit?.url) {
+          const result: DirectStreamResult = {
+            ok: true,
+            referer: vidlinkHit.referer,
+            captions: vidlinkHit.captions,
+            servers: [
+              {
+                name: effectiveServerId === "nebula" ? "Nebula" : (effectiveServerId === "lisbon" ? "Lisbon (Direct)" : vidlinkHit.serverName),
+                url: vidlinkHit.url,
+                kind: vidlinkHit.kind,
+                is4K: vidlinkHit.is4K,
+                hdUrl: vidlinkHit.hdUrl,
+                fourKUrl: vidlinkHit.fourKUrl,
+                isDirectCors: vidlinkHit.isDirectCors,
+                ms: Date.now() - started,
+              },
+            ],
+          };
+          extractCache.set(cacheKey, { at: Date.now(), result });
+          return result;
+        }
+      } catch (err) {
+        debugLog += `vidlink-fallback: ${err instanceof Error ? err.message : "failed"}; `;
       }
-    } catch (err) {
-      debugLog += `vidlink-fallback: ${err instanceof Error ? err.message : "failed"}; `;
     }
 
     // 3 & 4. Fallback to Bingr and Cinejoy in parallel if not already resolved
