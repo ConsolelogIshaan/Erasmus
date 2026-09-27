@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --webpack",
+    "build:worker": "opennextjs-cloudflare build",
+    "deploy:worker": "opennextjs-cloudflare deploy",
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

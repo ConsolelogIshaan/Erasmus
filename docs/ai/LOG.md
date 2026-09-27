@@ -1297,3 +1297,13 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Focused search tests: 9 passed. Typecheck, lint, and production build passed; lint retains existing warnings.
 - Local browser preview confirmed the authentication gate; authenticated UI inspection was not possible in the current browser session.
 - Existing navbar work retained. No streaming changes, dependencies, commits, deployments, or pushes.
+
+## 2026-09-27 7:18 PM IST | Ishaan | Antigravity
+- Configured Cloudflare Workers CI Git integration:
+  1. Connected repository `ConsolelogIshaan/Erasmus` directly to `erasmus-web` under Cloudflare Workers & Pages.
+  2. Set OpenNext Build command: `npx opennextjs-cloudflare build` and Deploy command: `npx wrangler deploy`.
+  3. Added convenience scripts to `package.json`: `"build:worker": "opennextjs-cloudflare build"`, `"deploy:worker": "opennextjs-cloudflare deploy"`.
+  4. Verified all production runtime variables and secrets are already present in Cloudflare Dashboard.
+  5. Verified `npm run typecheck` (0 errors), `npm run lint` (0 errors), `npm run test` (20/20 files, 223/223 tests passed), and `npm run build` (42/42 routes compiled cleanly).
+  6. Pushed to `origin/main` to trigger the first automated Cloudflare Workers CI build.
+
