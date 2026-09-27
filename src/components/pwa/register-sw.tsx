@@ -3,67 +3,34 @@
 import * as React from "react";
 
 /**
- * Registers the service worker in production and forces updates after deploys
- * so users don't stay stuck on a cached shell.
+ * Actively purges legacy service workers and stale CacheStorage
+ * across all client browsers to prevent reload loops and stale JS bundles.
  */
 export function RegisterServiceWorker() {
   React.useEffect(() => {
-    if (process.env.NODE_ENV !== "production") return;
-    if (!("serviceWorker" in navigator)) return;
+    if (typeof window === "undefined") return;
 
-    let refreshing = false;
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((registrations) => {
+          for (const reg of registrations) {
+            reg.unregister().catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }
 
-    const onControllerChange = () => {
-      if (refreshing) return;
-      refreshing = true;
-      window.location.reload();
-    };
-
-    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
-
-    navigator.serviceWorker
-      .register("/sw.js")
-      .then((reg) => {
-        // Check for a new SW when the tab becomes visible (post-deploy)
-        const check = () => {
-          void reg.update();
-        };
-        document.addEventListener("visibilitychange", () => {
-          if (document.visibilityState === "visible") check();
-        });
-        // Immediate update check on load
-        check();
-
-        if (reg.waiting) {
-          reg.waiting.postMessage({ type: "SKIP_WAITING" });
-        }
-
-        reg.addEventListener("updatefound", () => {
-          const worker = reg.installing;
-          if (!worker) return;
-          worker.addEventListener("statechange", () => {
-            if (worker.state === "installed" && navigator.serviceWorker.controller) {
-              // New version ready — activate immediately
-              worker.postMessage({ type: "SKIP_WAITING" });
-            }
-          });
-        });
-      })
-      .catch((err) => {
-        console.warn("[pwa] SW registration failed", err);
-      });
-
-    // Listen for skip waiting messages (older SW may not care)
-    navigator.serviceWorker.addEventListener("message", (event) => {
-      if (event.data?.type === "RELOAD") window.location.reload();
-    });
-
-    return () => {
-      navigator.serviceWorker.removeEventListener(
-        "controllerchange",
-        onControllerChange,
-      );
-    };
+    if ("caches" in window) {
+      caches
+        .keys()
+        .then((keys) => {
+          for (const key of keys) {
+            caches.delete(key).catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   return null;

@@ -1,4 +1,3 @@
-import { getMediaProvider } from "@/lib/media/providers";
 import { discoverMovies, discoverTv, getTvGenres, getMovieGenres } from "./catalog";
 import { extractAmbientColors } from "./ambient-colors";
 import { backdropUrl } from "./image";
@@ -72,8 +71,6 @@ export async function getAnimeDiscoveryHome(): Promise<{
   sections: DiscoverySection[];
   genres: Genre[];
 }> {
-  const provider = getMediaProvider();
-
   const [
     popularTv,
     popularMovies,
@@ -117,9 +114,9 @@ export async function getAnimeDiscoveryHome(): Promise<{
 
   // Combine top TV and film anime for rotating hero banner
   const heroPool: MediaSummary[] = [
-    ...popularTv.results.slice(0, 6),
-    ...popularMovies.results.slice(0, 4),
-    ...topRatedTv.results.slice(0, 4),
+    ...popularTv.results.slice(0, 4),
+    ...popularMovies.results.slice(0, 3),
+    ...topRatedTv.results.slice(0, 3),
   ];
 
   const seen = new Set<string>();
@@ -128,35 +125,18 @@ export async function getAnimeDiscoveryHome(): Promise<{
     if (seen.has(key)) return false;
     seen.add(key);
     return Boolean(item.backdropPath || item.posterPath);
-  }).slice(0, 10);
+  }).slice(0, 5);
 
-  // Pre-enrich hero items with official logos, taglines, and ambient palettes
   const heroItems: HeroBannerMediaItem[] = await Promise.all(
     uniqueHeroRaw.map(async (item) => {
-      let logoPath: string | null = null;
-      let tagline: string | null = null;
-      try {
-        if (item.mediaType === "movie") {
-          const m = await provider.getMovie(item.id);
-          logoPath = m?.logoPath ?? null;
-          tagline = m?.tagline ?? null;
-        } else {
-          const t = await provider.getTvShow(item.id);
-          logoPath = t?.logoPath ?? null;
-          tagline = t?.tagline ?? null;
-        }
-      } catch {
-        // Continue with basic metadata if details fetch fails
-      }
-
       const imgPath = item.backdropPath ?? item.posterPath;
       const palette = await extractAmbientColors(imgPath);
       const backdrop = backdropUrl(imgPath, "w1280");
 
       return {
         ...item,
-        logoPath,
-        tagline,
+        logoPath: null,
+        tagline: null,
         ambientPalette: palette,
         ambientBackdropUrl: backdrop,
       };
@@ -170,43 +150,43 @@ export async function getAnimeDiscoveryHome(): Promise<{
       id: "popular-series",
       title: "Popular Anime Series",
       href: "/anime?type=tv&sort=popularity.desc",
-      items: popularTv.results.slice(0, 18),
+      items: popularTv.results.slice(0, 12),
     },
     {
       id: "popular-movies",
       title: "Acclaimed Anime Films",
       href: "/anime?type=movie&sort=popularity.desc",
-      items: popularMovies.results.slice(0, 18),
+      items: popularMovies.results.slice(0, 12),
     },
     {
       id: "top-rated",
       title: "Top Rated Masterpieces",
       href: "/anime?sort=vote_average.desc",
-      items: topRatedTv.results.slice(0, 18),
+      items: topRatedTv.results.slice(0, 12),
     },
     {
       id: "action-shonen",
       title: "Action & Shonen",
       href: "/anime?genre=10759",
-      items: actionTv.results.slice(0, 18),
+      items: actionTv.results.slice(0, 12),
     },
     {
       id: "fantasy-isekai",
       title: "Fantasy & Isekai",
       href: "/anime?genre=10765",
-      items: fantasyTv.results.slice(0, 18),
+      items: fantasyTv.results.slice(0, 12),
     },
     {
       id: "comedy-slice-of-life",
       title: "Comedy & Slice of Life",
       href: "/anime?genre=35",
-      items: comedyTv.results.slice(0, 18),
+      items: comedyTv.results.slice(0, 12),
     },
     {
       id: "recent-simulcasts",
       title: "New & Recent Simulcasts",
       href: "/anime?sort=release_date.desc",
-      items: recentTv.results.slice(0, 18),
+      items: recentTv.results.slice(0, 12),
     },
   ];
 
@@ -220,9 +200,39 @@ export async function getAnimeDiscoveryHome(): Promise<{
   };
 }
 
-export async function safeGetAnimeDiscoveryHome() {
+let cachedAnimeHome: { data: Awaited<ReturnType<typeof getAnimeDiscoveryHome>>; timestamp: number } | null = null;
+let inFlightAnime: Promise<Awaited<ReturnType<typeof getAnimeDiscoveryHome>>> | null = null;
+const ANIME_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
+export async function safeGetAnimeDiscoveryHome(): Promise<
+  | (Awaited<ReturnType<typeof getAnimeDiscoveryHome>> & { configured: true; error?: never })
+  | {
+      hero: null;
+      heroItems: never[];
+      sections: never[];
+      genres: never[];
+      configured: true;
+      error: string;
+    }
+> {
+  const now = Date.now();
+  if (cachedAnimeHome && now - cachedAnimeHome.timestamp < ANIME_CACHE_TTL) {
+    return { ...cachedAnimeHome.data, configured: true };
+  }
+  if (inFlightAnime) {
+    try {
+      const data = await inFlightAnime;
+      return { ...data, configured: true };
+    } catch {
+      // Fall through to retry
+    }
+  }
+
   try {
-    return await getAnimeDiscoveryHome();
+    inFlightAnime = getAnimeDiscoveryHome();
+    const data = await inFlightAnime;
+    cachedAnimeHome = { data, timestamp: Date.now() };
+    return { ...data, configured: true };
   } catch (error) {
     console.error("[anime] Failed to load anime discovery home:", error);
     return {
@@ -233,5 +243,7 @@ export async function safeGetAnimeDiscoveryHome() {
       configured: true,
       error: error instanceof Error ? error.message : "Failed to load anime catalog",
     };
+  } finally {
+    inFlightAnime = null;
   }
 }

@@ -11,7 +11,6 @@ import { FilterBar } from "@/features/media/components/filter-bar";
 import { ImdbTopGrid } from "@/features/media/components/imdb-top-grid";
 import { PaginationControls } from "@/features/media/components/pagination-controls";
 import { CatalogConfigBanner } from "@/features/media/components/catalog-config-banner";
-import { PageLoader } from "@/components/feedback/page-loader";
 import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -259,8 +258,4 @@ export default async function MoviesPage({ searchParams }: PageProps) {
       </div>
     </div>
   );
-}
-
-export function MoviesLoading() {
-  return <PageLoader />;
 }

@@ -3,6 +3,7 @@
  * Features and pages call this layer — not providers or HTTP clients directly.
  */
 
+import { cache } from "react";
 import type {
   CollectionDetails,
   DiscoverySection,
@@ -32,56 +33,105 @@ export async function searchCatalog(
   return getMediaProvider().search(query, { page });
 }
 
-export async function getMovie(id: string): Promise<MovieDetails | null> {
+const itemCache = new Map<string, { at: number; data: unknown }>();
+const ITEM_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
+export const getMovie = cache(async function getMovie(id: string): Promise<MovieDetails | null> {
+  const cacheKey = `movie:${id}`;
+  const cached = itemCache.get(cacheKey) as { at: number; data: MovieDetails } | undefined;
+  if (cached && Date.now() - cached.at < ITEM_CACHE_TTL) {
+    return cached.data;
+  }
   const movie = await getMediaProvider().getMovie(id);
   if (!movie) return null;
-  const ratings = await enrichRatings({
-    imdbId: movie.imdbId,
-    title: movie.title,
-    releaseDate: movie.releaseDate,
-    mediaType: "movie",
-    voteAverage: movie.voteAverage,
-    voteCount: movie.voteCount,
-  });
-  return { ...movie, ratings };
-}
+  let ratings = movie.ratings;
+  try {
+    ratings = await enrichRatings({
+      imdbId: movie.imdbId,
+      title: movie.title,
+      releaseDate: movie.releaseDate,
+      mediaType: "movie",
+      voteAverage: movie.voteAverage,
+      voteCount: movie.voteCount,
+    });
+  } catch (err) {
+    console.warn(`[catalog] ratings enrichment failed for movie ${id}:`, err instanceof Error ? err.message : err);
+  }
+  const data: MovieDetails = { ...movie, ratings };
+  if (itemCache.size > 500) itemCache.clear();
+  itemCache.set(cacheKey, { at: Date.now(), data });
+  return data;
+});
 
-export async function getTvShow(id: string): Promise<TvDetails | null> {
+export const getTvShow = cache(async function getTvShow(id: string): Promise<TvDetails | null> {
+  const cacheKey = `tv:${id}`;
+  const cached = itemCache.get(cacheKey) as { at: number; data: TvDetails } | undefined;
+  if (cached && Date.now() - cached.at < ITEM_CACHE_TTL) {
+    return cached.data;
+  }
   const show = await getMediaProvider().getTvShow(id);
   if (!show) return null;
-  const ratings = await enrichRatings({
-    imdbId: show.imdbId,
-    title: show.title,
-    releaseDate: show.firstAirDate ?? show.releaseDate,
-    mediaType: "tv",
-    voteAverage: show.voteAverage,
-    voteCount: show.voteCount,
-  });
-  return { ...show, ratings };
-}
+  let ratings = show.ratings;
+  try {
+    ratings = await enrichRatings({
+      imdbId: show.imdbId,
+      title: show.title,
+      releaseDate: show.firstAirDate ?? show.releaseDate,
+      mediaType: "tv",
+      voteAverage: show.voteAverage,
+      voteCount: show.voteCount,
+    });
+  } catch (err) {
+    console.warn(`[catalog] ratings enrichment failed for tv ${id}:`, err instanceof Error ? err.message : err);
+  }
+  const data: TvDetails = { ...show, ratings };
+  if (itemCache.size > 500) itemCache.clear();
+  itemCache.set(cacheKey, { at: Date.now(), data });
+  return data;
+});
 
-export async function getTvSeason(
+export const getTvSeason = cache(async function getTvSeason(
   showId: string,
   seasonNumber: number,
 ): Promise<TvSeason | null> {
-  return getMediaProvider().getTvSeason(showId, seasonNumber);
-}
+  const cacheKey = `season:${showId}:${seasonNumber}`;
+  const cached = itemCache.get(cacheKey) as { at: number; data: TvSeason } | undefined;
+  if (cached && Date.now() - cached.at < ITEM_CACHE_TTL) {
+    return cached.data;
+  }
+  const data = await getMediaProvider().getTvSeason(showId, seasonNumber);
+  if (data) {
+    if (itemCache.size > 500) itemCache.clear();
+    itemCache.set(cacheKey, { at: Date.now(), data });
+  }
+  return data;
+});
 
-export async function getPerson(id: string): Promise<PersonDetails | null> {
-  return getMediaProvider().getPerson(id);
-}
+export const getPerson = cache(async function getPerson(id: string): Promise<PersonDetails | null> {
+  const cacheKey = `person:${id}`;
+  const cached = itemCache.get(cacheKey) as { at: number; data: PersonDetails } | undefined;
+  if (cached && Date.now() - cached.at < ITEM_CACHE_TTL) {
+    return cached.data;
+  }
+  const data = await getMediaProvider().getPerson(id);
+  if (data) {
+    if (itemCache.size > 500) itemCache.clear();
+    itemCache.set(cacheKey, { at: Date.now(), data });
+  }
+  return data;
+});
 
-export async function getCollection(id: string): Promise<CollectionDetails | null> {
+export const getCollection = cache(async function getCollection(id: string): Promise<CollectionDetails | null> {
   return getMediaProvider().getCollection(id);
-}
+});
 
-export async function getMovieGenres(): Promise<Genre[]> {
+export const getMovieGenres = cache(async function getMovieGenres(): Promise<Genre[]> {
   return getMediaProvider().getMovieGenres();
-}
+});
 
-export async function getTvGenres(): Promise<Genre[]> {
+export const getTvGenres = cache(async function getTvGenres(): Promise<Genre[]> {
   return getMediaProvider().getTvGenres();
-}
+});
 
 export async function discoverMovies(
   filters: MediaDiscoverFilters,
@@ -174,37 +224,13 @@ export async function getDiscoveryHome(): Promise<{
     ...popularTv.results,
   ];
   const seen = new Set<string>();
-  const heroItemsRaw = heroPool.filter((item) => {
+  const heroItems = heroPool.filter((item) => {
     const key = `${item.mediaType}:${item.id}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return Boolean(item.backdropPath || item.posterPath);
-  }).slice(0, 10);
+  }).slice(0, 5);
 
-  // Pre-enrich hero items with official logos & taglines so they render instantly with 0 client delay
-  const heroItems = await Promise.all(
-    heroItemsRaw.map(async (item) => {
-      try {
-        if (item.mediaType === "movie") {
-          const m = await provider.getMovie(item.id);
-          return {
-            ...item,
-            logoPath: m?.logoPath ?? null,
-            tagline: m?.tagline ?? null,
-          };
-        } else {
-          const t = await provider.getTvShow(item.id);
-          return {
-            ...item,
-            logoPath: t?.logoPath ?? null,
-            tagline: t?.tagline ?? null,
-          };
-        }
-      } catch {
-        return item;
-      }
-    }),
-  );
   const hero = heroItems[0] ?? trending.results[0] ?? popularMovies.results[0] ?? null;
 
   // Soft approach — use top trending items as "Editor's picks" placeholder
@@ -217,56 +243,55 @@ export async function getDiscoveryHome(): Promise<{
       id: "trending",
       title: "Trending Today",
       href: "/discover?section=trending",
-      items: trending.results.slice(0, 18),
+      items: trending.results.slice(0, 12),
     },
     {
       id: "popular-movies",
       title: "Popular Movies",
       href: "/movies?sort=popularity.desc",
-      items: popularMovies.results.slice(0, 18),
+      items: popularMovies.results.slice(0, 12),
     },
     {
       id: "popular-tv",
       title: "Popular TV Shows",
       href: "/tv?sort=popularity.desc",
-      items: popularTv.results.slice(0, 18),
+      items: popularTv.results.slice(0, 12),
     },
     {
       id: "now-playing",
       title: "Now Playing",
       href: "/movies?section=now_playing",
-      items: nowPlaying.results.slice(0, 18),
+      items: nowPlaying.results.slice(0, 12),
     },
     {
       id: "upcoming",
       title: "Upcoming Movies",
       href: "/movies?section=upcoming",
-      items: upcoming.results.slice(0, 18),
+      items: upcoming.results.slice(0, 12),
     },
     {
       id: "top-movies",
       title: "Top Rated Movies",
       href: "/movies?sort=vote_average.desc",
-      items: topMovies.results.slice(0, 18),
+      items: topMovies.results.slice(0, 12),
     },
     {
       id: "top-tv",
       title: "Top Rated Shows",
       href: "/tv?sort=vote_average.desc",
-      items: topTv.results.slice(0, 18),
+      items: topTv.results.slice(0, 12),
     },
     {
       id: "recent",
       title: "Recently Released",
       href: "/movies?sort=release_date.desc",
-      items: recentMovies.results.slice(0, 18),
+      items: recentMovies.results.slice(0, 12),
     },
     {
       id: "streaming",
       title: "New on Streaming",
       href: "/discover?section=streaming",
-      // Provider-ready: until a dedicated stream feed exists, reuse popular with watch providers later
-      items: popularMovies.results.slice(4, 16),
+      items: popularMovies.results.slice(2, 14),
     },
     {
       id: "editors",
@@ -277,11 +302,7 @@ export async function getDiscoveryHome(): Promise<{
 
   const filled = sections.filter((s) => s.items.length > 0);
 
-  if (filled.length === 0) {
-    throw new Error(
-      "Could not load any catalog sections from TMDB. Check network/DNS access to api.themoviedb.org.",
-    );
-  }
+
 
   return {
     hero,
@@ -317,8 +338,6 @@ export async function getGenrePage(
 
   const [popular, topRated, newest] = await Promise.all([
     discover({ ...base, sortBy: "popularity.desc" }),
-    // Same credibility floor the browse pages use — without it this rail fills
-    // with one-vote 10.0 titles rather than the genre's actual best.
     discover({
       ...base,
       sortBy: "vote_average.desc",
@@ -337,6 +356,17 @@ export async function getGenrePage(
   };
 }
 
+let cachedDiscovery: { at: number; data: Awaited<ReturnType<typeof getDiscoveryHome>> } | null = null;
+let inFlightDiscovery: Promise<Awaited<ReturnType<typeof getDiscoveryHome>>> | null = null;
+
+let cachedMoviesDiscovery: { at: number; data: Awaited<ReturnType<typeof getMoviesDiscoveryHome>> } | null = null;
+let inFlightMovies: Promise<Awaited<ReturnType<typeof getMoviesDiscoveryHome>>> | null = null;
+
+let cachedTvDiscovery: { at: number; data: Awaited<ReturnType<typeof getTvDiscoveryHome>> } | null = null;
+let inFlightTv: Promise<Awaited<ReturnType<typeof getTvDiscoveryHome>>> | null = null;
+
+const DISCOVERY_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
 /** Safe wrapper — returns empty discovery when TMDB is missing (dev without keys). */
 export async function safeGetDiscoveryHome() {
   if (!isCatalogConfigured()) {
@@ -348,11 +378,27 @@ export async function safeGetDiscoveryHome() {
       configured: false,
     };
   }
+  if (cachedDiscovery && Date.now() - cachedDiscovery.at < DISCOVERY_CACHE_TTL_MS) {
+    return { ...cachedDiscovery.data, configured: true };
+  }
+  if (inFlightDiscovery) {
+    try {
+      const data = await inFlightDiscovery;
+      return { ...data, configured: true };
+    } catch {
+      // Fall through to retry
+    }
+  }
   try {
-    const data = await getDiscoveryHome();
+    inFlightDiscovery = getDiscoveryHome();
+    const data = await inFlightDiscovery;
+    cachedDiscovery = { at: Date.now(), data };
     return { ...data, configured: true };
   } catch (error) {
     console.error("[catalog] discovery home failed", error);
+    if (cachedDiscovery?.data) {
+      return { ...cachedDiscovery.data, configured: true };
+    }
     return {
       hero: null as MediaSummary | null,
       heroItems: [] as MediaSummary[],
@@ -361,6 +407,8 @@ export async function safeGetDiscoveryHome() {
       configured: true,
       error: error instanceof Error ? error.message : "Failed to load catalog",
     };
+  } finally {
+    inFlightDiscovery = null;
   }
 }
 
@@ -427,27 +475,12 @@ export async function getMoviesDiscoveryHome(): Promise<{
   ];
 
   const seen = new Set<string>();
-  const heroItemsRaw = heroPool.filter((item) => {
+  const heroItems = heroPool.filter((item) => {
     const key = `movie:${item.id}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return Boolean(item.backdropPath || item.posterPath);
-  }).slice(0, 10);
-
-  const heroItems = await Promise.all(
-    heroItemsRaw.map(async (item) => {
-      try {
-        const m = await provider.getMovie(item.id);
-        return {
-          ...item,
-          logoPath: m?.logoPath ?? null,
-          tagline: m?.tagline ?? null,
-        };
-      } catch {
-        return item;
-      }
-    }),
-  );
+  }).slice(0, 5);
 
   const hero = heroItems[0] ?? popular.results[0] ?? null;
 
@@ -456,61 +489,61 @@ export async function getMoviesDiscoveryHome(): Promise<{
       id: "trending-movies",
       title: "Trending Movies",
       href: "/movies?sort=popularity.desc",
-      items: trending.results.slice(0, 18),
+      items: trending.results.slice(0, 12),
     },
     {
       id: "now-playing",
       title: "Now Playing in Theaters",
       href: "/movies?section=now_playing",
-      items: nowPlaying.results.slice(0, 18),
+      items: nowPlaying.results.slice(0, 12),
     },
     {
       id: "popular-movies",
       title: "Popular Movies",
       href: "/movies?sort=popularity.desc",
-      items: popular.results.slice(0, 18),
+      items: popular.results.slice(0, 12),
     },
     {
       id: "top-rated-movies",
       title: "Top Rated Films",
       href: "/movies?section=top_rated",
-      items: topRated.results.slice(0, 18),
+      items: topRated.results.slice(0, 12),
     },
     {
       id: "upcoming-movies",
       title: "Upcoming Blockbusters",
       href: "/movies?section=upcoming",
-      items: upcoming.results.slice(0, 18),
+      items: upcoming.results.slice(0, 12),
     },
     {
       id: "action-movies",
       title: "Action & Adventure",
       href: "/movies?genre=28",
-      items: action.results.slice(0, 18),
+      items: action.results.slice(0, 12),
     },
     {
       id: "scifi-movies",
       title: "Sci-Fi & Fantasy",
       href: "/movies?genre=878",
-      items: scifi.results.slice(0, 18),
+      items: scifi.results.slice(0, 12),
     },
     {
       id: "comedy-movies",
       title: "Comedy Hits",
       href: "/movies?genre=35",
-      items: comedy.results.slice(0, 18),
+      items: comedy.results.slice(0, 12),
     },
     {
       id: "horror-movies",
       title: "Horror & Suspense",
       href: "/movies?genre=27",
-      items: horror.results.slice(0, 18),
+      items: horror.results.slice(0, 12),
     },
     {
       id: "recent-movies",
       title: "Recently Released",
       href: "/movies?sort=release_date.desc",
-      items: recent.results.slice(0, 18),
+      items: recent.results.slice(0, 12),
     },
   ];
 
@@ -534,11 +567,27 @@ export async function safeGetMoviesDiscoveryHome() {
       configured: false,
     };
   }
+  if (cachedMoviesDiscovery && Date.now() - cachedMoviesDiscovery.at < DISCOVERY_CACHE_TTL_MS) {
+    return { ...cachedMoviesDiscovery.data, configured: true };
+  }
+  if (inFlightMovies) {
+    try {
+      const data = await inFlightMovies;
+      return { ...data, configured: true };
+    } catch {
+      // Fall through to retry
+    }
+  }
   try {
-    const data = await getMoviesDiscoveryHome();
+    inFlightMovies = getMoviesDiscoveryHome();
+    const data = await inFlightMovies;
+    cachedMoviesDiscovery = { at: Date.now(), data };
     return { ...data, configured: true };
   } catch (error) {
     console.error("[catalog] movies discovery home failed", error);
+    if (cachedMoviesDiscovery?.data) {
+      return { ...cachedMoviesDiscovery.data, configured: true };
+    }
     return {
       hero: null as MediaSummary | null,
       heroItems: [] as MediaSummary[],
@@ -547,6 +596,8 @@ export async function safeGetMoviesDiscoveryHome() {
       configured: true,
       error: error instanceof Error ? error.message : "Failed to load movies",
     };
+  } finally {
+    inFlightMovies = null;
   }
 }
 
@@ -614,27 +665,12 @@ export async function getTvDiscoveryHome(): Promise<{
   ];
 
   const seen = new Set<string>();
-  const heroItemsRaw = heroPool.filter((item) => {
+  const heroItems = heroPool.filter((item) => {
     const key = `tv:${item.id}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return Boolean(item.backdropPath || item.posterPath);
-  }).slice(0, 10);
-
-  const heroItems = await Promise.all(
-    heroItemsRaw.map(async (item) => {
-      try {
-        const t = await provider.getTvShow(item.id);
-        return {
-          ...item,
-          logoPath: t?.logoPath ?? null,
-          tagline: t?.tagline ?? null,
-        };
-      } catch {
-        return item;
-      }
-    }),
-  );
+  }).slice(0, 5);
 
   const hero = heroItems[0] ?? popular.results[0] ?? null;
 
@@ -643,55 +679,55 @@ export async function getTvDiscoveryHome(): Promise<{
       id: "trending-tv",
       title: "Trending Series",
       href: "/tv?sort=popularity.desc",
-      items: trending.results.slice(0, 18),
+      items: trending.results.slice(0, 12),
     },
     {
       id: "popular-tv",
       title: "Popular TV Shows",
       href: "/tv?sort=popularity.desc",
-      items: popular.results.slice(0, 18),
+      items: popular.results.slice(0, 12),
     },
     {
       id: "top-rated-tv",
       title: "Top Rated Series",
       href: "/tv?section=top_rated",
-      items: topRated.results.slice(0, 18),
+      items: topRated.results.slice(0, 12),
     },
     {
       id: "scifi-tv",
       title: "Sci-Fi & Fantasy Epics",
       href: "/tv?genre=10765",
-      items: scifi.results.slice(0, 18),
+      items: scifi.results.slice(0, 12),
     },
     {
       id: "drama-tv",
       title: "Drama Masterpieces",
       href: "/tv?genre=18",
-      items: drama.results.slice(0, 18),
+      items: drama.results.slice(0, 12),
     },
     {
       id: "action-tv",
       title: "Action & Adventure",
       href: "/tv?genre=10759",
-      items: action.results.slice(0, 18),
+      items: action.results.slice(0, 12),
     },
     {
       id: "crime-tv",
       title: "Crime & Mystery",
       href: "/tv?genre=80",
-      items: crime.results.slice(0, 18),
+      items: crime.results.slice(0, 12),
     },
     {
       id: "comedy-tv",
       title: "Comedy Series",
       href: "/tv?genre=35",
-      items: comedy.results.slice(0, 18),
+      items: comedy.results.slice(0, 12),
     },
     {
       id: "recent-tv",
       title: "Recently Aired",
       href: "/tv?sort=release_date.desc",
-      items: recent.results.slice(0, 18),
+      items: recent.results.slice(0, 12),
     },
   ];
 
@@ -715,11 +751,27 @@ export async function safeGetTvDiscoveryHome() {
       configured: false,
     };
   }
+  if (cachedTvDiscovery && Date.now() - cachedTvDiscovery.at < DISCOVERY_CACHE_TTL_MS) {
+    return { ...cachedTvDiscovery.data, configured: true };
+  }
+  if (inFlightTv) {
+    try {
+      const data = await inFlightTv;
+      return { ...data, configured: true };
+    } catch {
+      // Fall through to retry
+    }
+  }
   try {
-    const data = await getTvDiscoveryHome();
+    inFlightTv = getTvDiscoveryHome();
+    const data = await inFlightTv;
+    cachedTvDiscovery = { at: Date.now(), data };
     return { ...data, configured: true };
   } catch (error) {
     console.error("[catalog] tv discovery home failed", error);
+    if (cachedTvDiscovery?.data) {
+      return { ...cachedTvDiscovery.data, configured: true };
+    }
     return {
       hero: null as MediaSummary | null,
       heroItems: [] as MediaSummary[],
@@ -728,6 +780,8 @@ export async function safeGetTvDiscoveryHome() {
       configured: true,
       error: error instanceof Error ? error.message : "Failed to load TV shows",
     };
+  } finally {
+    inFlightTv = null;
   }
 }
 

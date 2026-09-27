@@ -1,11 +1,3 @@
-if (typeof window === "undefined") {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const dns = require("node:dns");
-    dns.setDefaultResultOrder?.("ipv4first");
-  } catch {}
-}
-
 /**
  * Timeout-bounded `fetch` for every Supabase client, with a circuit breaker.
  *

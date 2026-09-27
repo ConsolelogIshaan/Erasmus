@@ -227,7 +227,19 @@ const nextConfig: NextConfig = {
       source: "/manifest.webmanifest",
       headers: [
         { key: "Content-Type", value: "application/manifest+json" },
-        { key: "Cache-Control", value: "public, max-age=86400" },
+        { key: "Cache-Control", value: "public, max-age=604800, s-maxage=2592000" },
+      ],
+    },
+    {
+      source: "/favicon.ico",
+      headers: [
+        { key: "Cache-Control", value: "public, max-age=604800, s-maxage=2592000" },
+      ],
+    },
+    {
+      source: "/icons/:path*",
+      headers: [
+        { key: "Cache-Control", value: "public, max-age=604800, s-maxage=2592000" },
       ],
     },
   ],

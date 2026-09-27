@@ -3,10 +3,10 @@ import { type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
 /**
- * Root proxy — session refresh + route protection (Next.js 16+).
+ * Root middleware — session refresh + route protection (Edge runtime).
  * Keep this file thin; business logic lives in lib/supabase/middleware.
  */
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   return updateSession(request);
 }
 
@@ -20,6 +20,6 @@ export const config = {
      * - api/stream (streaming chunks & subtitles)
      * - public assets with file extensions
      */
-    "/((?!_next/static|_next/image|favicon.ico|api/stream|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest\\.webmanifest|sw\\.js|offline|api/stream|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

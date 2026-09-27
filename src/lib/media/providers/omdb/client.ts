@@ -42,6 +42,7 @@ async function omdbFetch(params: Record<string, string>): Promise<OmdbResponse |
       // Cache ratings for a day — speeds detail pages on repeat visits
       next: { revalidate: 60 * 60 * 24, tags: ["omdb"] },
       headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(3500),
     });
     if (!res.ok) {
       console.warn("[omdb] HTTP", res.status);

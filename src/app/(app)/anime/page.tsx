@@ -10,7 +10,6 @@ import { MediaGrid } from "@/features/media/components/media-grid";
 import { FilterBar } from "@/features/media/components/filter-bar";
 import { PaginationControls } from "@/features/media/components/pagination-controls";
 import { CatalogConfigBanner } from "@/features/media/components/catalog-config-banner";
-import { PageLoader } from "@/components/feedback/page-loader";
 import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -227,8 +226,4 @@ export default async function AnimeBrowsePage({ searchParams }: PageProps) {
       </div>
     </div>
   );
-}
-
-export function AnimeLoading() {
-  return <PageLoader />;
 }

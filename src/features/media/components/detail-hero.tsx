@@ -151,7 +151,7 @@ export function DetailHero({
                   className="flex flex-wrap justify-center gap-1.5 sm:justify-start"
                 >
                   {genres.map((g) => (
-                    <Link key={g.id} href={mediaHref("genre", g.id)}>
+                    <Link key={g.id} href={mediaHref("genre", g.id)} prefetch={false}>
                       <Badge
                         variant="muted"
                         className="bg-white/10 text-white/90 border-white/15 backdrop-blur-md transition-colors hover:bg-white/20 hover:text-white"

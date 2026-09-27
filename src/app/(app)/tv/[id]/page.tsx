@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -28,6 +29,8 @@ import type { MediaIdentity } from "@/types/library";
 interface PageProps {
   params: Promise<{ id: string }>;
 }
+
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
@@ -75,35 +78,33 @@ export default async function TvDetailPage({ params }: PageProps) {
     originalLanguage: show.originalLanguage,
   };
 
-  const personal = await getPersonalMediaState("tv", show.id, identity);
-  const [allTags, allCollections, intelligence] = await Promise.all([
-    personal.userId ? listTags(personal.userId) : Promise.resolve([]),
-    personal.userId ? listCollections(personal.userId) : Promise.resolve([]),
-    personal.userId
-      ? loadIntelligenceData(personal.userId)
-      : Promise.resolve(null),
-  ]);
+  let personal: Awaited<ReturnType<typeof getPersonalMediaState>> = {
+    userId: null,
+    entry: null,
+    review: null,
+    notes: [],
+    tags: [],
+    collections: [],
+    recentSessions: [],
+    ratingHistory: [],
+    episodeProgress: [],
+  };
+  let allTags: Awaited<ReturnType<typeof listTags>> = [];
+  let allCollections: Awaited<ReturnType<typeof listCollections>> = [];
 
-  const decision =
-    intelligence != null
-      ? computeDecisionScore(
-          {
-            title: show.title,
-            mediaType: "tv",
-            genres: show.genres,
-            voteAverage: show.voteAverage,
-            popularity: show.popularity,
-            runtime,
-            episodeRunTime: show.episodeRunTime,
-            releaseDate: show.firstAirDate,
-            overview: show.overview,
-            crew: show.crew,
-            cast: show.cast,
-          },
-          computeUserStats(intelligence),
-          intelligence.entries,
-        )
-      : null;
+  try {
+    personal = await getPersonalMediaState("tv", show.id, identity);
+    if (personal.userId) {
+      const [t, c] = await Promise.all([
+        listTags(personal.userId).catch(() => []),
+        listCollections(personal.userId).catch(() => []),
+      ]);
+      allTags = t;
+      allCollections = c;
+    }
+  } catch (err) {
+    console.warn(`[tv] personal media state load failed for show ${show.id}:`, err);
+  }
 
     const ambientBackdrop = backdropUrl(show.backdropPath ?? show.posterPath, "w1280");
   const ambientPalette = await extractAmbientColors(show.backdropPath ?? show.posterPath);
@@ -199,7 +200,11 @@ export default async function TvDetailPage({ params }: PageProps) {
             />
           ) : null}
 
-          {decision ? <DecisionScoreCard decision={decision} /> : null}
+          {personal.userId ? (
+            <Suspense fallback={null}>
+              <TvDecisionSection userId={personal.userId} show={show} runtime={runtime} />
+            </Suspense>
+          ) : null}
 
           <div className="rounded-3xl border-0 bg-muted/40 dark:bg-white/[0.05] p-5">
             <h2 className="mb-3 text-sm font-semibold">Details</h2>
@@ -277,4 +282,44 @@ export default async function TvDetailPage({ params }: PageProps) {
       </div>
     </div>
   );
+}
+
+async function TvDecisionSection({
+  userId,
+  show,
+  runtime,
+}: {
+  userId: string;
+  show: Awaited<ReturnType<typeof getTvShow>> & {};
+  runtime?: number | null;
+}) {
+  let decision: ReturnType<typeof computeDecisionScore> | null = null;
+  try {
+    const intelligence = await loadIntelligenceData(userId);
+    if (intelligence) {
+      const stats = computeUserStats(intelligence);
+      decision = computeDecisionScore(
+        {
+          title: show.title,
+          mediaType: "tv",
+          genres: show.genres,
+          voteAverage: show.voteAverage,
+          popularity: show.popularity,
+          runtime,
+          episodeRunTime: show.episodeRunTime,
+          releaseDate: show.firstAirDate,
+          overview: show.overview,
+          crew: show.crew,
+          cast: show.cast,
+        },
+        stats,
+        intelligence.entries,
+      );
+    }
+  } catch {
+    decision = null;
+  }
+
+  if (!decision) return null;
+  return <DecisionScoreCard decision={decision} />;
 }

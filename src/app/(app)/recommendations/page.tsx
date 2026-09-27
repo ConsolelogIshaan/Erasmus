@@ -10,6 +10,8 @@ import { RecommendationDebugPanel } from "@/features/recommendations/components/
 import { RecommendationHero } from "@/features/recommendations/components/recommendation-hero";
 import { RecommendationRail } from "@/features/recommendations/components/recommendation-rail";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Recommendations",
   description: "Personalized picks built from your library, ratings and viewing habits",

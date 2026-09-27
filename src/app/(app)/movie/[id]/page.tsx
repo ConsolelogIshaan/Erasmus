@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -33,6 +34,8 @@ import type { MediaIdentity } from "@/types/library";
 interface PageProps {
   params: Promise<{ id: string }>;
 }
+
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
@@ -78,34 +81,33 @@ export default async function MovieDetailPage({ params }: PageProps) {
     originalLanguage: movie.originalLanguage,
   };
 
-  const personal = await getPersonalMediaState("movie", movie.id, identity);
-  const [allTags, allCollections, intelligence] = await Promise.all([
-    personal.userId ? listTags(personal.userId) : Promise.resolve([]),
-    personal.userId ? listCollections(personal.userId) : Promise.resolve([]),
-    personal.userId
-      ? loadIntelligenceData(personal.userId)
-      : Promise.resolve(null),
-  ]);
+  let personal: Awaited<ReturnType<typeof getPersonalMediaState>> = {
+    userId: null,
+    entry: null,
+    review: null,
+    notes: [],
+    tags: [],
+    collections: [],
+    recentSessions: [],
+    ratingHistory: [],
+    episodeProgress: [],
+  };
+  let allTags: Awaited<ReturnType<typeof listTags>> = [];
+  let allCollections: Awaited<ReturnType<typeof listCollections>> = [];
 
-  const decision =
-    intelligence != null
-      ? computeDecisionScore(
-          {
-            title: movie.title,
-            mediaType: "movie",
-            genres: movie.genres,
-            voteAverage: movie.voteAverage,
-            popularity: movie.popularity,
-            runtime: movie.runtime,
-            releaseDate: movie.releaseDate,
-            overview: movie.overview,
-            crew: movie.crew,
-            cast: movie.cast,
-          },
-          computeUserStats(intelligence),
-          intelligence.entries,
-        )
-      : null;
+  try {
+    personal = await getPersonalMediaState("movie", movie.id, identity);
+    if (personal.userId) {
+      const [t, c] = await Promise.all([
+        listTags(personal.userId).catch(() => []),
+        listCollections(personal.userId).catch(() => []),
+      ]);
+      allTags = t;
+      allCollections = c;
+    }
+  } catch (err) {
+    console.warn(`[movie] personal media state load failed for movie ${movie.id}:`, err);
+  }
 
   // Crew jobs may be merged ("Director · Writer") — match token, not exact string
   const directors = movie.crew.filter((c) =>
@@ -191,7 +193,11 @@ export default async function MovieDetailPage({ params }: PageProps) {
             />
           ) : null}
 
-          {decision ? <DecisionScoreCard decision={decision} /> : null}
+          {personal.userId ? (
+            <Suspense fallback={null}>
+              <MovieDecisionSection userId={personal.userId} movie={movie} />
+            </Suspense>
+          ) : null}
 
           <div className="rounded-3xl border-0 bg-muted/40 dark:bg-white/[0.05] p-5">
             <h2 className="mb-3 text-sm font-semibold">Details</h2>
@@ -266,6 +272,43 @@ export default async function MovieDetailPage({ params }: PageProps) {
       </div>
     </div>
   );
+}
+
+async function MovieDecisionSection({
+  userId,
+  movie,
+}: {
+  userId: string;
+  movie: Awaited<ReturnType<typeof getMovie>> & {};
+}) {
+  let decision: ReturnType<typeof computeDecisionScore> | null = null;
+  try {
+    const intelligence = await loadIntelligenceData(userId);
+    if (intelligence) {
+      const stats = computeUserStats(intelligence);
+      decision = computeDecisionScore(
+        {
+          title: movie.title,
+          mediaType: "movie",
+          genres: movie.genres,
+          voteAverage: movie.voteAverage,
+          popularity: movie.popularity,
+          runtime: movie.runtime,
+          releaseDate: movie.releaseDate,
+          overview: movie.overview,
+          crew: movie.crew,
+          cast: movie.cast,
+        },
+        stats,
+        intelligence.entries,
+      );
+    }
+  } catch {
+    decision = null;
+  }
+
+  if (!decision) return null;
+  return <DecisionScoreCard decision={decision} />;
 }
 
 

@@ -15,6 +15,8 @@ interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+export const revalidate = 900;
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
   return { title: `Genre ${id}` };

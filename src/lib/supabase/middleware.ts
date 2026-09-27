@@ -127,7 +127,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (isAuthRoute && user) {
+  if (user && (isAuthRoute || pathname === "/")) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = ROUTES.discover;
     redirectUrl.search = "";

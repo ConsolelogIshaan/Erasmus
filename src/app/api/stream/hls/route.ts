@@ -77,49 +77,6 @@ function enrichAudioTracks(text: string): string {
   return lines.join("\n");
 }
 
-function isDirectCdnSegment(rawUrl: string): boolean {
-  try {
-    const url = new URL(rawUrl);
-    const host = url.hostname.toLowerCase();
-    const pathname = url.pathname.toLowerCase();
-
-    // Playlists (.m3u8) must always pass through relay to enrich audio and rewrite child paths
-    const isPlaylist = pathname.endsWith(".m3u8") || pathname.includes("/playlist");
-    if (isPlaylist) return false;
-
-    const isMediaChunk =
-      pathname.endsWith(".ts") ||
-      pathname.endsWith(".m4s") ||
-      pathname.endsWith(".mp4") ||
-      pathname.endsWith(".html") ||
-      pathname.includes("video_") ||
-      pathname.includes("audio_") ||
-      pathname.includes("/seg-") ||
-      pathname.includes("/init-");
-
-    if (!isMediaChunk) return false;
-
-    // CDNs with verified open CORS (*) and zero referer locks:
-    // Browser can download segments directly with 0 Vercel bandwidth consumption
-    if (
-      host.includes("solarpanelcleaning") ||
-      host.includes("shegu.st") ||
-      host.includes("keenanchor.top") ||
-      host.includes("hakunaymatata.com") ||
-      host.includes("cloudflare") ||
-      host.includes("cloudfront") ||
-      host.includes("fastly") ||
-      host.includes("akamai")
-    ) {
-      return true;
-    }
-
-    return false;
-  } catch {
-    return false;
-  }
-}
-
 function rewritePlaylist(
   text: string,
   baseUrl: string,
@@ -135,16 +92,10 @@ function rewritePlaylist(
       if (trimmed.startsWith("#")) {
         return trimmed.replace(/URI="([^"]+)"/gi, (_, uri: string) => {
           const absolute = new URL(uri, baseUrl).href;
-          if (isDirectCdnSegment(absolute)) {
-            return `URI="${absolute}"`;
-          }
           return `URI="${proxied(relay, absolute, referer)}"`;
         });
       }
       const absolute = new URL(trimmed, baseUrl).href;
-      if (isDirectCdnSegment(absolute)) {
-        return absolute;
-      }
       return proxied(relay, absolute, referer);
     })
     .join("\n");
@@ -207,9 +158,10 @@ export async function GET(request: Request) {
     /\.(mp4|m4s|ts)$/i.test(path) ||
     isHtmlMediaSegment ||
     isObfuscatedSegment;
-  // Child playlists/segments are rewritten to the active relay: the Cloudflare
-  // Worker when NEXT_PUBLIC_HLS_RELAY_URL is set, else this same local route.
-  const relay = HLS_RELAY_BASE;
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const relay = forwardedHost && !forwardedHost.includes("erasmus-web") && !forwardedHost.includes("erasmustv")
+    ? `https://${forwardedHost}`
+    : HLS_RELAY_BASE;
 
   const playlistResponse = (text: string) =>
     new NextResponse(rewritePlaylist(text, target.href, relay, referer), {

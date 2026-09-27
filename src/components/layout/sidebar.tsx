@@ -38,6 +38,7 @@ function NavRow({ item, active, collapsed }: NavRowProps) {
       <TooltipTrigger asChild>
         <Link
           href={comingSoon ? "#" : item.href}
+          prefetch={false}
           aria-current={active ? "page" : undefined}
           onClick={(event) => {
             if (comingSoon) event.preventDefault();

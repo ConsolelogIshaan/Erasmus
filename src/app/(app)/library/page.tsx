@@ -14,6 +14,8 @@ import { getCurrentUser } from "@/lib/services/user-service";
 import { ROUTES } from "@/constants/routes";
 import type { LibraryEntry, LibraryListFilters } from "@/types/library";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Library",
   description: "Your personal entertainment library",

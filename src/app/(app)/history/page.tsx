@@ -53,6 +53,7 @@ export default async function HistoryPage() {
               <li key={s.id}>
                 <Link
                   href={href}
+                  prefetch={false}
                   className="flex items-center gap-3 rounded-2xl border-0 bg-muted/40 dark:bg-white/[0.05] p-3 transition-colors hover:bg-muted/40"
                 >
                   <span className="relative h-14 w-10 shrink-0 overflow-hidden rounded-md bg-muted">

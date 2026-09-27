@@ -58,6 +58,7 @@ export function MobileNav() {
                 {showSeparator ? <Separator className="my-2 opacity-25" /> : null}
                 <Link
                   href={item.comingSoon ? "#" : item.href}
+                  prefetch={false}
                   aria-disabled={item.comingSoon}
                   aria-current={active ? "page" : undefined}
                   onClick={(e) => {

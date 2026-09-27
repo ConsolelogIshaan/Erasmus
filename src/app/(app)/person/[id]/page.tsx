@@ -18,6 +18,8 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+export const revalidate = 86400;
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
   if (!isCatalogConfigured()) return { title: "Person" };

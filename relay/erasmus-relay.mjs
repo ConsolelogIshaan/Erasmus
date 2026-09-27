@@ -18,57 +18,7 @@ function refererFor(requested) {
 function proxied(relayBase, absolute, referer) {
   const query = new URLSearchParams({ url: absolute });
   if (referer) query.set('referer', referer);
-  return `${relayBase}/api/stream/hls?${query.toString()}`;
-}
-
-function isDirectCdnSegment(rawUrl) {
-  try {
-    const url = new URL(rawUrl);
-    const host = url.hostname.toLowerCase();
-    const pathname = url.pathname.toLowerCase();
-
-    // Playlists (.m3u8) must always pass through relay to enrich audio and rewrite child paths
-    const isPlaylist = pathname.endsWith('.m3u8') || pathname.includes('/playlist');
-    if (isPlaylist) return false;
-
-    const isMediaChunk =
-      pathname.endsWith('.ts') ||
-      pathname.endsWith('.m4s') ||
-      pathname.endsWith('.mp4') ||
-      pathname.endsWith('.html') ||
-      pathname.includes('video_') ||
-      pathname.includes('audio_') ||
-      pathname.includes('/seg-') ||
-      pathname.includes('/init-');
-
-    if (!isMediaChunk) return false;
-
-    // CDNs with verified open CORS (*) and zero referer locks:
-    // Browser can download segments directly with 0 relay bandwidth consumption
-    if (
-      host.includes('solarpanelcleaning') ||
-      host.includes('shegu.st') ||
-      host.includes('keenanchor.top') ||
-      host.includes('rousav.tech') ||
-      host.includes('gaiaflix.live') ||
-      host.includes('acdn28.com') ||
-      host.includes('acdn29.com') ||
-      host.includes('bxcnm.com') ||
-      host.includes('bxcnv.com') ||
-      host.includes('bxncw.com') ||
-      host.includes('wnowe.com') ||
-      host.includes('cloudflare') ||
-      host.includes('cloudfront') ||
-      host.includes('fastly') ||
-      host.includes('akamai')
-    ) {
-      return true;
-    }
-
-    return false;
-  } catch {
-    return false;
-  }
+  return `${relayBase}?${query.toString()}`;
 }
 
 function rewritePlaylist(text, baseUrl, relayBase, referer) {
@@ -80,16 +30,10 @@ function rewritePlaylist(text, baseUrl, relayBase, referer) {
       if (trimmed.startsWith('#')) {
         return trimmed.replace(/URI="([^"]+)"/gi, (_, uri) => {
           const absolute = new URL(uri, baseUrl).href;
-          if (isDirectCdnSegment(absolute)) {
-            return `URI="${absolute}"`;
-          }
           return `URI="${proxied(relayBase, absolute, referer)}"`;
         });
       }
       const absolute = new URL(trimmed, baseUrl).href;
-      if (isDirectCdnSegment(absolute)) {
-        return absolute;
-      }
       return proxied(relayBase, absolute, referer);
     })
     .join('\n');
@@ -160,9 +104,12 @@ const server = http.createServer(async (req, res) => {
       contentType.includes('m3u8') ||
       path.endsWith('.m3u8');
 
-    const proto = req.headers['x-forwarded-proto'] || 'http';
+    const proto = req.headers['x-forwarded-proto'] || 'https';
     const host = req.headers['x-forwarded-host'] || req.headers.host;
-    const relayBase = `${proto}://${host}`;
+    const isLocalOrTunnel = !host || host.includes('localhost') || host.includes('trycloudflare.com') || host.includes('127.0.0.1');
+    const relayBase = isLocalOrTunnel
+      ? 'https://erasmus-hls-relay.ishaan-jangid1.workers.dev'
+      : `${proto}://${host}`;
 
     if (looksPlaylist) {
       const text = await upstream.text();

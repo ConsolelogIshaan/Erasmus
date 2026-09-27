@@ -5,7 +5,6 @@ import { HeroBanner } from "@/features/media/components/hero-banner";
 import { MediaRow } from "@/features/media/components/media-row";
 import { GenreChips } from "@/features/media/components/genre-chips";
 import { CatalogConfigBanner } from "@/features/media/components/catalog-config-banner";
-import { PageLoader } from "@/components/feedback/page-loader";
 import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { safeGetDiscoveryHome } from "@/lib/media/catalog";
 import { extractAmbientColors } from "@/lib/media/ambient-colors";
@@ -100,8 +99,4 @@ export default async function DiscoverPage() {
       </div>
     </div>
   );
-}
-
-export function DiscoverLoading() {
-  return <PageLoader />;
 }

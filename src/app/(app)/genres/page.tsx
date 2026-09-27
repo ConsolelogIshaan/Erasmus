@@ -6,6 +6,8 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { getMovieGenres, getTvGenres, isCatalogConfigured } from "@/lib/media/catalog";
 import { mediaHref } from "@/lib/media/routes";
 
+export const revalidate = 86400;
+
 export const metadata: Metadata = {
   title: "Genres",
   description: "Browse movies and TV by genre",
@@ -31,7 +33,7 @@ export default async function GenresPage() {
         <h2 className="font-display text-lg font-semibold tracking-tight">Movie genres</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {movieGenres.map((g) => (
-            <Link key={`m-${g.id}`} href={`${mediaHref("genre", g.id)}?type=movie`}>
+            <Link key={`m-${g.id}`} href={`${mediaHref("genre", g.id)}?type=movie`} prefetch={false}>
               <Card className="h-full transition-colors hover:bg-card/80">
                 <CardHeader className="p-4">
                   <CardTitle className="text-base">{g.name}</CardTitle>
@@ -47,7 +49,7 @@ export default async function GenresPage() {
         <h2 className="font-display text-lg font-semibold tracking-tight">TV genres</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {tvGenres.map((g) => (
-            <Link key={`t-${g.id}`} href={`${mediaHref("genre", g.id)}?type=tv`}>
+            <Link key={`t-${g.id}`} href={`${mediaHref("genre", g.id)}?type=tv`} prefetch={false}>
               <Card className="h-full transition-colors hover:bg-card/80">
                 <CardHeader className="p-4">
                   <CardTitle className="text-base">{g.name}</CardTitle>

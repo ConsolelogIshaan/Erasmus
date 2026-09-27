@@ -26,6 +26,7 @@ export function GenreChips({ genres, className, basePath }: GenreChipsProps) {
         <h2 className="text-section-title">Browse by Genre</h2>
         <Link
           href={basePath ? `${basePath}?explore=true` : "/genres"}
+          prefetch={false}
           className="text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           View all
@@ -39,6 +40,7 @@ export function GenreChips({ genres, className, basePath }: GenreChipsProps) {
           <Link
             key={g.id}
             href={basePath ? `${basePath}?genre=${g.id}` : mediaHref("genre", g.id)}
+            prefetch={false}
             className="shrink-0 transition-transform duration-200 ease-out hover:-translate-y-0.5 active:scale-[0.98]"
           >
             <Badge

@@ -164,31 +164,77 @@ export async function extractDirectStream(input: {
       }
     }
 
-    // 2. VidFast direct stream resolver (Flagship Lisbon 4K/1080p HLS)
-    const vidfastRes = await resolveVidfastDirectStream(input);
-    if (vidfastRes.hit?.url) {
-      const result: DirectStreamResult = {
-        ok: true,
-        referer: vidfastRes.hit.referer,
-        servers: [
-          {
-            name: vidfastRes.hit.serverName,
-            url: vidfastRes.hit.url,
-            kind: vidfastRes.hit.kind,
-            is4K: vidfastRes.hit.is4K,
-            hdUrl: vidfastRes.hit.hdUrl,
-            fourKUrl: vidfastRes.hit.fourKUrl,
-            isDirectCors: false,
-            ms: Date.now() - started,
-          },
-        ],
-      };
-      extractCache.set(cacheKey, { at: Date.now(), result });
-      return result;
-    }
-    if (vidfastRes.debug) debugLog += `vidfast: ${vidfastRes.debug}; `;
+    // On Cloudflare Workers (workerd), vidfast.vc blocks worker datacenter IPs with 403 Forbidden.
+    // Detecting Cloudflare skips the 5,000ms wasted 403 timeout and routes directly to the Vercel resolver.
+    const isCloudflare =
+      (typeof globalThis !== "undefined" && "WebSocketPair" in globalThis) ||
+      Boolean(process.env.NEXT_PUBLIC_IS_CLOUDFLARE) ||
+      (typeof navigator !== "undefined" && navigator.userAgent?.includes("Cloudflare-Workers"));
 
-    // 2.5. Vidlink pristine edge fallback for Lisbon and other non-Bingr servers
+    if (!isCloudflare) {
+      const vidfastRes = await resolveVidfastDirectStream(input);
+      if (vidfastRes.hit?.url) {
+        const result: DirectStreamResult = {
+          ok: true,
+          referer: vidfastRes.hit.referer,
+          servers: [
+            {
+              name: vidfastRes.hit.serverName,
+              url: vidfastRes.hit.url,
+              kind: vidfastRes.hit.kind,
+              is4K: vidfastRes.hit.is4K,
+              hdUrl: vidfastRes.hit.hdUrl,
+              fourKUrl: vidfastRes.hit.fourKUrl,
+              isDirectCors: false,
+              ms: Date.now() - started,
+            },
+          ],
+        };
+        extractCache.set(cacheKey, { at: Date.now(), result });
+        return result;
+      }
+      if (vidfastRes.debug) debugLog += `vidfast: ${vidfastRes.debug}; `;
+    } else {
+      // 2.5 Vercel Production Resolver:
+      // Uses Vercel's AWS us-east-1 IP to resolve VidFast with zero blocking.
+      // Returns authentic 4K vRapid master playlist (~1 KB JSON, 0 video bandwidth on Vercel).
+      try {
+        const vParams = new URLSearchParams({
+          id: input.tmdbId,
+          type: input.type,
+          server: effectiveServerId,
+        });
+        if (input.season) vParams.set("season", String(input.season));
+        if (input.episode) vParams.set("episode", String(input.episode));
+        if (title) vParams.set("title", title);
+        if (year) vParams.set("year", year);
+        if (imdbId) vParams.set("imdb", imdbId);
+
+        const vRes = await fetch(
+          `https://erasmus-nine.vercel.app/api/stream/direct?${vParams.toString()}`,
+          {
+            headers: { "User-Agent": "Mozilla/5.0" },
+            signal: AbortSignal.timeout(8000),
+          },
+        );
+        if (vRes.ok) {
+          const vData = (await vRes.json()) as DirectStreamResult;
+          if (vData.ok && vData.servers?.length > 0 && vData.servers[0]?.url) {
+            // If the server requested was a VidFast server (like Lisbon), ensure we don't return an unrelated Bastion match
+            const vServer = vData.servers[0];
+            const isBastionOnNonBingr = !isBingrServer && vServer.name?.toLowerCase().includes("bastion");
+            if (!isBastionOnNonBingr) {
+              extractCache.set(cacheKey, { at: Date.now(), result: vData });
+              return vData;
+            }
+          }
+        }
+      } catch (vercelErr) {
+        debugLog += `vercel-resolver: ${vercelErr instanceof Error ? vercelErr.message : "failed"}; `;
+      }
+    }
+
+    // 2.6. Vidlink pristine edge fallback for Lisbon and other non-Bingr servers
     try {
       const vidlinkHit = await resolveVidlinkStream({
         type: input.type,
@@ -222,57 +268,76 @@ export async function extractDirectStream(input: {
       debugLog += `vidlink-fallback: ${err instanceof Error ? err.message : "failed"}; `;
     }
 
-    // 3. Fallback to Bingr cluster if not already tried
+    // 3 & 4. Fallback to Bingr and Cinejoy in parallel if not already resolved
+    const fallbackTasks: Promise<DirectStreamResult | null>[] = [];
+
     if (!isBingrServer) {
-      try {
-        const enriched = await getEnriched();
-        const fallbackTarget = effectiveServerId === "nebula" ? "bastion" : "aphelion";
-        const bingrHit = await resolveBingrStream({
-          ...enriched,
-          serverId: fallbackTarget,
-        });
-        if (bingrHit?.url) {
-          const result: DirectStreamResult = {
-            ok: true,
-            referer: bingrHit.referer,
-            captions: bingrHit.captions,
-            servers: [
-              {
-                name: effectiveServerId === "nebula" ? "Nebula" : (effectiveServerId === "lisbon" ? "Lisbon" : bingrHit.serverName),
-                url: bingrHit.url,
-                kind: bingrHit.kind,
-                is4K: bingrHit.is4K,
-                isDirectCors: bingrHit.isDirectCors,
-                ms: Date.now() - started,
-              },
-            ],
-          };
-          extractCache.set(cacheKey, { at: Date.now(), result });
-          return result;
-        }
-      } catch (err) {
-        debugLog += `bingr-fallback: ${err instanceof Error ? err.message : "failed"}; `;
-      }
+      fallbackTasks.push(
+        (async () => {
+          try {
+            const enriched = await getEnriched();
+            const fallbackTarget = effectiveServerId === "nebula" ? "bastion" : "aphelion";
+            const bingrHit = await resolveBingrStream({
+              ...enriched,
+              serverId: fallbackTarget,
+            });
+            // Guard against Bastion wrong-movie fallback for flagship Lisbon/Sakura/Nebula
+            if (bingrHit?.url && (bingrHit.serverId !== "bastion" || effectiveServerId === "nebula")) {
+              return {
+                ok: true,
+                referer: bingrHit.referer,
+                captions: bingrHit.captions,
+                servers: [
+                  {
+                    name: effectiveServerId === "nebula" ? "Nebula" : (effectiveServerId === "lisbon" ? "Lisbon" : bingrHit.serverName),
+                    url: bingrHit.url,
+                    kind: bingrHit.kind,
+                    is4K: bingrHit.is4K,
+                    isDirectCors: bingrHit.isDirectCors,
+                    ms: Date.now() - started,
+                  },
+                ],
+              };
+            }
+          } catch (err) {
+            debugLog += `bingr-fallback: ${err instanceof Error ? err.message : "failed"}; `;
+          }
+          return null;
+        })(),
+      );
     }
 
-    // 4. Secondary: Cinejoy/Shegu stream resolver
-    const hit = await resolveCinejoyStream(input);
-    if (hit?.url) {
-      const result: DirectStreamResult = {
-        ok: true,
-        referer: hit.referer,
-        captions: hit.captions,
-        servers: [
-          {
-            name: hit.serverName,
-            url: hit.url,
-            kind: hit.kind,
-            ms: Date.now() - started,
-          },
-        ],
-      };
-      extractCache.set(cacheKey, { at: Date.now(), result });
-      return result;
+    fallbackTasks.push(
+      (async () => {
+        try {
+          const hit = await resolveCinejoyStream(input);
+          if (hit?.url) {
+            return {
+              ok: true,
+              referer: hit.referer,
+              captions: hit.captions,
+              servers: [
+                {
+                  name: hit.serverName,
+                  url: hit.url,
+                  kind: hit.kind,
+                  ms: Date.now() - started,
+                },
+              ],
+            };
+          }
+        } catch (err) {
+          debugLog += `cinejoy: ${err instanceof Error ? err.message : "failed"}; `;
+        }
+        return null;
+      })(),
+    );
+
+    const fallbackResults = await Promise.all(fallbackTasks);
+    const validFallback = fallbackResults.find((r): r is DirectStreamResult => Boolean(r?.ok));
+    if (validFallback) {
+      extractCache.set(cacheKey, { at: Date.now(), result: validFallback });
+      return validFallback;
     }
 
     return { ok: false, error: "no stream", debug: debugLog, servers: [] };

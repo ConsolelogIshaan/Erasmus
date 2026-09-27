@@ -55,6 +55,7 @@ import {
 import { cn } from "@/lib/utils";
 import { stillUrl } from "@/lib/media/image";
 import { buildRelayUrl } from "@/lib/streaming/relay";
+import { fetchClientMediaDetails } from "@/lib/media/client-details";
 
 /**
  * Wraps an upstream URL in the active relay.
@@ -355,9 +356,8 @@ export function StreamingTheaterModal({
   React.useEffect(() => {
     if (!open || !tmdbId) return;
     let cancelled = false;
-    fetch(`/api/media/details?type=${mediaType}&id=${tmdbId}&_cb=${Date.now()}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { logoPath?: string | null; tagline?: string | null; posterPath?: string | null; title?: string | null; imdbId?: string | null; enBackdropPath?: string | null; logoBackdropPath?: string | null; backdropPath?: string | null } | null) => {
+    fetchClientMediaDetails(mediaType, tmdbId)
+      .then((data) => {
         if (cancelled || !data) return;
         if (data.logoPath) setResolvedLogoPath(data.logoPath);
         if (data.tagline) setResolvedTagline(data.tagline);
@@ -468,6 +468,7 @@ export function StreamingTheaterModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot episode at open only
   }, [open]);
 
+  const identityRef = React.useRef<MediaIdentity | null>(null);
   const effectiveIdentity: MediaIdentity = React.useMemo(() => {
     if (identity) {
       return {
@@ -553,11 +554,10 @@ export function StreamingTheaterModal({
           const hit = data.servers?.[0];
           if (data.ok && hit?.url) {
             setDirectKind(hit.kind === "file" ? "file" : "hls");
-            const isDirect = Boolean((hit as { isDirectCors?: boolean })?.isDirectCors);
             const rawHit = hit as { hdUrl?: string; fourKUrl?: string };
-            const resolvedFourK = rawHit.fourKUrl ? (isDirect ? rawHit.fourKUrl : relayUrl(rawHit.fourKUrl, data.referer)) : null;
-            const resolvedHd = rawHit.hdUrl ? (isDirect ? rawHit.hdUrl : relayUrl(rawHit.hdUrl, data.referer)) : null;
-            const primarySrc = resolvedFourK || (isDirect ? hit.url : relayUrl(hit.url, data.referer));
+            const resolvedFourK = rawHit.fourKUrl ? relayUrl(rawHit.fourKUrl, data.referer) : null;
+            const resolvedHd = rawHit.hdUrl ? relayUrl(rawHit.hdUrl, data.referer) : null;
+            const primarySrc = relayUrl(hit.url, data.referer);
             setDirectSrc(primarySrc);
             setDirectIs4K(Boolean((hit as { is4K?: boolean })?.is4K || resolvedFourK));
             setDirectHdSrc(resolvedHd);
@@ -659,8 +659,10 @@ export function StreamingTheaterModal({
       if (seconds < 5) return;
       lastKnownRef.current = { seconds, duration };
       savePlaybackProgress(progressInput, seconds, duration);
+      const hasAuthCookie = typeof document !== "undefined" && document.cookie.includes("sb-");
       if (
         effectiveIdentity &&
+        hasAuthCookie &&
         Date.now() - lastLibrarySyncRef.current > 60_000
       ) {
         lastLibrarySyncRef.current = Date.now();
@@ -683,18 +685,55 @@ export function StreamingTheaterModal({
   );
 
   React.useEffect(() => {
-    if (open && effectiveIdentity) {
-      actionUpsertAndSetStatus(effectiveIdentity, "watching").catch(() => {});
-      if (mediaType === "tv") {
-        actionSetTvProgress(
-          effectiveIdentity,
-          activeSeason,
-          activeEpisode,
-          [],
-        ).catch(() => {});
+    identityRef.current = effectiveIdentity;
+  }, [effectiveIdentity]);
+
+  const wasOpenRef = React.useRef(open);
+  React.useEffect(() => {
+    if (wasOpenRef.current && !open) {
+      // User closed the theater modal - sync final position to library once
+      const hasAuthCookie = typeof document !== "undefined" && document.cookie.includes("sb-");
+      const ident = identityRef.current;
+      if (ident && hasAuthCookie && lastKnownRef.current.seconds >= 15) {
+        if (mediaType === "movie") {
+          actionSetMovieProgress(
+            ident,
+            Math.max(1, Math.round(lastKnownRef.current.seconds / 60)),
+          ).catch(() => {});
+        } else if (mediaType === "tv") {
+          actionSetTvProgress(
+            ident,
+            activeSeason,
+            activeEpisode,
+            [],
+          ).catch(() => {});
+        }
       }
     }
-  }, [open, effectiveIdentity, mediaType, activeSeason, activeEpisode]);
+    wasOpenRef.current = open;
+  }, [open, mediaType, activeSeason, activeEpisode]);
+
+  const hasSyncedWatchingRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    if (!open || !effectiveIdentity) return;
+    const hasAuthCookie = typeof document !== "undefined" && document.cookie.includes("sb-");
+    if (!hasAuthCookie) return;
+
+    const trackingKey = `${mediaType}:${tmdbId}:${activeSeason}:${activeEpisode}`;
+    if (hasSyncedWatchingRef.current === trackingKey) return;
+    hasSyncedWatchingRef.current = trackingKey;
+
+    actionUpsertAndSetStatus(effectiveIdentity, "watching").catch(() => {});
+    if (mediaType === "tv") {
+      actionSetTvProgress(
+        effectiveIdentity,
+        activeSeason,
+        activeEpisode,
+        [],
+      ).catch(() => {});
+    }
+  }, [open, effectiveIdentity, mediaType, tmdbId, activeSeason, activeEpisode]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -773,23 +812,8 @@ export function StreamingTheaterModal({
       window.clearInterval(interval);
       window.removeEventListener("pagehide", flushWallClock);
       document.removeEventListener("visibilitychange", onHide);
-      if (effectiveIdentity && lastKnownRef.current.seconds >= 15) {
-        if (mediaType === "movie") {
-          actionSetMovieProgress(
-            effectiveIdentity,
-            Math.max(1, Math.round(lastKnownRef.current.seconds / 60)),
-          ).catch(() => {});
-        } else if (mediaType === "tv") {
-          actionSetTvProgress(
-            effectiveIdentity,
-            activeSeason,
-            activeEpisode,
-            [],
-          ).catch(() => {});
-        }
-      }
     };
-  }, [open, persistProgress, effectiveIdentity, mediaType, activeSeason, activeEpisode]);
+  }, [open, persistProgress]);
 
   const handleReload = () => {
     setDirectSrc(null);

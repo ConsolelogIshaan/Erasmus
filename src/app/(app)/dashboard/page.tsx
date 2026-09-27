@@ -45,6 +45,8 @@ import { getDashboardPayload } from "@/lib/intelligence/dashboard";
 import { formatWatchHours } from "@/lib/intelligence/stats-engine";
 import type { Profile } from "@/types";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Profile",
   description: "Your watch history, habits, and profile details",
@@ -400,6 +402,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                         ? ROUTES.movie(entry.external_id)
                         : ROUTES.show(entry.external_id)
                     }
+                    prefetch={false}
                     className="text-sm font-medium hover:underline"
                   >
                     {entry.title}

@@ -174,6 +174,47 @@ const worker = {
       rawTarget.includes("audio_")
     );
 
+    // Path 0: Direct Cloudflare Edge Fetch for video media chunks (.ts, .m4s, .mp4)
+    // Upstream CDNs (mintcastle, hunts439kow, quietridge, etc.) serve chunks directly
+    // when given the provider referer header. Fetching directly from Cloudflare's 330+ datacenter edge
+    // gives multi-gigabit delivery and zero buffering, without bottlenecking through residential ISP.
+    if (isMediaChunk) {
+      try {
+        const edgeHeaders = new Headers();
+        edgeHeaders.set(
+          "User-Agent",
+          request.headers.get("User-Agent") ||
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+        );
+        const ref = requestUrl.searchParams.get("referer") || "https://vidfast.vc/";
+        edgeHeaders.set("Referer", ref);
+        const range = request.headers.get("Range");
+        if (range) edgeHeaders.set("Range", range);
+
+        const edgeCtrl = new AbortController();
+        const edgeTimeoutId = setTimeout(() => edgeCtrl.abort(), 12000);
+
+        const directRes = await fetch(rawTarget, {
+          method: request.method,
+          headers: edgeHeaders,
+          redirect: "follow",
+          signal: edgeCtrl.signal,
+        });
+        clearTimeout(edgeTimeoutId);
+
+        if (directRes.ok || directRes.status === 206) {
+          const resHeaders = new Headers(directRes.headers);
+          resHeaders.set("Access-Control-Allow-Origin", "*");
+          return new Response(directRes.body, {
+            status: directRes.status,
+            headers: resHeaders,
+          });
+        }
+      } catch {
+        // Fall through to tunnel and Vercel
+      }
+    }
+
     const activeTunnel = await getActiveTunnel(env);
     const now = Date.now();
     const isTunnelAlive = Boolean(activeTunnel && (now - cachedPing < HEARTBEAT_EXPIRY_MS));
@@ -229,6 +270,65 @@ const worker = {
       }
     }
 
+    // Path 1.5: Cloudflare Edge Direct Playlist Fetch (100% Cloudflare, zero PC & zero Vercel dependency)
+    if (isPlaylist) {
+      try {
+        const edgeHeaders = new Headers();
+        edgeHeaders.set(
+          "User-Agent",
+          request.headers.get("User-Agent") ||
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+        );
+        const ref = requestUrl.searchParams.get("referer") || "https://vidfast.vc/";
+        edgeHeaders.set("Referer", ref);
+
+        const edgeCtrl = new AbortController();
+        const edgeTimeoutId = setTimeout(() => edgeCtrl.abort(), 12000);
+
+        const directPlaylistRes = await fetch(rawTarget, {
+          method: request.method,
+          headers: edgeHeaders,
+          redirect: "follow",
+          signal: edgeCtrl.signal,
+        });
+        clearTimeout(edgeTimeoutId);
+
+        if (directPlaylistRes.ok) {
+          const rawText = await directPlaylistRes.text();
+          const rewritten = rawText
+            .split("\n")
+            .map((line) => {
+              const trimmed = line.trim();
+              if (!trimmed) return line;
+              if (trimmed.startsWith("#")) {
+                return trimmed.replace(/URI="([^"]+)"/gi, (_, uri) => {
+                  const abs = new URL(uri, rawTarget).href;
+                  const q = new URLSearchParams({ url: abs });
+                  if (ref) q.set("referer", ref);
+                  return `URI="${requestUrl.origin}?${q.toString()}"`;
+                });
+              }
+              const abs = new URL(trimmed, rawTarget).href;
+              const q = new URLSearchParams({ url: abs });
+              if (ref) q.set("referer", ref);
+              return `${requestUrl.origin}?${q.toString()}`;
+            })
+            .join("\n");
+
+          const resHeaders = new Headers(directPlaylistRes.headers);
+          resHeaders.set("Content-Type", "application/vnd.apple.mpegurl; charset=utf-8");
+          resHeaders.set("Access-Control-Allow-Origin", "*");
+          resHeaders.set("Cache-Control", "no-cache");
+          return new Response(rewritten, {
+            status: 200,
+            headers: resHeaders,
+          });
+        }
+      } catch (err) {
+        console.warn("[Worker] Edge playlist direct fetch failed, falling back:", err);
+      }
+    }
+
     // Path 2: Safe Fallback to Vercel (Only for playlists or when home PC is genuinely offline/asleep)
     try {
       const fallbackUrl = `${VERCEL_FALLBACK_BASE}${requestUrl.search}`;
@@ -240,6 +340,17 @@ const worker = {
         headers: forwardHeaders,
         redirect: "follow",
       });
+
+      if (isPlaylist && fallbackRes.ok) {
+        const text = await fallbackRes.text();
+        const rewritten = text.replaceAll("erasmus-hls-relay.erasmustv.workers.dev", requestUrl.host);
+        const resHeaders = new Headers(fallbackRes.headers);
+        resHeaders.set("Access-Control-Allow-Origin", "*");
+        return new Response(rewritten, {
+          status: 200,
+          headers: resHeaders,
+        });
+      }
 
       const resHeaders = new Headers(fallbackRes.headers);
       resHeaders.set("Access-Control-Allow-Origin", "*");

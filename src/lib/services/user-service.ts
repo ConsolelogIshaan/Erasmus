@@ -167,9 +167,6 @@ export const getUserPreferences = cache(async function getUserPreferences(
   return data;
 });
 
-/**
- * Bundled load for app shell hydration.
- */
 export const getSessionContext = cache(async function getSessionContext() {
   const user = await getCurrentUser();
   if (!user) {
@@ -183,4 +180,44 @@ export const getSessionContext = cache(async function getSessionContext() {
   ]);
 
   return { user, profile, settings, preferences };
+});
+
+/**
+ * Lightweight, zero-redundancy user accessor for AppLayout and global shell.
+ * Uses validated session JWT metadata directly, bypassing settings and preferences queries.
+ */
+export const getAppShellUser = cache(async function getAppShellUser() {
+  const user = await getCurrentUser();
+  if (!user) return null;
+
+  const meta = user.user_metadata || {};
+  const hasMetaName = Boolean(meta.full_name || meta.name);
+  const hasMetaAvatar = Boolean(meta.avatar_url);
+
+  let profile: Profile | null = null;
+  if (!hasMetaName || !hasMetaAvatar) {
+    profile = await getProfile(user.id);
+  }
+
+  const displayName =
+    profile?.display_name ??
+    meta.full_name ??
+    meta.name ??
+    user.email?.split("@")[0] ??
+    "User";
+
+  const username =
+    profile?.username ??
+    meta.user_name ??
+    user.email?.split("@")[0] ??
+    "user";
+
+  const avatarUrl = (profile?.avatar_url ?? meta.avatar_url) as string | undefined;
+
+  return {
+    email: user.email,
+    displayName,
+    username,
+    avatarUrl,
+  };
 });

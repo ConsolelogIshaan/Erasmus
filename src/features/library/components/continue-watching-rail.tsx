@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { EmptyState } from "@/components/feedback/empty-state";
 import { LibraryPosterCard } from "@/features/library/components/library-poster-card";
+import { fetchClientMediaDetails } from "@/lib/media/client-details";
 import { Button } from "@/components/ui/button";
 import { StreamingTheaterModal } from "@/features/streaming/components/streaming-theater-modal";
 import {
@@ -17,7 +18,6 @@ import {
 } from "@/lib/streaming/playback-progress";
 import {
   actionRemoveFromLibrary,
-  actionGetContinueWatching,
 } from "@/features/library/actions/library-actions";
 import {
   getCachedBackdrop,
@@ -25,6 +25,8 @@ import {
 } from "@/lib/media/backdrop-cache";
 import { cn } from "@/lib/utils";
 import type { LibraryEntry } from "@/types/library";
+
+const EMPTY_INITIAL_ENTRIES: LibraryEntry[] = [];
 
 interface ContinueWatchingRailProps {
   initialEntries?: LibraryEntry[];
@@ -36,7 +38,7 @@ interface ContinueWatchingRailProps {
 }
 
 export function ContinueWatchingRail({
-  initialEntries = [],
+  initialEntries = EMPTY_INITIAL_ENTRIES,
   variant = "grid",
   cardOrientation,
   title = "Continue watching",
@@ -44,6 +46,7 @@ export function ContinueWatchingRail({
   className,
 }: ContinueWatchingRailProps) {
   const effectiveOrientation = cardOrientation ?? (variant === "row" ? "landscape" : "portrait");
+  const hasSyncedRef = React.useRef(false);
 
   // Synchronously initialize entries from recent playback storage on frame zero (~0ms)
   const [entries, setEntries] = React.useState<LibraryEntry[]>(() => {
@@ -144,23 +147,14 @@ export function ContinueWatchingRail({
   }, []);
 
   React.useEffect(() => {
+    if (hasSyncedRef.current) return;
+    hasSyncedRef.current = true;
     let cancelled = false;
 
     async function syncEntries() {
       const recent = getRecentPlayback();
 
-      let baseEntries = initialEntries;
-
-      if (!baseEntries.length) {
-        try {
-          const serverList = await actionGetContinueWatching(12);
-          if (!cancelled && serverList.length > 0) {
-            baseEntries = serverList;
-          }
-        } catch {
-          // ignore error
-        }
-      }
+      const baseEntries = initialEntries;
 
       if (cancelled) return;
 
@@ -265,9 +259,11 @@ export function ContinueWatchingRail({
         Promise.all(
           displayList.map(async (entry) => {
             try {
-              const res = await fetch(`/api/media/details?type=${entry.media_type}&id=${entry.external_id}&_cb=${Date.now()}`);
-              if (!res.ok) return null;
-              const data = await res.json();
+              if (entry.backdrop_path && entry.poster_path && getCachedBackdrop(entry.media_type, entry.external_id)) {
+                return null;
+              }
+              const data = await fetchClientMediaDetails(entry.media_type, entry.external_id);
+              if (!data) return null;
               const bestBackdrop = data.enBackdropPath || data.logoBackdropPath || data.backdropPath || null;
               if (data.enBackdropPath || data.logoBackdropPath) {
                 setCachedBackdrop(entry.media_type, entry.external_id, {
@@ -297,7 +293,7 @@ export function ContinueWatchingRail({
             if (r) {
               const newBackdrop = (effectiveOrientation === "landscape" && r.backdropPath) ? r.backdropPath : (r.backdropPath || e.backdrop_path);
               const newPoster = r.posterPath || e.poster_path;
-              const fixedTitle = (r.title && (e.title.includes(",") || e.title.length > 35)) ? r.title : (e.title || r.title);
+              const fixedTitle = ((r.title && (e.title.includes(",") || e.title.length > 35)) ? r.title : (e.title || r.title)) || e.title;
 
               if (newBackdrop !== e.backdrop_path || newPoster !== e.poster_path || fixedTitle !== e.title) {
                 updated = true;
@@ -335,7 +331,7 @@ export function ContinueWatchingRail({
     return () => {
       cancelled = true;
     };
-  }, [initialEntries, effectiveOrientation]);
+  }, []);
 
   if (entries.length === 0) {
     if (variant === "row") {
@@ -383,6 +379,7 @@ export function ContinueWatchingRail({
               {href ? (
                 <Link
                   href={href}
+                  prefetch={false}
                   className="group inline-flex items-center gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 >
                   <h2 className="text-section-title transition-colors duration-300 group-hover:text-primary">

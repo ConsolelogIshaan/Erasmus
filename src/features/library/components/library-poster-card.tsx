@@ -8,6 +8,7 @@ import { Heart, Pin, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { posterUrl, backdropUrl } from "@/lib/media/image";
+import { fetchClientMediaDetails } from "@/lib/media/client-details";
 import { Badge } from "@/components/ui/badge";
 import { WATCH_STATUS_LABELS, type LibraryEntry } from "@/types/library";
 import { ROUTES } from "@/constants/routes";
@@ -46,7 +47,6 @@ export function LibraryPosterCard({
   const reduceMotion = useReducedMotion();
   const [localProgress, setLocalProgress] = React.useState<number | null>(null);
   const [episodeLabel, setEpisodeLabel] = React.useState<string | null>(null);
-
   React.useEffect(() => {
     if (entry.media_type === "tv") {
       const tvResume = getTvShowResume(entry.external_id);
@@ -116,10 +116,13 @@ export function LibraryPosterCard({
 
   React.useEffect(() => {
     if (!entry.external_id) return;
+    // Skip network call if entry already has both backdrop and poster
+    if (entry.backdrop_path && entry.poster_path && getCachedBackdrop(entry.media_type, entry.external_id)) {
+      return;
+    }
 
     let cancelled = false;
-    fetch(`/api/media/details?type=${entry.media_type}&id=${entry.external_id}&_cb=${Date.now()}`)
-      .then((res) => (res.ok ? res.json() : null))
+    fetchClientMediaDetails(entry.media_type, entry.external_id)
       .then((data) => {
         if (cancelled || !data) return;
         const bestBackdrop = data.enBackdropPath || data.logoBackdropPath || data.backdropPath;
@@ -192,7 +195,7 @@ export function LibraryPosterCard({
       >
         <Link
           href={href}
-          prefetch
+          prefetch={false}
           onClick={(e) => {
             if (onCardClick) {
               if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {

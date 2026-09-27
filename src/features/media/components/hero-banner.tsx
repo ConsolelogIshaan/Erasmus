@@ -15,6 +15,7 @@ import { getTvShowResume } from "@/lib/streaming/playback-progress";
 import type { MediaSummary } from "@/types/media";
 import { useAmbient } from "@/providers/ambient-provider";
 import type { AmbientPalette } from "@/lib/media/ambient-palette-types";
+import { fetchClientMediaDetails } from "@/lib/media/client-details";
 
 export type HeroBannerMediaItem = MediaSummary & {
   ambientPalette?: AmbientPalette;
@@ -57,6 +58,7 @@ export function HeroBanner({
     Record<string, { logoPath: string | null; tagline: string | null }>
   >({});
   const [theaterOpen, setTheaterOpen] = React.useState(false);
+  const fetchedKeysRef = React.useRef<Set<string>>(new Set());
 
   const go = React.useCallback(
     (dir: -1 | 1) => {
@@ -67,12 +69,12 @@ export function HeroBanner({
 
   // Auto-advance carousel timer (pauses on hover)
   React.useEffect(() => {
-    if (slides.length <= 1 || paused) return;
+    if (slides.length <= 1 || paused || theaterOpen) return;
     const timer = window.setInterval(() => {
       setIndex((i) => (i + 1) % slides.length);
     }, intervalMs);
     return () => window.clearInterval(timer);
-  }, [slides.length, paused, intervalMs]);
+  }, [slides.length, paused, theaterOpen, intervalMs]);
 
   const active = slides[index] ?? slides[0];
 
@@ -119,10 +121,11 @@ export function HeroBanner({
         }
       }
 
-      // 3. Details fetch if logo not yet known
-      if (detailsCache[key] !== undefined || slide.logoPath) return;
-      fetch(`/api/media/details?type=${slide.mediaType}&id=${slide.id}`)
-        .then((res) => (res.ok ? res.json() : null))
+      // 3. Details fetch if logo not yet known (strictly once per slide)
+      if (slide.logoPath || fetchedKeysRef.current.has(key)) return;
+      fetchedKeysRef.current.add(key);
+
+      fetchClientMediaDetails(slide.mediaType, slide.id)
         .then((data) => {
           if (!data) return;
           if (data.logoPath) {
@@ -142,40 +145,7 @@ export function HeroBanner({
         })
         .catch(() => {});
     });
-  }, [slides, detailsCache]);
-
-  // Fetch logo/tagline for active slide if not already cached
-  React.useEffect(() => {
-    if (!active) return;
-    const key = `${active.mediaType}:${active.id}`;
-    if (detailsCache[key] !== undefined) return;
-
-    let isCancelled = false;
-    fetch(`/api/media/details?type=${active.mediaType}&id=${active.id}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (isCancelled || !data) return;
-        setDetailsCache((prev) => ({
-          ...prev,
-          [key]: {
-            logoPath: data.logoPath ?? null,
-            tagline: data.tagline ?? null,
-          },
-        }));
-      })
-      .catch(() => {
-        if (!isCancelled) {
-          setDetailsCache((prev) => ({
-            ...prev,
-            [key]: { logoPath: null, tagline: null },
-          }));
-        }
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [active, detailsCache]);
+  }, [slides]);
 
   if (!active) return null;
 
@@ -321,6 +291,7 @@ export function HeroBanner({
                   {logo ? (
                     <Link
                       href={href}
+                      prefetch={false}
                       className="inline-block transition-transform duration-300 hover:scale-[1.02] focus:outline-none"
                       aria-label={`View ${active.title}`}
                     >
@@ -342,6 +313,7 @@ export function HeroBanner({
                     <h2 className="font-display text-balance text-[clamp(2.6rem,1.8rem+3.4vw,4.8rem)] font-extrabold leading-[1.04] tracking-[-0.03em] text-white drop-shadow-xl">
                       <Link
                         href={href}
+                        prefetch={false}
                         className="transition-colors hover:text-primary focus-visible:text-primary focus:outline-none"
                       >
                         {active.title}
@@ -381,7 +353,7 @@ export function HeroBanner({
               {/* Pill See More Button */}
               <Link
                 href={href}
-                prefetch
+                prefetch={false}
                 className="inline-flex items-center gap-2 sm:gap-2.5 rounded-full border border-white/25 bg-black/45 hover:bg-white/15 hover:border-white/35 px-5 sm:px-6 py-3 text-sm sm:text-base font-semibold text-white backdrop-blur-md transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 aria-label={`See more details about ${active.title}`}
               >

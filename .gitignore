@@ -74,3 +74,12 @@ vendor/
 relay/*.log
 relay/CURRENT_TUNNEL_URL.txt
 
+# Cloudflare OpenNext
+.open-next/
+.wrangler/
+.dev.vars
+
+# Temporary scratch scripts
+scratch/
+
+

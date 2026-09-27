@@ -49,6 +49,7 @@ export function MediaRow({
           {href ? (
             <Link
               href={href}
+              prefetch={false}
               className="group inline-flex items-center gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               <h2 className="text-section-title transition-colors duration-300 group-hover:text-primary">

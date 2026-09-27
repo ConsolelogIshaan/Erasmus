@@ -1,7 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 
-const WORKER_URL = 'https://erasmus-hls-relay.erasmustv.workers.dev';
+const PRIMARY_WORKER_URL = 'https://erasmus-hls-relay.ishaan-jangid1.workers.dev';
+const WORKER_URLS = [
+  PRIMARY_WORKER_URL,
+  'https://erasmus-hls-relay.erasmustv.workers.dev',
+];
 const SYNC_SECRET = 'erasmus_relay_tunnel_key_9247f1';
 
 const logPath = path.join(process.cwd(), 'relay', 'tunnel.log');
@@ -11,33 +15,36 @@ const currentUrlFile = path.join(process.cwd(), 'relay', 'CURRENT_TUNNEL_URL.txt
 let lastRegisteredUrl = '';
 
 async function registerWithWorker(tunnelUrl) {
-  try {
-    const res = await fetch(`${WORKER_URL}/set-target`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SYNC_SECRET}`,
-      },
-      body: JSON.stringify({ target: tunnelUrl }),
-    });
-    const data = await res.json();
-    console.warn(`[Sync] Registered with Cloudflare Worker (${WORKER_URL}):`, data.status === 'ok' ? 'SUCCESS' : data);
-    return true;
-  } catch (err) {
-    console.warn('[Sync] Could not reach Cloudflare Worker:', err.message);
-    return false;
+  for (const url of WORKER_URLS) {
+    try {
+      const res = await fetch(`${url}/set-target`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SYNC_SECRET}`,
+        },
+        body: JSON.stringify({ target: tunnelUrl }),
+      });
+      const data = await res.json();
+      console.warn(`[Sync] Registered with Cloudflare Worker (${url}):`, data.status === 'ok' ? 'SUCCESS' : data);
+    } catch (err) {
+      console.warn(`[Sync] Could not reach Cloudflare Worker (${url}):`, err.message);
+    }
   }
+  return true;
 }
 
 async function sendHeartbeat() {
-  try {
-    await fetch(`${WORKER_URL}/ping`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SYNC_SECRET}`,
-      },
-    });
-  } catch {}
+  for (const url of WORKER_URLS) {
+    try {
+      await fetch(`${url}/ping`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SYNC_SECRET}`,
+        },
+      });
+    } catch {}
+  }
 }
 
 async function checkAndSync() {
@@ -68,12 +75,12 @@ async function checkAndSync() {
       let env = fs.readFileSync(envPath, 'utf8');
       const regex = /NEXT_PUBLIC_HLS_RELAY_URL=.*/;
       if (regex.test(env)) {
-        env = env.replace(regex, `NEXT_PUBLIC_HLS_RELAY_URL=${WORKER_URL}`);
+        env = env.replace(regex, `NEXT_PUBLIC_HLS_RELAY_URL=${PRIMARY_WORKER_URL}`);
       } else {
-        env += `\nNEXT_PUBLIC_HLS_RELAY_URL=${WORKER_URL}\n`;
+        env += `\nNEXT_PUBLIC_HLS_RELAY_URL=${PRIMARY_WORKER_URL}\n`;
       }
       fs.writeFileSync(envPath, env, 'utf8');
-      console.warn(`[Sync] .env.local configured with permanent Worker URL: ${WORKER_URL}`);
+      console.warn(`[Sync] .env.local configured with permanent Worker URL: ${PRIMARY_WORKER_URL}`);
     }
 
     // Register active tunnel target with the Cloudflare Worker

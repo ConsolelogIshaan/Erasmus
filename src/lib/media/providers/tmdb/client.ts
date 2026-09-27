@@ -45,14 +45,20 @@ export function isTmdbConfigured(): boolean {
   return Boolean(apiKey || accessToken);
 }
 
-const publicResolver = new Resolver();
-publicResolver.setServers(PUBLIC_DNS_SERVERS);
+let publicResolver: Resolver | null = null;
+try {
+  publicResolver = new Resolver();
+  publicResolver.setServers(PUBLIC_DNS_SERVERS);
+} catch {
+  publicResolver = null;
+}
 
 type IpCacheEntry = { ips: string[]; expiresAt: number };
 const ipCache = new Map<string, IpCacheEntry>();
 const IP_CACHE_TTL_MS = 5 * 60 * 1000;
 
 async function resolveIpv4(hostname: string): Promise<string[]> {
+  if (!publicResolver) return [];
   const cached = ipCache.get(hostname);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.ips;
@@ -80,11 +86,23 @@ interface RawHttpResponse {
   body: string;
 }
 
-function requestOnce(
+async function requestOnce(
   url: URL,
   headers: Record<string, string>,
   address: string | null,
 ): Promise<RawHttpResponse> {
+  if (!address || typeof https?.request !== "function") {
+    const res = await fetch(url.toString(), {
+      headers,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    return {
+      status: res.status,
+      statusText: res.statusText,
+      body: await res.text(),
+    };
+  }
+
   const hostname = url.hostname;
   const connectHost = address ?? hostname;
 
@@ -130,6 +148,37 @@ async function resilientGet(
   url: URL,
   headers: Record<string, string>,
 ): Promise<RawHttpResponse> {
+  const isCloudflare = Boolean(
+    process.env.NEXT_PUBLIC_IS_CLOUDFLARE === "true" ||
+    "WebSocketPair" in globalThis
+  );
+
+  // In Cloudflare Workers, Cloudflare edge handles DNS globally with zero ISP blocking.
+  // Standard native fetch() connects directly in ~50ms without raw socket emulation.
+  if (isCloudflare) {
+    try {
+      const res = await fetch(url.toString(), {
+        headers,
+        signal: AbortSignal.timeout(6000),
+      });
+      return {
+        status: res.status,
+        statusText: res.statusText,
+        body: await res.text(),
+      };
+    } catch (error) {
+      console.warn(
+        `[tmdb] Cloudflare native fetch failed for ${url.pathname}:`,
+        error instanceof Error ? error.message : error,
+      );
+      throw new TmdbError(
+        error instanceof Error ? error.message : "TMDB fetch failed on Cloudflare",
+        0,
+        url.pathname,
+      );
+    }
+  }
+
   const ips = await resolveIpv4(url.hostname);
   const targets: Array<string | null> =
     ips.length > 0 ? ips.slice(0, 3) : [null];
@@ -156,8 +205,16 @@ async function resilientGet(
   throw new TmdbError(message, 0, url.pathname);
 }
 
+type TmdbCacheEntry = { data: unknown; expiresAt: number };
+const tmdbResponseCache = new Map<string, TmdbCacheEntry>();
+const tmdbInflightRequests = new Map<string, Promise<unknown>>();
+const TMDB_CACHE_TTL_MS = 5 * 60 * 1000;
+const MAX_TMDB_CACHE_ENTRIES = 300;
+
 /**
  * GET a TMDB v3 endpoint. Returns null on 404; throws on other errors.
+ * Includes in-memory TTL caching and inflight deduplication to avoid hitting
+ * Cloudflare Worker subrequest limits (Error 1200).
  */
 export async function tmdbFetch<T>(
   path: string,
@@ -188,6 +245,17 @@ export async function tmdbFetch<T>(
     url.searchParams.set("api_key", apiKey);
   }
 
+  const cacheKey = url.toString();
+  const cached = tmdbResponseCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data as T;
+  }
+
+  const inflight = tmdbInflightRequests.get(cacheKey);
+  if (inflight) {
+    return (await inflight) as T | null;
+  }
+
   const headers: Record<string, string> = {
     Accept: "application/json",
   };
@@ -195,23 +263,38 @@ export async function tmdbFetch<T>(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  const response = await resilientGet(url, headers);
+  const executeFetch = async (): Promise<T | null> => {
+    try {
+      const response = await resilientGet(url, headers);
 
-  if (response.status === 404) {
-    return null;
-  }
+      if (response.status === 404) {
+        return null;
+      }
 
-  if (response.status < 200 || response.status >= 300) {
-    throw new TmdbError(
-      `TMDB ${response.status}: ${response.body.slice(0, 200) || response.statusText}`,
-      response.status,
-      path,
-    );
-  }
+      if (response.status < 200 || response.status >= 300) {
+        throw new TmdbError(
+          `TMDB ${response.status}: ${response.body.slice(0, 200) || response.statusText}`,
+          response.status,
+          path,
+        );
+      }
 
-  try {
-    return JSON.parse(response.body) as T;
-  } catch {
-    throw new TmdbError("TMDB returned invalid JSON", response.status, path);
-  }
+      try {
+        const data = JSON.parse(response.body) as T;
+        if (tmdbResponseCache.size >= MAX_TMDB_CACHE_ENTRIES) {
+          tmdbResponseCache.clear();
+        }
+        tmdbResponseCache.set(cacheKey, { data, expiresAt: Date.now() + TMDB_CACHE_TTL_MS });
+        return data;
+      } catch {
+        throw new TmdbError("TMDB returned invalid JSON", response.status, path);
+      }
+    } finally {
+      tmdbInflightRequests.delete(cacheKey);
+    }
+  };
+
+  const promise = executeFetch();
+  tmdbInflightRequests.set(cacheKey, promise);
+  return promise;
 }

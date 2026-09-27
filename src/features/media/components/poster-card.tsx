@@ -167,7 +167,7 @@ export function PosterCard({
       >
         <Link
           href={href}
-          prefetch
+          prefetch={false}
           className="focus-visible:ring-ring absolute inset-0 z-0 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
           aria-label={`${rank != null ? `#${rank} ` : ""}${item.title}${
             year ? `, ${year}` : ""
@@ -302,7 +302,7 @@ export function PosterCard({
         </AnimatePresence>
       </div>
 
-      <Link href={href} prefetch className="mt-2.5 block space-y-1 px-0.5">
+      <Link href={href} prefetch={false} className="mt-2.5 block space-y-1 px-0.5">
         <p className="line-clamp-2 text-[15px] leading-snug font-semibold tracking-tight">
           {item.title}
         </p>
