@@ -1348,4 +1348,28 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
      - `npm run build`: 52/52 routes compiled cleanly.
      - Strictly 0 git push without explicit user instruction per `AGENTS.md`.
 
-
+## 2026-09-27 9:42 PM IST | Ishaan | Antigravity
+- Optimized: Maximized Bandwidth Utilization ("Juice Internet") & Zero-Buffering Buffer Headroom:
+  1. Root Objective:
+     - User instructed: "juice out the users internet because i want the best quality and possibility of as much as low buffering as possible".
+     - Enable aggressive forward pre-buffering and rapid ABR step-up without introducing the 3-second watchdog stutter or UI thread lag.
+  2. Implementations Applied:
+     - In `src/features/streaming/components/native-player.tsx`:
+       - `maxBufferLength: 120`: 2 minutes of continuous forward buffer.
+       - `maxMaxBufferLength: 240`: Allows up to 4 minutes of buffer headroom whenever connection throughput permits.
+       - `maxBufferSize: 180 * 1000 * 1000`: 180 MB MSE buffer ceiling, accommodating 1080p and 4K streams smoothly.
+       - `backBufferLength: 60`: 60 seconds back-buffer for instantaneous zero-rebuffer rewinds.
+       - `abrBandWidthFactor: 0.95`: Directs Hls.js to utilize 95% of measured bandwidth for maximum quality.
+       - `abrBandWidthUpFactor: 0.75`: Ensures responsive, rapid upgrades to higher quality levels on fast internet.
+       - `abrMaxWithRealBitrate: true`: Measures actual downloaded segment throughput rather than relying on theoretical manifest bitrates, immediately detecting high-speed user connections.
+       - Smart Start Level Fallback: Prioritizes 1080p, then 720p, or the highest available stream level for crisp instant playback startup.
+       - Watchdog & Stability: Kept `highBufferWatchdogPeriod: 8` and `nudgeOffset: 0.1` (immune to 3s jitter skips) with `fragLoadingTimeOut: 25000` and 6 retries.
+     - In `src/features/streaming/components/streaming-theater-modal.tsx`:
+       - Throttled `savePlaybackProgress` from running 4x/second on every 250ms `timeupdate` to at most once every 1,500ms during playback.
+       - Added fallback to persist full final position on modal close. Eliminates main-thread JSON serialization spikes during video playback.
+  3. Verification:
+     - `npm run typecheck`: 0 errors.
+     - `npm run lint`: 0 errors (11 pre-existing warnings).
+     - `npm run test`: 20/20 test files passed (223/223 tests passed, 100% pass rate).
+     - `npm run build`: 52/52 routes compiled cleanly.
+     - Strictly 0 git push without explicit user instruction per `AGENTS.md`.

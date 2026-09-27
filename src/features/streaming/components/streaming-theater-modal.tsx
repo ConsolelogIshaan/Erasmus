@@ -654,18 +654,23 @@ export function StreamingTheaterModal({
     };
   }, [open, mediaType, tmdbId, activeSeason, activeEpisode, resolvedImdbId, title]);
 
+  const lastSaveTimeRef = React.useRef(0);
   const persistProgress = React.useCallback(
     (seconds: number, duration: number | null) => {
       if (seconds < 5) return;
       lastKnownRef.current = { seconds, duration };
-      savePlaybackProgress(progressInput, seconds, duration);
+      const now = Date.now();
+      if (now - lastSaveTimeRef.current >= 1500) {
+        lastSaveTimeRef.current = now;
+        savePlaybackProgress(progressInput, seconds, duration);
+      }
       const hasAuthCookie = typeof document !== "undefined" && document.cookie.includes("sb-");
       if (
         effectiveIdentity &&
         hasAuthCookie &&
-        Date.now() - lastLibrarySyncRef.current > 60_000
+        now - lastLibrarySyncRef.current > 60_000
       ) {
-        lastLibrarySyncRef.current = Date.now();
+        lastLibrarySyncRef.current = now;
         if (mediaType === "movie") {
           actionSetMovieProgress(
             effectiveIdentity,
@@ -692,6 +697,9 @@ export function StreamingTheaterModal({
   React.useEffect(() => {
     if (wasOpenRef.current && !open) {
       // User closed the theater modal - sync final position to library once
+      if (lastKnownRef.current.seconds >= 5) {
+        savePlaybackProgress(progressInput, lastKnownRef.current.seconds, lastKnownRef.current.duration);
+      }
       const hasAuthCookie = typeof document !== "undefined" && document.cookie.includes("sb-");
       const ident = identityRef.current;
       if (ident && hasAuthCookie && lastKnownRef.current.seconds >= 15) {
@@ -711,7 +719,7 @@ export function StreamingTheaterModal({
       }
     }
     wasOpenRef.current = open;
-  }, [open, mediaType, activeSeason, activeEpisode]);
+  }, [open, mediaType, activeSeason, activeEpisode, progressInput]);
 
   const hasSyncedWatchingRef = React.useRef<string | null>(null);
 

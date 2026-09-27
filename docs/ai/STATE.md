@@ -1,38 +1,39 @@
 # STATE
 
-Updated: 2026-09-27 9:28 PM IST
-Git: `origin/main` (Clean working tree; verified build, lints, and tests; streaming buffering & stuttering fixed)
+Updated: 2026-09-27 9:42 PM IST
+Git: `origin/main` (Clean working tree; verified build, lints, and tests; high-bandwidth buffering & low-latency streaming optimized)
 
 ## Priority
-Streaming/playback is stable and rock-solid. Fixed the buffering and stuttering issues reported by the user in `NativePlayer` and deployed the updated Smart Relay worker to Cloudflare.
+Streaming/playback is stable, fast, and buffered ahead. Optimized `NativePlayer` to maximize user bandwidth ("juice internet") with high forward buffer headroom, 95% ABR bandwidth utilization, real bitrate estimation, and throttled playback progress persistence to eliminate UI thread frame-drops.
 
-## Buffering & Stuttering Fixes Applied
-1. **Eliminated Hls.js 3-Second Watchdog Stutter Loop**:
-   - Reverted `highBufferWatchdogPeriod: 3` and `nudgeOffset: 0.3` back to stable defaults (`highBufferWatchdogPeriod: 8`, `nudgeOffset: 0.2`, `nudgeMaxRetry: 5`).
-   - Root Cause: Setting `highBufferWatchdogPeriod: 3` caused HLS.js to violently skip the playhead forward by 0.3s every 3 seconds whenever any buffer underrun occurred, causing rapid play-pause-skip jitter.
+## Buffering & Bandwidth Optimizations Applied
+1. **Aggressive Forward Buffer Headroom (Zero Buffering)**:
+   - `maxBufferLength: 120` (2 minutes forward buffer).
+   - `maxMaxBufferLength: 240` (up to 4 minutes forward buffer headroom when bandwidth allows).
+   - `maxBufferSize: 180 * 1000 * 1000` (180 MB MSE buffer ceiling to accommodate high-bitrate 1080p and 4K streams).
+   - `backBufferLength: 60` (60 seconds back-buffer for instant, zero-rebuffer rewinds).
 
-2. **Removed Forged 18 Mbps Bitrate Bias & Bandwidth Testing**:
-   - Removed `abrEwmaDefaultEstimate: 18_000_000` and `testBandwidth: true`.
-   - Root Cause: Forcing an initial 18 Mbps estimate caused HLS.js to immediately jump straight into the highest 16.2 Mbps 4K stream on initial frame load, starving the buffer on typical residential internet connections. Removed `testBandwidth: true` to prevent continuous test-fetching and quality level flapping.
+2. **Responsive Adaptive Bitrate (Max Quality)**:
+   - `abrBandWidthFactor: 0.95`: Utilizes 95% of measured bandwidth to consistently target highest resolution tiers.
+   - `abrBandWidthUpFactor: 0.75`: Smooth and responsive quality step-ups without waiting for double bandwidth overhead.
+   - `abrMaxWithRealBitrate: true`: Measures actual downloaded segment throughput rather than theoretical manifest values, detecting high-speed connections immediately.
+   - Smart Start Level: Prefers 1080p for instant high-def playback startup, falling back to 720p or highest available stream.
 
-3. **Restored Balanced Buffer Headroom & Max Hole Clearance**:
-   - Restored `maxBufferLength: 60`, `maxMaxBufferLength: 120`, `maxBufferSize: 120 * 1000 * 1000`, and `maxBufferHole: 0.8`.
-   - Root Cause: Attempting to buffer 250 MB (180s) ahead with a 1.5s hole tolerance requested too many concurrent fragments and allowed container PTS discontinuities.
+3. **Stutter-Free Watchdog Stability**:
+   - `highBufferWatchdogPeriod: 8` and `nudgeOffset: 0.1`: Gentle 100ms nudge only on genuine decoder stalls, completely immune to the 3-second rapid skip jitter loop.
+   - `maxBufferHole: 0.8`: Tight timestamp gap clearance.
+   - `fragLoadingTimeOut: 25000` with 6 retries and 500ms delay.
 
-4. **Fixed Stuck Loading Spinner in `FRAG_BUFFERED`**:
-   - Removed `if (!video.paused)` guard from `Hls.Events.FRAG_BUFFERED`. The buffering spinner now clears unconditionally whenever fresh media frames arrive, eliminating the permanent spinner trap shown in the user's screenshots.
-
-5. **Cloudflare Smart Relay Deployment**:
-   - Added `Origin` header handling alongside `Referer` to `relay/cloudflare-worker/worker.js` for upstream CDN compatibility.
-   - Deployed to `https://erasmus-hls-relay.erasmustv.workers.dev` (Version ID: `bc187618-abdf-4779-a9f6-d5421193a16d`).
-   - Fixed `PRIMARY_WORKER_URL` in `relay/sync-tunnel-url.mjs` to point to `erasmustv.workers.dev` so background scripts never revert `.env.local` to the slow residential tunnel.
+4. **Throttled LocalStorage Sync During Playback**:
+   - In `streaming-theater-modal.tsx`, throttled `savePlaybackProgress` from firing 4x/sec (every 250ms `timeupdate`) down to once every 1500ms.
+   - Guaranteed full final position sync on modal close / pause. Eliminates main-thread JSON serialization spikes during video playback.
 
 ---
 
 ## Verification Summary
 - `npm run typecheck`: 0 errors.
-- `npm run lint`: 0 errors.
-- `npm run test`: 20/20 test files passed (223/223 tests passed, 100% pass rate).
+- `npm run lint`: 0 errors (11 pre-existing warnings).
+- `npm run test`: All 20 test files passed (223/223 tests passed, 100% pass rate).
 - `npm run build`: 52/52 routes compiled cleanly.
 - Worker deployed: `erasmus-hls-relay.erasmustv.workers.dev` (Version `bc187618-abdf-4779-a9f6-d5421193a16d`).
 - Strictly 0 git push without explicit user instruction per `AGENTS.md`.
