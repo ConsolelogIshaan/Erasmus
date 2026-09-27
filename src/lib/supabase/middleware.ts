@@ -35,8 +35,8 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Never run auth checks or Supabase network calls on stream relay chunks/subtitles
-  if (pathname.startsWith("/api/stream")) {
+  // Never run auth checks or Supabase network calls on API routes
+  if (pathname.startsWith("/api/")) {
     return supabaseResponse;
   }
 
@@ -90,6 +90,18 @@ export async function updateSession(request: NextRequest) {
       redirectUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(redirectUrl);
     }
+    return supabaseResponse;
+  }
+
+  // Link prefetch optimization: Next.js pre-fetches RSC payloads in the background on link hover.
+  // Running full remote getUser() for every hovered poster card or navbar link exhausts Cloudflare
+  // Worker CPU (Error 1102). Since auth cookie is present, allow the prefetch pass immediately.
+  const isPrefetch =
+    request.headers.get("x-middleware-prefetch") === "1" ||
+    request.headers.get("next-router-prefetch") === "1" ||
+    request.headers.get("purpose") === "prefetch";
+
+  if (isPrefetch) {
     return supabaseResponse;
   }
 

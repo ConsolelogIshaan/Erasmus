@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { extractAmbientColors, DEFAULT_AMBIENT_PALETTE } from "@/lib/media/ambient-colors";
 
 export const runtime = "nodejs";

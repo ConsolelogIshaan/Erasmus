@@ -1298,12 +1298,28 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Local browser preview confirmed the authentication gate; authenticated UI inspection was not possible in the current browser session.
 - Existing navbar work retained. No streaming changes, dependencies, commits, deployments, or pushes.
 
-## 2026-09-27 7:18 PM IST | Ishaan | Antigravity
-- Configured Cloudflare Workers CI Git integration:
-  1. Connected repository `ConsolelogIshaan/Erasmus` directly to `erasmus-web` under Cloudflare Workers & Pages.
-  2. Set OpenNext Build command: `npx opennextjs-cloudflare build` and Deploy command: `npx wrangler deploy`.
-  3. Added convenience scripts to `package.json`: `"build:worker": "opennextjs-cloudflare build"`, `"deploy:worker": "opennextjs-cloudflare deploy"`.
-  4. Verified all production runtime variables and secrets are already present in Cloudflare Dashboard.
-  5. Verified `npm run typecheck` (0 errors), `npm run lint` (0 errors), `npm run test` (20/20 files, 223/223 tests passed), and `npm run build` (42/42 routes compiled cleanly).
-  6. Pushed to `origin/main` to trigger the first automated Cloudflare Workers CI build.
+## 2026-09-27 8:38 PM IST | Ishaan | Antigravity
+- Proactive Hardening against Cloudflare Worker Error 1102 ("Worker exceeded CPU time limit"):
+  1. Root Middleware Bypass for API Routes:
+     - In `src/middleware.ts`, updated config matcher to exclude `api/` along with static assets.
+     - In `src/lib/supabase/middleware.ts`, added early return for `pathname.startsWith("/api/")`.
+     - Completely prevents Cloudflare Workers from spinning up the Edge isolate, parsing cookies, and making remote Supabase `getUser()` network calls on every media/catalog API call.
+  2. Link Prefetch Guard in Middleware:
+     - In `src/lib/supabase/middleware.ts`, detected Next.js background link prefetch requests (`x-middleware-prefetch`, `next-router-prefetch`, `purpose: prefetch`).
+     - If the user has an active session cookie, immediately returns `supabaseResponse` without executing redundant remote `getUser()` token revalidations during link hovers.
+  3. Public Edge CDN Caching on Media Routes:
+     - `src/app/api/media/trending/route.ts`: Removed redundant per-request session checks; added `Cache-Control: public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400` and `CDN-Cache-Control: public, max-age=86400`. Cloudflare Anycast Edge serves trending titles from memory with 0ms Worker CPU.
+     - `src/app/api/media/tv/[showId]/season/[seasonNumber]/route.ts`: Added `s-maxage=86400` and `CDN-Cache-Control: public, max-age=86400`.
+  4. Search Query Debounce & Guard:
+     - `src/features/search/hooks/use-media-search.ts`: Raised minimum query threshold from `>= 1` to `>= 2` characters, preventing premature multi-provider search queries on single-character typing pauses.
+     - `src/app/api/media/search/route.ts`: Guarded `q.length < 2` and added `s-maxage=600` edge caching to search responses.
+  5. In-Memory TTL Caching & Request Deduplication:
+     - `src/lib/media/providers/omdb/client.ts`: Added in-memory TTL cache (1h TTL, 300 max items) and inflight request deduplication for OMDb ratings.
+     - `src/lib/media/providers/tmdb/client.ts`: Added `cf: { cacheEverything: true, cacheTtl: 300 }` edge caching for native Cloudflare fetches to TMDB.
+  6. Verification:
+     - `npm run typecheck`: 0 errors.
+     - `npm run lint`: 0 errors (12 pre-existing warnings).
+     - `npm run test`: 20/20 test files passed (223/223 tests passed, 100% pass rate).
+     - `npm run build`: 52/52 routes compiled cleanly.
+     - Strictly 0 git push per `AGENTS.md`.
 

@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   }
 
   const q = (request.nextUrl.searchParams.get("q")?.trim() ?? "").slice(0, 120);
-  if (q.length < 1) {
+  if (q.length < 2) {
     return NextResponse.json({ query: q, results: [], totalResults: 0 });
   }
 
@@ -54,9 +54,8 @@ export async function GET(request: NextRequest) {
     const data = await searchCatalog(q, page);
     return NextResponse.json(data, {
       headers: {
-        // Per-user results are not involved, but the response is now behind a
-        // session, so keep it off shared caches.
-        "Cache-Control": "private, max-age=60",
+        "Cache-Control": "public, max-age=120, s-maxage=600, stale-while-revalidate=1800",
+        "CDN-Cache-Control": "public, max-age=600",
       },
     });
   } catch (error) {
