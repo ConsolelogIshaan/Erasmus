@@ -55,4 +55,4 @@ Streaming/playback is frozen and stable. Hardened the codebase proactively again
 - `npm run lint`: 0 errors (12 pre-existing warnings).
 - `npm run test`: 20/20 test files passed (223/223 tests passed, 100% pass rate).
 - `npm run build`: 52/52 routes compiled cleanly.
-- ZERO git push performed per `AGENTS.md`.
+- Pushed to `origin/main` per explicit user command (Cloudflare CI deployment triggered).
