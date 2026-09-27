@@ -64,6 +64,9 @@ export function generateQueryVariants(query: string): string[] {
   // High priority: normalize letter runs ("inceptioon" → "inception")
   add(collapseRepeats(q, 1), 0);
   add(collapseRepeats(q, 2), 1);
+  // Prefix retrieval finds candidates for missing/replaced letters too.
+  if (q.length >= 5) add(q.slice(0, 4), 1);
+  if (q.length >= 5) add(q.slice(0, 3), 1);
 
   // Trailing mistype / still typing
   if (q.length >= 3) add(q.slice(0, -1), 2);
@@ -108,8 +111,15 @@ export function generateQueryVariants(query: string): string[] {
 
 /** Higher is better — used to re-rank fuzzy fallback hits. */
 export function titleSimilarityScore(title: string, query: string): number {
-  const t = title.trim().toLowerCase();
-  const q = query.trim().toLowerCase();
+  const normalize = (value: string) =>
+    value
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
+  const t = normalize(title);
+  const q = normalize(query);
   if (!t || !q) return 0;
   if (t === q) return 10_000;
   if (t.startsWith(q)) return 8_000 - (t.length - q.length);
@@ -117,8 +127,11 @@ export function titleSimilarityScore(title: string, query: string): number {
   if (q.includes(t) && t.length >= 3) return 5_000;
 
   const head = (t.split(/[\s:·\-–—]+/)[0] ?? t).trim();
-  const dist = Math.min(editDistance(t, q), editDistance(head, q));
-  const maxLen = Math.max(t.length, q.length, 1);
-  const ratio = 1 - dist / maxLen;
-  return Math.round(ratio * 4_000) - dist;
+  return Math.max(
+    ...[t, head].map((candidate) => {
+      const dist = editDistance(candidate, q);
+      const ratio = 1 - dist / Math.max(candidate.length, q.length, 1);
+      return Math.round(ratio * 4_000) - dist;
+    }),
+  );
 }

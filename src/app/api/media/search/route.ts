@@ -10,9 +10,9 @@ import {
 
 /**
  * GET /api/media/search?q=
- * Universal catalog search for the command palette.
+ * Universal catalog search for the dedicated Search page.
  *
- * Session-gated: the only caller is the palette inside the authenticated shell,
+ * Session-gated: the caller is inside the authenticated shell,
  * and one request here fans out into several upstream TMDB calls.
  */
 export async function GET(request: NextRequest) {
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const q = (request.nextUrl.searchParams.get("q")?.trim() ?? "").slice(0, 120);
   if (q.length < 1) {
     return NextResponse.json({ query: q, results: [], totalResults: 0 });
   }

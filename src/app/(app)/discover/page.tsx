@@ -26,11 +26,7 @@ export const revalidate = 900;
 export default async function DiscoverPage() {
   const data = await safeGetDiscoveryHome();
   const rawHeroItems =
-    data.heroItems?.length > 0
-      ? data.heroItems
-      : data.hero
-        ? [data.hero]
-        : [];
+    data.heroItems?.length > 0 ? data.heroItems : data.hero ? [data.hero] : [];
 
   const heroItems = await Promise.all(
     rawHeroItems.map(async (item) => {
@@ -42,36 +38,34 @@ export default async function DiscoverPage() {
         ambientPalette: palette,
         ambientBackdropUrl: backdrop,
       };
-    })
+    }),
   );
 
   return (
-    <div className="relative w-full min-h-dvh">
+    <div className="relative min-h-dvh w-full">
       <h1 className="sr-only">Discover — Films and television worth your time</h1>
 
       {!data.configured ? (
-        <div className="content-container-fullbleed pt-[calc(var(--header-height)+1.5rem)]">
+        <div className="content-container-fullbleed pt-[calc(var(--header-height)+3rem)]">
           <CatalogConfigBanner />
         </div>
       ) : null}
 
       {"error" in data && data.error ? (
-        <div className="content-container-fullbleed pt-[calc(var(--header-height)+1.5rem)]">
+        <div className="content-container-fullbleed pt-[calc(var(--header-height)+3rem)]">
           <div
-            className="animate-fade-up rounded-xl border-0 bg-destructive/12 px-4 py-3 text-sm text-destructive"
+            className="animate-fade-up bg-destructive/12 text-destructive rounded-xl border-0 px-4 py-3 text-sm"
             role="alert"
           >
             <p className="font-medium">Catalog temporarily unavailable</p>
-            <p className="mt-1 text-muted-foreground">{data.error}</p>
+            <p className="text-muted-foreground mt-1">{data.error}</p>
           </div>
         </div>
       ) : null}
 
-      {heroItems.length > 0 ? (
-        <HeroBanner items={heroItems} intervalMs={6000} />
-      ) : null}
+      {heroItems.length > 0 ? <HeroBanner items={heroItems} intervalMs={6000} /> : null}
 
-      <div className="content-container-fullbleed space-y-10 pb-16 pt-6">
+      <div className="content-container-fullbleed space-y-10 pt-6 pb-16">
         <Suspense fallback={<Skeleton className="h-12 w-full rounded-xl" />}>
           <ScrollReveal delay={0.05}>
             <GenreChips genres={data.genres} />
@@ -79,7 +73,11 @@ export default async function DiscoverPage() {
         </Suspense>
 
         <div className="space-y-10">
-          <ContinueWatchingRail variant="row" cardOrientation="landscape" href={ROUTES.library} />
+          <ContinueWatchingRail
+            variant="row"
+            cardOrientation="landscape"
+            href={ROUTES.library}
+          />
           {data.sections.map((section, index) => (
             <MediaRow
               key={section.id}
@@ -92,7 +90,7 @@ export default async function DiscoverPage() {
         </div>
 
         {data.configured && !data.hero && data.sections.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             No catalog content returned. Check your TMDB key and network access.
           </p>
         ) : null}

@@ -15,6 +15,7 @@ export const ROUTES = {
   privacy: "/privacy",
   // Catalog
   discover: "/discover",
+  search: "/search",
   movies: "/movies",
   tv: "/tv",
   anime: "/anime",
@@ -57,6 +58,7 @@ export const PROTECTED_ROUTES: readonly string[] = [
   ROUTES.settings,
   ROUTES.profile,
   ROUTES.discover,
+  ROUTES.search,
   ROUTES.movies,
   ROUTES.tv,
   ROUTES.anime,

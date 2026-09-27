@@ -37,12 +37,7 @@ interface HeroBannerProps {
  * Features synchronized ambient atmosphere blending, silky Ken Burns backdrop crossfades,
  * gentle optical de-blurring title motion, and liquid countdown progress pills.
  */
-export function HeroBanner({
-  items,
-  item,
-  intervalMs = 6000,
-  ctaHref,
-}: HeroBannerProps) {
+export function HeroBanner({ items, item, intervalMs = 6000, ctaHref }: HeroBannerProps) {
   const reduceMotion = useReducedMotion();
   const { setAmbientTheme } = useAmbient();
   const slides = React.useMemo(() => {
@@ -64,7 +59,7 @@ export function HeroBanner({
     (dir: -1 | 1) => {
       setIndex((i) => (i + dir + slides.length) % slides.length);
     },
-    [slides.length]
+    [slides.length],
   );
 
   // Auto-advance carousel timer (pauses on hover)
@@ -153,7 +148,8 @@ export function HeroBanner({
   const activeDetails = detailsCache[activeKey];
   const activeLogoPath = activeDetails?.logoPath ?? active.logoPath ?? null;
   const activeTagline = activeDetails?.tagline ?? active.tagline ?? null;
-  const logo = !failedLogos[activeKey] && activeLogoPath ? logoUrl(activeLogoPath, "w500") : null;
+  const logo =
+    !failedLogos[activeKey] && activeLogoPath ? logoUrl(activeLogoPath, "w500") : null;
 
   const href = ctaHref ?? mediaHref(active.mediaType, active.id);
   const bg =
@@ -167,14 +163,12 @@ export function HeroBanner({
 
   return (
     <section
-      className="relative w-full overflow-hidden min-h-[min(94vh,64rem)] flex flex-col justify-end select-none"
+      className="relative flex min-h-[min(94vh,64rem)] w-full flex-col justify-end overflow-hidden select-none"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       aria-roledescription="carousel"
       aria-label="Featured titles"
     >
-
-
       {/* -------------------------------------------------------------
           EXPANSIVE FULL-BLEED BACKDROP STAGE WITH SWEET, SILKY SCRIMS
          ------------------------------------------------------------- */}
@@ -183,8 +177,7 @@ export function HeroBanner({
         style={{
           WebkitMaskImage:
             "linear-gradient(to bottom, black 0%, black 65%, transparent 100%)",
-          maskImage:
-            "linear-gradient(to bottom, black 0%, black 65%, transparent 100%)",
+          maskImage: "linear-gradient(to bottom, black 0%, black 65%, transparent 100%)",
         }}
       >
         <AnimatePresence mode="popLayout">
@@ -212,10 +205,10 @@ export function HeroBanner({
                 fill
                 priority={true}
                 sizes="100vw"
-                className="object-cover object-top sm:object-center filter brightness-[1.07] contrast-[1.03] saturate-[1.06]"
+                className="object-cover object-top brightness-[1.07] contrast-[1.03] saturate-[1.06] filter sm:object-center"
               />
             ) : (
-              <div className="absolute inset-0 bg-muted/20" />
+              <div className="bg-muted/20 absolute inset-0" />
             )}
           </motion.div>
         </AnimatePresence>
@@ -259,30 +252,24 @@ export function HeroBanner({
           }}
           aria-hidden
         />
-
-        {/* 5. Subtle left edge feather under floating sidebar */}
-        <div
-          className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-20 sm:w-32"
-          style={{
-            background:
-              "linear-gradient(to right, hsl(var(--background) / 0.4) 0%, transparent 100%)",
-          }}
-          aria-hidden
-        />
       </div>
 
       {/* -------------------------------------------------------------
           FOREGROUND MOVING PANEL: PROMINENT LOGO & CINEMATIC CONTROLS
          ------------------------------------------------------------- */}
-      <div className="content-container-fullbleed relative z-[2] pb-12 sm:pb-16 pt-[calc(var(--header-height)+3rem)]">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-          <div className="max-w-3xl space-y-4 text-center sm:text-left min-w-0">
+      <div className="content-container-fullbleed relative z-[2] pt-[calc(var(--header-height)+3rem)] pb-12 sm:pb-16">
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-3xl min-w-0 space-y-4 text-center sm:text-left">
             <AnimatePresence mode="popLayout">
               <motion.div
                 key={`info-${active.mediaType}-${active.id}`}
-                initial={reduceMotion ? false : { opacity: 0, y: 12, filter: "blur(4px)" }}
+                initial={
+                  reduceMotion ? false : { opacity: 0, y: 12, filter: "blur(4px)" }
+                }
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={reduceMotion ? undefined : { opacity: 0, y: -8, filter: "blur(4px)" }}
+                exit={
+                  reduceMotion ? undefined : { opacity: 0, y: -8, filter: "blur(4px)" }
+                }
                 transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
                 className="space-y-4"
               >
@@ -295,14 +282,14 @@ export function HeroBanner({
                       className="inline-block transition-transform duration-300 hover:scale-[1.02] focus:outline-none"
                       aria-label={`View ${active.title}`}
                     >
-                      <div className="relative h-28 sm:h-36 lg:h-44 w-80 sm:w-[28rem] lg:w-[34rem] max-w-full">
+                      <div className="relative h-28 w-80 max-w-full sm:h-36 sm:w-[28rem] lg:h-44 lg:w-[34rem]">
                         <Image
                           src={logo}
                           alt={active.title}
                           fill
                           priority={index === 0}
                           sizes="(max-width: 768px) 360px, 560px"
-                          className="object-contain object-bottom sm:object-left-bottom filter drop-shadow-[0_12px_32px_rgba(0,0,0,0.9)] brightness-[1.06]"
+                          className="object-contain object-bottom brightness-[1.06] drop-shadow-[0_12px_32px_rgba(0,0,0,0.9)] filter sm:object-left-bottom"
                           onError={() => {
                             setFailedLogos((prev) => ({ ...prev, [activeKey]: true }));
                           }}
@@ -310,11 +297,11 @@ export function HeroBanner({
                       </div>
                     </Link>
                   ) : (
-                    <h2 className="font-display text-balance text-[clamp(2.6rem,1.8rem+3.4vw,4.8rem)] font-extrabold leading-[1.04] tracking-[-0.03em] text-white drop-shadow-xl">
+                    <h2 className="font-display text-[clamp(2.6rem,1.8rem+3.4vw,4.8rem)] leading-[1.04] font-extrabold tracking-[-0.03em] text-balance text-white drop-shadow-xl">
                       <Link
                         href={href}
                         prefetch={false}
-                        className="transition-colors hover:text-primary focus-visible:text-primary focus:outline-none"
+                        className="hover:text-primary focus-visible:text-primary transition-colors focus:outline-none"
                       >
                         {active.title}
                       </Link>
@@ -323,14 +310,14 @@ export function HeroBanner({
 
                   {/* Tagline below logo/title */}
                   {activeTagline ? (
-                    <p className="text-base sm:text-lg italic text-white/90 text-pretty font-light tracking-wide drop-shadow-md">
+                    <p className="text-base font-light tracking-wide text-pretty text-white/90 italic drop-shadow-md sm:text-lg">
                       {activeTagline}
                     </p>
                   ) : null}
 
                   {/* Overview */}
                   {active.overview ? (
-                    <p className="max-w-xl text-sm sm:text-base text-white/85 line-clamp-3 leading-relaxed drop-shadow font-normal text-pretty">
+                    <p className="line-clamp-3 max-w-xl text-sm leading-relaxed font-normal text-pretty text-white/85 drop-shadow sm:text-base">
                       {active.overview}
                     </p>
                   ) : null}
@@ -339,22 +326,22 @@ export function HeroBanner({
             </AnimatePresence>
 
             {/* Action Buttons & Badges Row */}
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 sm:gap-3.5 pt-2">
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2 sm:justify-start sm:gap-3.5">
               {/* Circular White Play Button */}
               <button
                 type="button"
                 onClick={() => setTheaterOpen(true)}
-                className="flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-full bg-white text-black shadow-xl shadow-black/50 transition-all duration-200 hover:bg-white/90 hover:scale-105 active:scale-95 shrink-0 cursor-pointer"
+                className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white text-black shadow-xl shadow-black/50 transition-all duration-200 hover:scale-105 hover:bg-white/90 active:scale-95 sm:h-13 sm:w-13"
                 aria-label={`Play ${active.title}`}
               >
-                <Play className="h-5 w-5 fill-black text-black ml-0.5" />
+                <Play className="ml-0.5 h-5 w-5 fill-black text-black" />
               </button>
 
               {/* Pill See More Button */}
               <Link
                 href={href}
                 prefetch={false}
-                className="inline-flex items-center gap-2 sm:gap-2.5 rounded-full border border-white/25 bg-black/45 hover:bg-white/15 hover:border-white/35 px-5 sm:px-6 py-3 text-sm sm:text-base font-semibold text-white backdrop-blur-md transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/45 px-5 py-3 text-sm font-semibold text-white backdrop-blur-md transition-all duration-200 hover:scale-[1.02] hover:border-white/35 hover:bg-white/15 active:scale-[0.98] sm:gap-2.5 sm:px-6 sm:text-base"
                 aria-label={`See more details about ${active.title}`}
               >
                 <Info className="h-5 w-5 text-white" />
@@ -362,16 +349,16 @@ export function HeroBanner({
               </Link>
 
               {/* Badges Row */}
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:ml-2">
-                <span className="inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white backdrop-blur-md shadow-sm">
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:ml-2 sm:justify-start">
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold tracking-wider text-white uppercase shadow-sm backdrop-blur-md">
                   <Sparkles className="h-3 w-3 text-white/80" />
                   Featured
                 </span>
-                <span className="inline-flex items-center rounded-md border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wider text-white/90 backdrop-blur-md">
+                <span className="inline-flex items-center rounded-md border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-medium tracking-wider text-white/90 uppercase backdrop-blur-md">
                   {active.mediaType === "tv" ? "TV Series" : "Movie"}
                 </span>
                 {year ? (
-                  <span className="text-xs font-medium text-white/70 px-1">{year}</span>
+                  <span className="px-1 text-xs font-medium text-white/70">{year}</span>
                 ) : null}
                 {active.voteAverage != null && active.voteAverage > 0 ? (
                   <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/30 bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-300 backdrop-blur-md">
@@ -385,12 +372,12 @@ export function HeroBanner({
 
           {/* Clean Glass Carousel Controls with Liquid Progress Fill — positioned in bottom right */}
           {slides.length > 1 ? (
-            <div className="flex items-center justify-center md:justify-end shrink-0 md:pb-1">
-              <div className="flex items-center gap-2 rounded-full border border-white/20 bg-black/45 px-3.5 py-1.5 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.5)]">
+            <div className="flex shrink-0 items-center justify-center md:justify-end md:pb-1">
+              <div className="flex items-center gap-2 rounded-full border border-white/20 bg-black/45 px-3.5 py-1.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-xl">
                 <button
                   type="button"
                   onClick={() => go(-1)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-all duration-200 hover:bg-white/15 hover:text-white hover:scale-110 active:scale-95"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-all duration-200 hover:scale-110 hover:bg-white/15 hover:text-white active:scale-95"
                   aria-label="Previous featured title"
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -406,10 +393,10 @@ export function HeroBanner({
                         aria-label={`Show ${s.title}`}
                         aria-current={isActive}
                         className={cn(
-                          "relative h-1.5 rounded-full overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white",
+                          "relative h-1.5 overflow-hidden rounded-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:ring-1 focus-visible:ring-white focus-visible:outline-none",
                           isActive
-                            ? "w-8 sm:w-10 bg-white/20 shadow-[0_0_10px_rgba(0,0,0,0.4)]"
-                            : "w-2 bg-white/30 hover:bg-white/60 hover:w-3"
+                            ? "w-8 bg-white/20 shadow-[0_0_10px_rgba(0,0,0,0.4)] sm:w-10"
+                            : "w-2 bg-white/30 hover:w-3 hover:bg-white/60",
                         )}
                       >
                         {isActive ? (
@@ -429,7 +416,7 @@ export function HeroBanner({
                 <button
                   type="button"
                   onClick={() => go(1)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-all duration-200 hover:bg-white/15 hover:text-white hover:scale-110 active:scale-95"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-all duration-200 hover:scale-110 hover:bg-white/15 hover:text-white active:scale-95"
                   aria-label="Next featured title"
                 >
                   <ChevronRight className="h-4 w-4" />

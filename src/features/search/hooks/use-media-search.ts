@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import type { SearchResponse, SearchResultItem } from "@/types/media";
 
@@ -35,8 +35,15 @@ export function pushRecentSearch(query: string) {
   }
 }
 
-async function fetchSearch(query: string): Promise<SearchResponse> {
-  const res = await fetch(`/api/media/search?q=${encodeURIComponent(query)}`);
+async function fetchSearch(
+  query: string,
+  signal: AbortSignal,
+  page: number,
+): Promise<SearchResponse> {
+  const res = await fetch(
+    `/api/media/search?q=${encodeURIComponent(query)}&page=${page}`,
+    { signal },
+  );
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error ?? "Search failed");
@@ -52,7 +59,7 @@ async function fetchTrending(): Promise<SearchResultItem[]> {
 }
 
 /**
- * Debounced media search for the command palette.
+ * Debounced catalog search with cancellation of obsolete requests.
  */
 export function useMediaSearch(query: string, enabled: boolean) {
   const [debounced, setDebounced] = React.useState(query);
@@ -62,12 +69,14 @@ export function useMediaSearch(query: string, enabled: boolean) {
     return () => window.clearTimeout(t);
   }, [query]);
 
-  const searchQuery = useQuery({
+  const searchQuery = useInfiniteQuery({
     queryKey: ["media-search", debounced],
-    queryFn: () => fetchSearch(debounced),
+    queryFn: ({ signal, pageParam }) => fetchSearch(debounced, signal, pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (last, _pages, page) =>
+      page < Math.min(last.totalPages ?? 1, 500) ? page + 1 : undefined,
     enabled: enabled && debounced.length >= 1,
     staleTime: 30_000,
-    placeholderData: (prev) => prev,
   });
 
   const trendingQuery = useQuery({
@@ -79,10 +88,25 @@ export function useMediaSearch(query: string, enabled: boolean) {
 
   return {
     debouncedQuery: debounced,
-    results: searchQuery.data?.results ?? [],
-    isLoading: searchQuery.isFetching && debounced.length >= 1,
+    results: [
+      ...new Map(
+        (searchQuery.data?.pages.flatMap((page) => page.results) ?? []).map((item) => [
+          `${item.kind}:${item.id}`,
+          item,
+        ]),
+      ).values(),
+    ],
+    isLoading:
+      query.trim() !== debounced ||
+      (searchQuery.isFetching &&
+        !searchQuery.isFetchingNextPage &&
+        debounced.length >= 1),
     isError: searchQuery.isError,
     error: searchQuery.error,
+    retry: searchQuery.refetch,
+    hasMore: searchQuery.hasNextPage,
+    loadMore: searchQuery.fetchNextPage,
+    isLoadingMore: searchQuery.isFetchingNextPage,
     trending: trendingQuery.data ?? [],
     isTrendingLoading: trendingQuery.isLoading,
   };

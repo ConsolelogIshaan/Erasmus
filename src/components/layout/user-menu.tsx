@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ROUTES } from "@/constants/routes";
-import { formatDisplayName } from "@/lib/utils";
+import { cn, formatDisplayName } from "@/lib/utils";
 import { signOut } from "@/features/auth/actions/auth-actions";
 
 export interface UserMenuUser {
@@ -26,12 +26,13 @@ export interface UserMenuUser {
 
 interface UserMenuProps {
   user: UserMenuUser;
+  className?: string;
 }
 
 /**
  * Authenticated user menu with profile, settings, and sign out.
  */
-export function UserMenu({ user }: UserMenuProps) {
+export function UserMenu({ user, className }: UserMenuProps) {
   const name = formatDisplayName({
     displayName: user.displayName,
     username: user.username,
@@ -50,7 +51,11 @@ export function UserMenu({ user }: UserMenuProps) {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="relative h-9 w-9 rounded-full p-0"
+          className={cn(
+            "relative h-9 w-9 rounded-full p-0 transition-[transform,filter] duration-[160ms] hover:scale-[1.04] hover:brightness-110",
+            "focus-visible:ring-2 focus-visible:ring-white/55 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+            className,
+          )}
           aria-label="Open user menu"
         >
           <Avatar className="h-9 w-9">
@@ -62,9 +67,9 @@ export function UserMenu({ user }: UserMenuProps) {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{name}</p>
+            <p className="text-sm leading-none font-medium">{name}</p>
             {user.email ? (
-              <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+              <p className="text-muted-foreground text-xs leading-none">{user.email}</p>
             ) : null}
           </div>
         </DropdownMenuLabel>

@@ -1,9 +1,23 @@
 # STATE
 
-Updated: 2026-09-27 6:00 PM IST
-Git: `origin/main` (Clean local working tree; verified build, lints, tests, and pushed to remote upon explicit user command)
+Updated: 2026-09-27 6:38 PM IST
+Git: `codex/floating-navbar` on top of `origin/main` at `45253b3`; local changes only, not pushed
 
 ## Priority
+The authenticated web application uses a centered floating navbar instead of the permanent desktop sidebar. Streaming/playback remains frozen and unchanged by this task.
+
+## Current Local UI Work
+
+- Added the responsive floating navbar and preserved watchlist, profile, and mobile navigation flows.
+- Replaced Spotlight with a dedicated protected `/search` page. Navbar search and keyboard shortcuts navigate there; the overlay and its state were removed.
+- Search includes debounced live results, cancellation, URL queries, recent searches, type filters, trending discovery, retry, and pagination.
+- Improved typo recovery with merged and ranked fallback candidates, prefix retrieval, and accent/punctuation normalization.
+- Search verification: 9 focused tests passed; typecheck, lint, and production build passed. Browser preview reaches the login gate; authenticated visual verification is unavailable in the current browser session.
+- Removed the desktop sidebar and obsolete sidebar layout state/offsets.
+- Updated full-bleed hero and catalog spacing for the fixed navbar.
+- Validation before rebasing: typecheck, lint, build, and targeted streaming tests passed; full live-provider tests remain subject to upstream instability.
+
+## Streaming Priority
 Zero buffering, zero stuttering, and zero playback freezes; maximizing user bandwidth utilization ("juicing" out 15–30+ Mbps connections with aggressive forward pre-buffering); Cloudflare Anycast edge relay delivery with edge RAM caching; zero domestic upload bandwidth strangulation (bypassing slow local tunnels); 100% clean builds, lints, and tests.
 
 ---

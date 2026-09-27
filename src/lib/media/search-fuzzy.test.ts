@@ -20,6 +20,10 @@ describe("generateQueryVariants", () => {
   it("returns empty for tiny queries", () => {
     expect(generateQueryVariants("a")).toEqual([]);
   });
+  it("keeps prefix recovery within the bounded query budget", () => {
+    expect(generateQueryVariants("intersteler")).toContain("inte");
+    expect(generateQueryVariants("inceotion")).toContain("ince");
+  });
 });
 
 describe("editDistance", () => {
@@ -30,6 +34,12 @@ describe("editDistance", () => {
 });
 
 describe("titleSimilarityScore", () => {
+  it("handles missing letters, substitutions, and accent punctuation normalization", () => {
+    expect(titleSimilarityScore("Interstellar", "intersteler")).toBeGreaterThan(2600);
+    expect(titleSimilarityScore("Inception", "inceotion")).toBeGreaterThan(2600);
+    expect(titleSimilarityScore("Amélie", "amelie")).toBe(10000);
+    expect(titleSimilarityScore("A Completely Unrelated Long Title", "batamn")).toBeLessThan(2600);
+  });
   it("ranks exact and near matches higher", () => {
     const exact = titleSimilarityScore("Inception", "inception");
     const near = titleSimilarityScore("Inception", "inceptioon");

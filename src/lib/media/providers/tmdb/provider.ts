@@ -118,20 +118,26 @@ export class TmdbMediaProvider implements MediaProvider {
 
     // Typo / partial tolerance: if TMDB finds nothing, try relaxed query forms.
     // Only on first page so pagination stays stable for exact matches.
-    if (page === 1 && (multi.results?.length ?? 0) === 0) {
+    const hasStrongMatch = multi.results.some(item =>
+      titleSimilarityScore(("title" in item ? item.title : item.name) ?? "", q) >= 3300,
+    );
+    if (page === 1 && q.length >= 3 && !hasStrongMatch) {
       const variants = generateQueryVariants(q);
-      for (const variant of variants) {
+      const alternatives = await Promise.all(variants.map(async variant => {
         const alt = await tmdbFetch<TmdbPaginated<TmdbMultiResult>>("/search/multi", {
           query: variant,
           page: 1,
           include_adult: false,
         });
-        if (alt?.results?.length) {
-          multi = alt;
-          usedFuzzy = true;
-          break;
-        }
+        return alt?.results ?? [];
+      }));
+      const candidates = new Map(multi.results.map(item => [`${item.media_type}:${item.id}`, item]));
+      for (const item of alternatives.flat()) {
+        const title = ("title" in item ? item.title : item.name) ?? "";
+        if (titleSimilarityScore(title, q) >= 2600) candidates.set(`${item.media_type}:${item.id}`, item);
       }
+      multi = { ...multi, results: [...candidates.values()] };
+      usedFuzzy = true;
     }
 
     const mapped = mapSearchResponse(q, multi, collections, companies, genres);
@@ -144,6 +150,9 @@ export class TmdbMediaProvider implements MediaProvider {
         return (b.popularity ?? 0) - (a.popularity ?? 0);
       });
     }
+    if (usedFuzzy) mapped.totalResults = mapped.results.length;
+    mapped.page = page;
+    mapped.totalPages = usedFuzzy ? 1 : multi.total_pages;
 
     return mapped;
   }

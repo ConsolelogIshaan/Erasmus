@@ -46,7 +46,7 @@ export default async function TvBrowsePage({ searchParams }: PageProps) {
 
   if (!configured) {
     return (
-      <div className="content-container-fullbleed pt-[calc(var(--header-height)+1.5rem)]">
+      <div className="content-container-fullbleed pt-[calc(var(--header-height)+3rem)]">
         <CatalogConfigBanner />
       </div>
     );
@@ -56,13 +56,13 @@ export default async function TvBrowsePage({ searchParams }: PageProps) {
   const pageParam = typeof params.page === "string" ? Number(params.page) || 1 : 1;
   const hasFilters = Boolean(
     params.genre ||
-      params.year ||
-      params.rating ||
-      params.language ||
-      params.sort ||
-      params.explore === "true" ||
-      section ||
-      pageParam > 1,
+    params.year ||
+    params.rating ||
+    params.language ||
+    params.sort ||
+    params.explore === "true" ||
+    section ||
+    pageParam > 1,
   );
 
   const flatParams: Record<string, string | undefined> = {};
@@ -77,14 +77,14 @@ export default async function TvBrowsePage({ searchParams }: PageProps) {
     if (section === "top_rated") {
       const top = await getImdbTopRated("tv", pageParam);
       return (
-        <div className="relative w-full min-h-dvh">
+        <div className="relative min-h-dvh w-full">
           <h1 className="sr-only">Top Rated TV Shows</h1>
 
-          <div className="content-container-fullbleed space-y-8 pb-16 pt-[calc(var(--header-height)+1.5rem)]">
+          <div className="content-container-fullbleed space-y-8 pt-[calc(var(--header-height)+3rem)] pb-16">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="text-section-title">Top Rated TV Shows</h2>
-                <p className="text-meta mt-1 text-muted-foreground">
+                <p className="text-meta text-muted-foreground mt-1">
                   {top.imdbEnabled
                     ? "The highest-rated series in television history, ordered by IMDb score."
                     : "The highest-rated series ordered by audience ratings."}
@@ -128,14 +128,14 @@ export default async function TvBrowsePage({ searchParams }: PageProps) {
     }
 
     return (
-      <div className="relative w-full min-h-dvh">
+      <div className="relative min-h-dvh w-full">
         <h1 className="sr-only">TV Shows Catalog</h1>
 
-        <div className="content-container-fullbleed space-y-8 pb-16 pt-[calc(var(--header-height)+1.5rem)]">
+        <div className="content-container-fullbleed space-y-8 pt-[calc(var(--header-height)+3rem)] pb-16">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-section-title">Explore TV Shows</h2>
-              <p className="text-meta mt-1 text-muted-foreground">
+              <p className="text-meta text-muted-foreground mt-1">
                 Filter series by genre, first air year, rating, and language.
               </p>
             </div>
@@ -190,30 +190,27 @@ export default async function TvBrowsePage({ searchParams }: PageProps) {
   );
 
   return (
-    <div className="relative w-full min-h-dvh">
+    <div className="relative min-h-dvh w-full">
       <h1 className="sr-only">TV Shows — Series, limited runs, and epics on Erasmus</h1>
 
       {"error" in discoveryData && discoveryData.error ? (
-        <div className="content-container-fullbleed pt-[calc(var(--header-height)+1.5rem)]">
+        <div className="content-container-fullbleed pt-[calc(var(--header-height)+3rem)]">
           <div
-            className="animate-fade-up rounded-xl border-0 bg-destructive/12 px-4 py-3 text-sm text-destructive"
+            className="animate-fade-up bg-destructive/12 text-destructive rounded-xl border-0 px-4 py-3 text-sm"
             role="alert"
           >
             <p className="font-medium">Catalog temporarily unavailable</p>
-            <p className="mt-1 text-muted-foreground">{discoveryData.error}</p>
+            <p className="text-muted-foreground mt-1">{discoveryData.error}</p>
           </div>
         </div>
       ) : null}
 
       {heroItems.length > 0 ? <HeroBanner items={heroItems} intervalMs={6000} /> : null}
 
-      <div className="content-container-fullbleed space-y-10 pb-16 pt-6">
+      <div className="content-container-fullbleed space-y-10 pt-6 pb-16">
         <Suspense fallback={<Skeleton className="h-12 w-full rounded-xl" />}>
           <ScrollReveal delay={0.05}>
-            <GenreChips
-              genres={discoveryData.genres}
-              basePath="/tv"
-            />
+            <GenreChips genres={discoveryData.genres} basePath="/tv" />
           </ScrollReveal>
         </Suspense>
 
@@ -230,12 +227,15 @@ export default async function TvBrowsePage({ searchParams }: PageProps) {
         </div>
 
         {/* Bottom Catalog Explorer Access */}
-        <div className="pt-6 border-t border-border/40">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="border-border/40 border-t pt-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-semibold tracking-tight">Looking for a specific series?</h3>
-              <p className="text-sm text-muted-foreground">
-                Filter through thousands of television shows with custom genres, ratings, and status.
+              <h3 className="text-lg font-semibold tracking-tight">
+                Looking for a specific series?
+              </h3>
+              <p className="text-muted-foreground text-sm">
+                Filter through thousands of television shows with custom genres, ratings,
+                and status.
               </p>
             </div>
             <Button asChild>

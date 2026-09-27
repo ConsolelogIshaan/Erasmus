@@ -4,7 +4,7 @@ Frame is keyboard-first. Shortcuts work on authenticated pages (outside text fie
 
 | Keys | Action |
 | --- | --- |
-| `⌘K` / `Ctrl+K` | Toggle command palette / search |
+| `⌘K` / `Ctrl+K` | Open Search page |
 | `/` | Open search |
 | `G` then `D` | Home dashboard |
 | `G` then `L` | Library |
@@ -14,9 +14,8 @@ Frame is keyboard-first. Shortcuts work on authenticated pages (outside text fie
 | `G` then `W` | Watchlist |
 | `G` then `P` | Profile (Dashboard) |
 | `G` then `,` | Settings |
-| `Esc` | Close modals / palette (browser default + Radix) |
-| Arrow keys | Navigate command results (cmdk) |
-| `Enter` | Select highlighted command result |
+| `Esc` | Close modals (browser default + Radix) |
+| `Enter` | Submit search |
 
 Source of truth: `src/constants/shortcuts.ts`  
 Also listed under **Settings → Keyboard**.

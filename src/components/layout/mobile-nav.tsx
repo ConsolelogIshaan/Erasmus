@@ -25,7 +25,6 @@ import { ROUTES } from "@/constants/routes";
  */
 export function MobileNav() {
   const pathname = usePathname();
-  const isHomeScreen = pathname === ROUTES.discover || pathname === ROUTES.home;
   const { mobileNavOpen, setMobileNavOpen } = useUI();
 
   return (
@@ -34,16 +33,19 @@ export function MobileNav() {
         <Button
           variant="ghost"
           size="icon-sm"
-          className="md:hidden"
+          className="h-10 w-10 rounded-full text-white/70 hover:bg-white/[0.07] hover:text-white md:hidden"
           aria-label="Open navigation menu"
         >
           <Menu className="h-5 w-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-[min(100%,20rem)] p-0">
+      <SheetContent
+        side="left"
+        className="w-[min(92%,20rem)] border-white/[0.10] bg-[rgba(8,9,11,0.96)] p-0 backdrop-blur-2xl"
+      >
         <SheetHeader className="border-0 px-4 py-4 text-left">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          {isHomeScreen ? <Logo href={ROUTES.discover} /> : null}
+          <Logo href={ROUTES.discover} />
         </SheetHeader>
         <nav className="flex flex-col gap-1 p-3" aria-label="Mobile navigation">
           {[...MAIN_NAV, ...SECONDARY_NAV].map((item, index) => {
@@ -83,17 +85,11 @@ export function MobileNav() {
                     />
                   ) : null}
                   <Icon
-                    className={cn(
-                      "relative z-[1] h-4 w-4",
-                      active && "text-foreground",
-                    )}
+                    className={cn("relative z-[1] h-4 w-4", active && "text-foreground")}
                     aria-hidden="true"
                   />
                   <span
-                    className={cn(
-                      "relative z-[1] flex-1",
-                      active && "text-foreground",
-                    )}
+                    className={cn("relative z-[1] flex-1", active && "text-foreground")}
                   >
                     {item.title}
                   </span>

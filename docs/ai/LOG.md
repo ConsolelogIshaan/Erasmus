@@ -1,5 +1,11 @@
 # LOG
 
+## 2026-09-27 6:18 PM IST | Codex | Pulled Latest Remote and Reapplied Floating Navbar (Local Only)
+- Updated `codex/floating-navbar` from `origin/main` through commit `45253b3`.
+- Reapplied the floating-navbar UI changes on top of the latest remote state.
+- Resolved documentation-only stash conflicts while preserving the latest remote history and local UI work.
+- No commit or push was performed.
+
 Append-only. Add new entries at the bottom. Never edit old entries.
 Format: `## DATE | Developer | AI` then Changed / Files / Result / Next.
 
@@ -1283,5 +1289,11 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   5. Push Authorization:
      - User explicitly commanded `git push` to synchronize all fixes (commits `64568b1`, `772af9a`, `6e4794d`, and documentation updates) to remote `origin/main`.
 
-
-
+## 2026-09-27 6:38 PM IST | Codex | Dedicated Search Page (Local Only)
+- Replaced the Spotlight overlay with a protected /search page and redirected navbar and keyboard search entry points.
+- Removed command palette component, trigger, and global palette state.
+- Added live search, obsolete-request cancellation, shareable URL queries, filters, trending discovery, recent searches, error retry, and load-more pagination.
+- Improved typo fallback retrieval and ranking for repeated/swapped/missing/replaced letters, with accent and punctuation normalization.
+- Focused search tests: 9 passed. Typecheck, lint, and production build passed; lint retains existing warnings.
+- Local browser preview confirmed the authentication gate; authenticated UI inspection was not possible in the current browser session.
+- Existing navbar work retained. No streaming changes, dependencies, commits, deployments, or pushes.

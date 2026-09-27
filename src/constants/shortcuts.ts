@@ -19,13 +19,13 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: "command",
     keys: ["⌘", "K"],
-    description: "Open command palette / search",
+    description: "Go to Search",
     action: "command",
   },
   {
     id: "search",
     keys: ["/"],
-    description: "Focus search (command palette)",
+    description: "Go to Search",
     action: "search",
   },
   {
@@ -87,6 +87,6 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: "escape",
     keys: ["Esc"],
-    description: "Close modal / command palette",
+    description: "Close modal",
   },
 ] as const;

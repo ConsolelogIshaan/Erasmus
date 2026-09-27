@@ -46,7 +46,7 @@ export default async function LibrarySearchPage({ searchParams }: PageProps) {
       {!q.trim() ? (
         <p className="text-sm text-muted-foreground">
           Type a query and press Enter. This searches your own library, not the full
-          catalog (use ⌘K for that).
+          catalog. <Link href={ROUTES.search} className="underline underline-offset-4">Search the full catalog</Link>.
         </p>
       ) : null}
 
