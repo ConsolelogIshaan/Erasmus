@@ -1230,3 +1230,26 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   3. Expanded buffer headroom: Raised `maxBufferSize` from 60MB to 120MB and `maxBufferLength` from 30s to 60s (`maxMaxBufferLength: 120s`), giving 15-20 Mbps connections ample pre-buffered 4K data so playback never stutters.
   4. Zero Request Overhead: Chunks are fixed-duration (~6s), so total requests for any movie remain identical (~1,200 chunks). Requests are not increased.
   5. Verification: npm run typecheck passed (0 errors), npm run lint passed (0 errors), npm run test passed (19/19 files, 217/217 tests), npm run build passed (41/41 routes). Deployed to Cloudflare Workers (Version: c9074580-f962-4024-80f5-9dd5414b7234).
+
+## 2026-09-27 4:20 PM IST | Ishaan | Antigravity
+- Fixed: Eliminated "clickbait" 4K quality option across entire platform; quality tiers now strictly reflect physical HLS manifest ground truth:
+  1. Root cause:
+     - In `vidfast-direct.ts`: Upstream VidFast servers returned generic UI icons (`candidate.image: "/4k.png"`) and metadata notes (`description: "Original audio, 4K?"`) or candidate name `"vfast"` on 1080p content (e.g. Modern Family S09E07). This tricked the resolver into setting `is4K = true` and seeking a fake companion `fourKUrl`.
+     - In `native-player.tsx`: `has4KSupport` previously trusted `is4KHint` and `fourKSrc` unconditionally even after the HLS manifest had loaded with only 1080p, 720p, and 480p streams. The quality menu rendered `4K (2160p Ultra HD)` for 1080p content, and selecting 4K silently fell back to 1080p.
+  2. Fixed in `src/lib/streaming/vidfast-direct.ts`:
+     - Removed server name `"vfast"`, generic button image `image: "/4k.png"`, and ambiguous description `"4K?"` from triggering 4K flags.
+  3. Fixed in `src/features/streaming/components/native-player.tsx`:
+     - Manifest Ground Truth: Once HLS manifest levels are parsed (`levels.length > 0`), the actual parsed stream resolutions are the single source of truth (`levels.some(l => checkIs4KSource(l, activeSrc))`).
+     - Dynamic Quality Menu: 4K, 1080p, and 720p options in the player quality panel now conditionally render based on actual stream support (`has4KSupport`, `has1080pSupport`, `has720pSupport`).
+     - Quality Tier Locking: `selectQualityTier("4k")` strictly validates `has4KSupport` and selects the actual UHD stream; never downgrades quietly to 1080p while claiming 4K.
+     - Pure function refactoring: Replaced component-level `useCallback` wrappers with direct module-level pure function calls (`checkIs4KSource`, `checkIs1080pSource`) to comply with React 19 Compiler.
+  4. Regression Tests in `src/lib/streaming/quality-detection.test.ts`:
+     - Added test cases verifying Modern Family S09E07 manifest levels strictly reject 4K, while Dune 4K manifest levels correctly unlock the 4K tier.
+  5. Verification:
+     - `npm run typecheck`: 0 errors.
+     - `npm run lint`: 0 errors.
+     - `npm run test`: 19/19 files, 217/217 tests passed.
+     - `npm run build`: 41/41 routes compiled cleanly.
+     - `opennextjs-cloudflare build` & `wrangler deploy`: Succeeded (Version `01ec524c-1900-4da0-9743-57ab67dbfff8`).
+     - ZERO git push performed per `AGENTS.md`.
+

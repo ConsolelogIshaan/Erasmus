@@ -59,4 +59,27 @@ describe("Truthful Stream Quality Detection", () => {
     const has4KWithUHD = levels4K.some((lvl) => is4K(lvl));
     expect(has4KWithUHD).toBe(true);
   });
+
+  it("verifies Modern Family S09E07 stream levels strictly reject 4K option", () => {
+    // Exact manifest profile returned by VidFast for Modern Family S09E07
+    const modernFamilyLevels = [
+      { width: 1920, height: 1080, bitrate: 6043872 },
+      { width: 1280, height: 720, bitrate: 3053114 },
+      { width: 852, height: 480, bitrate: 1302516 },
+    ];
+    const has4K = modernFamilyLevels.some((lvl) => is4K(lvl));
+    expect(has4K).toBe(false);
+  });
+
+  it("verifies Dune 4K master playlist correctly unlocks 4K option", () => {
+    // Exact manifest profile returned by VidFast for Dune (TMDB 438631)
+    const duneLevels = [
+      { width: 3840, height: 2160, bitrate: 16178584 },
+      { width: 1920, height: 1080, bitrate: 6133690 },
+      { width: 1280, height: 720, bitrate: 3110729 },
+      { width: 852, height: 480, bitrate: 1317236 },
+    ];
+    const has4K = duneLevels.some((lvl) => is4K(lvl));
+    expect(has4K).toBe(true);
+  });
 });

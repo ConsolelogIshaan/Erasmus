@@ -374,9 +374,7 @@ async function resolveVidfastDirectStreamSingle(input: {
 
           const is4K =
             cleanId === "224372" ||
-            candidate.name.toLowerCase() === "vfast" ||
-            Boolean(candidate.description && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(candidate.description)) ||
-            Boolean(candidate.image && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(candidate.image)) ||
+            Boolean(candidate.description && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(candidate.description) && !candidate.description.includes("4K?")) ||
             finalUrl.includes("2160") ||
             /(^|[._\s/-])4k([._\s/-]|$)/i.test(finalUrl);
 
@@ -422,9 +420,7 @@ async function resolveVidfastDirectStreamSingle(input: {
                 (s) =>
                   s.data &&
                   s.name.toLowerCase() !== candidate.name.toLowerCase() &&
-                  (s.name.toLowerCase() === "vfast" ||
-                    Boolean(s.description?.toLowerCase().includes("4k")) ||
-                    Boolean(s.image?.includes("4k"))),
+                  Boolean(s.description && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(s.description) && !s.description.includes("4K?")),
               );
               if (fourKCandidate) {
                 const companionUrl = await resolveCandidateUrl(fourKCandidate);

@@ -1,10 +1,10 @@
 # STATE
 
-Updated: 2026-09-27 3:55 PM IST
-Git: `origin/main` (Clean local working tree; verified build and tests)
+Updated: 2026-09-27 4:20 PM IST
+Git: `origin/main` (Clean local working tree; verified build, lints, and tests)
 
 ## Priority
-Maintaining 100% stable, seamless streaming across all devices; dual-account 200,000 requests/day split ($0 cost); full routing of Lisbon and all streaming servers to Account 2 (`ishaan.jangid1@gmail.com`); permanent elimination of excessive request loops on Cloudflare Workers; zero buffering, zero slideshow freezing, zero detail page crashes.
+Maintaining 100% stable, seamless streaming across all devices; dual-account 200,000 requests/day split ($0 cost); full routing of Lisbon and all streaming servers to Account 2 (`ishaan.jangid1@gmail.com`); elimination of clickbait 4K quality options on 1080p content; permanent elimination of excessive request loops on Cloudflare Workers; zero buffering, zero slideshow freezing, zero detail page crashes.
 
 ---
 
@@ -13,7 +13,7 @@ Maintaining 100% stable, seamless streaming across all devices; dual-account 200
 ### Cloudflare Deployment Topology (Dual-Account Split: 200,000 Free Requests/Day)
 1. **Account 1 (`shrdsubscriptions@gmail.com`) — Web Application (`erasmus-web`)**:
    * **URL**: [https://erasmus-web.erasmustv.workers.dev](https://erasmus-web.erasmustv.workers.dev)
-   * **Active Version ID**: `c9074580-f962-4024-80f5-9dd5414b7234`
+   * **Active Version ID**: `01ec524c-1900-4da0-9743-57ab67dbfff8`
    * **Role**: Serves the Next.js App Router UI, page SSR, catalog discovery, search, TMDB client caching, and user authentication.
    * **Status**: 100% OK. Fully decoupled from video streaming. Request rate during active playback is ~0 req/min.
 2. **Account 2 (`ishaan.jangid1@gmail.com`) — Primary Streaming Relay (`erasmus-hls-relay`)**:
@@ -100,6 +100,9 @@ A 30-minute real-world video playback test (watching a movie on server Lisbon) c
 ## Verification
 - `npm run typecheck`: 0 errors.
 - `npm run lint`: 0 errors.
-- `npm run test`: 19/19 files passed (213/213 tests passed).
+- `npm run test`: 19/19 files passed (217/217 tests passed, including truthful quality detection).
 - `npm run build`: 41/41 routes compiled cleanly.
-- `opennextjs-cloudflare build` & `wrangler deploy`: Succeeded (Version `5cc30900-9d5e-443f-8334-992314256c99`).
+- `opennextjs-cloudflare build` & `wrangler deploy`: Succeeded (Version `01ec524c-1900-4da0-9743-57ab67dbfff8`).
+- Truthful Quality Menu:
+  - Modern Family S09E07 (1080p max manifest): strictly shows 1080p, 720p, 480p, 360p. Zero 4K clickbait option.
+  - Dune / Avatar (genuine 3840x2160 UHD manifest): shows 4K (2160p Ultra HD) and maintains quality lock.

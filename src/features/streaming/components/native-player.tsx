@@ -410,7 +410,7 @@ export function NativePlayer({
   kind = "hls",
   serverId: _serverId,
   serverName,
-  is4KHint = false,
+  is4KHint: _is4KHint = false,
   hdSrc,
   fourKSrc,
   onOpenServers,
@@ -549,7 +549,7 @@ export function NativePlayer({
     setPlayingWidth(0);
     if (fourKSrc && activeSrc === fourKSrc) {
       setSelectedQualityTier("4k");
-    } else if (selectedQualityTier !== "4k") {
+    } else if (selectedQualityTierRef.current !== "4k") {
       setSelectedQualityTier("auto");
       setLevel(-1);
     }
@@ -717,26 +717,22 @@ export function NativePlayer({
           }
         }
 
-        if (selectedQualityTier === "4k") {
-          let bestIdx = 0;
-          let maxScore = -1;
-          for (let i = 0; i < hls.levels.length; i++) {
-            const lvl = hls.levels[i];
-            if (lvl) {
-              const score = (lvl.width || 0) * (lvl.height || 0) || (lvl.height || 0) * 1000 || (lvl.bitrate || 0);
-              if (score > maxScore) {
-                maxScore = score;
-                bestIdx = i;
-              }
+        if (selectedQualityTierRef.current === "4k") {
+          const fourKIdx = hls.levels.findIndex((lvl) => lvl && (lvl.height >= 1900 || lvl.width >= 3600 || checkIs4KSource(lvl, activeSrc)));
+          if (fourKIdx >= 0) {
+            hls.currentLevel = fourKIdx;
+            setLevel(fourKIdx);
+            setSelectedQualityTier("4k");
+            const initialLvl = hls.levels[fourKIdx] || null;
+            if (initialLvl) {
+              setPlayingHeight(initialLvl.height || 0);
+              setPlayingWidth(initialLvl.width || 0);
             }
-          }
-          hls.currentLevel = bestIdx;
-          setLevel(bestIdx);
-          setSelectedQualityTier("4k");
-          const initialLvl = hls.levels[bestIdx] || null;
-          if (initialLvl) {
-            setPlayingHeight(initialLvl.height || 0);
-            setPlayingWidth(initialLvl.width || 0);
+          } else {
+            // Stream does not physically contain 4K tier; fallback to auto
+            hls.currentLevel = -1;
+            setLevel(-1);
+            setSelectedQualityTier("auto");
           }
         } else {
           // Select optimal start level (1080p or 720p) for instant, stutter-free startup
@@ -829,7 +825,7 @@ export function NativePlayer({
         if (video.videoHeight > 0) {
           setPlayingHeight(video.videoHeight);
           setPlayingWidth(video.videoWidth);
-          if (video.videoHeight >= 2000 || is4KHint || (fourKSrc && activeSrc === fourKSrc)) {
+          if (video.videoHeight >= 1900 || (fourKSrc && activeSrc === fourKSrc)) {
             setSelectedQualityTier("4k");
           } else if (video.videoHeight >= 950) {
             setSelectedQualityTier("1080p");
@@ -887,7 +883,7 @@ export function NativePlayer({
       video.removeAttribute("src");
       video.load();
     };
-  }, [activeSrc, startAt, kind, serverName, fourKSrc, is4KHint]);
+  }, [activeSrc, startAt, kind, serverName, fourKSrc]);
 
   React.useEffect(() => {
     const video = videoRef.current;
@@ -1147,32 +1143,20 @@ export function NativePlayer({
     video.currentTime = Math.max(0, seconds);
   };
 
-  const is4KSource = React.useCallback(
-    (dims?: { height?: number; width?: number; url?: string | string[] }) =>
-      checkIs4KSource(dims, activeSrc),
-    [activeSrc],
-  );
-
-  const is1080pSource = React.useCallback(
-    (dims?: { height?: number; width?: number; url?: string | string[] }) =>
-      checkIs1080pSource(dims, activeSrc),
-    [activeSrc],
-  );
-
   const has4KSupport = React.useMemo(() => {
-    // 0. If server or metadata has a 4K source or 4K hint: ALWAYS support 4K!
-    if (is4KHint || Boolean(fourKSrc)) {
+    // 1. If HLS manifest has parsed levels, the actual manifest is the GROUND TRUTH!
+    if (levels.length > 0) {
+      return levels.some((lvl) => checkIs4KSource(lvl, activeSrc));
+    }
+    // 2. If a separate distinct fourKSrc exists (verified to be 4K)
+    if (fourKSrc && fourKSrc !== activeSrc && (fourKSrc.includes("2160") || /(^|[._\s/-])4k([._\s/-]|$)/i.test(fourKSrc))) {
       return true;
     }
-    // 1. If HLS manifest has parsed levels, check if ANY level satisfies 4K
-    if (levels.length > 0 && levels.some((lvl) => is4KSource(lvl))) {
+    // 3. Direct video element dimensions
+    if (playingHeight >= 1900 || playingWidth >= 3600 || checkIs4KSource({ height: playingHeight, width: playingWidth }, activeSrc)) {
       return true;
     }
-    // 2. If video element dimensions are known, check if current playing resolution is 4K
-    if (playingHeight >= 2000 || playingWidth >= 3800 || is4KSource({ height: playingHeight, width: playingWidth })) {
-      return true;
-    }
-    // 3. If activeSrc itself contains explicit 4K indicators
+    // 4. If activeSrc itself contains explicit 4K indicators
     if (
       activeSrc &&
       (activeSrc.includes("2160") || /(^|[._\s/-])4k([._\s/-]|$)/i.test(activeSrc))
@@ -1180,7 +1164,27 @@ export function NativePlayer({
       return true;
     }
     return false;
-  }, [levels, is4KSource, playingHeight, playingWidth, fourKSrc, activeSrc, is4KHint]);
+  }, [levels, playingHeight, playingWidth, fourKSrc, activeSrc]);
+
+  const has1080pSupport = React.useMemo(() => {
+    if (levels.length > 0) {
+      return levels.some((lvl) => checkIs1080pSource(lvl, activeSrc) || checkIs4KSource(lvl, activeSrc) || (lvl.height && lvl.height >= 950));
+    }
+    if (playingHeight > 0) {
+      return playingHeight >= 950 || checkIs1080pSource({ height: playingHeight, width: playingWidth }, activeSrc) || has4KSupport;
+    }
+    return true;
+  }, [levels, activeSrc, playingHeight, playingWidth, has4KSupport]);
+
+  const has720pSupport = React.useMemo(() => {
+    if (levels.length > 0) {
+      return levels.some((lvl) => (lvl.height && lvl.height >= 650) || checkIs1080pSource(lvl, activeSrc) || checkIs4KSource(lvl, activeSrc));
+    }
+    if (playingHeight > 0) {
+      return playingHeight >= 650;
+    }
+    return true;
+  }, [levels, activeSrc, playingHeight]);
 
   const applyLevel = (index: number) => {
     const hls = hlsRef.current;
@@ -1213,39 +1217,21 @@ export function NativePlayer({
     }
 
     if (tier === "4k") {
-      setSelectedQualityTier("4k");
+      if (!has4KSupport) return;
       if (fourKSrc && activeSrc !== fourKSrc) {
         if (video) switchTimeRef.current = video.currentTime;
         setActiveSrc(fourKSrc);
+        setSelectedQualityTier("4k");
         setPanel("none");
         return;
       }
       if (hls && levels.length > 0) {
-        const idx = levels.findIndex((l) => is4KSource(l));
+        const idx = levels.findIndex((l) => checkIs4KSource(l, activeSrc));
         if (idx >= 0) {
           applyLevel(levels[idx]?.index ?? 0);
           setSelectedQualityTier("4k");
           return;
         }
-        // If no explicit 4K level found, select highest available resolution/bitrate tier
-        let bestIdx = -1;
-        let maxScore = -1;
-        levels.forEach((l, i) => {
-          const score = (l.width || 0) * (l.height || 0) || (l.height || 0) * 1000 || (l.bitrate || 0);
-          if (score > maxScore) {
-            maxScore = score;
-            bestIdx = l.index ?? i;
-          }
-        });
-        if (bestIdx >= 0) {
-          applyLevel(bestIdx);
-          setSelectedQualityTier("4k");
-          return;
-        }
-      }
-      if (has4KSupport || is4KHint) {
-        applyLevel(0);
-        setSelectedQualityTier("4k");
       }
       return;
     }
@@ -1254,7 +1240,7 @@ export function NativePlayer({
     if (
       hdSrc &&
       activeSrc !== hdSrc &&
-      is4KSource({ height: playingHeight, width: playingWidth }) &&
+      checkIs4KSource({ height: playingHeight, width: playingWidth }, activeSrc) &&
       levels.length <= 1
     ) {
       if (video) switchTimeRef.current = video.currentTime;
@@ -1268,7 +1254,7 @@ export function NativePlayer({
       let targetIndex = -1;
       if (tier === "1080p") {
         targetIndex = levels.findIndex(
-          (l) => is1080pSource(l) || (l.height >= 950 && l.height < 1440),
+          (l) => checkIs1080pSource(l, activeSrc) || (l.height >= 950 && l.height < 1440),
         );
         if (targetIndex < 0) {
           let maxScore = -1;
@@ -1314,17 +1300,16 @@ export function NativePlayer({
         ? { height: activeLevel.height, width: activeLevel.width, url: (activeLevel as { url?: string })?.url }
         : { height: playingHeight, width: playingWidth };
 
-      if (is4KSource(currentDims) || (currentDims.height && currentDims.height >= 2000)) {
+      if (checkIs4KSource(currentDims, activeSrc) || (currentDims.height && currentDims.height >= 2000)) {
         return "Auto (4K)";
       }
-      if (is1080pSource(currentDims) || (currentDims.height && currentDims.height >= 950)) {
+      if (checkIs1080pSource(currentDims, activeSrc) || (currentDims.height && currentDims.height >= 950)) {
         return "Auto (1080p)";
       }
       if (currentDims.height && currentDims.height >= 650) {
         return "Auto (720p)";
       }
       if (playingHeight > 0) return `Auto (${playingHeight}p)`;
-      if (has4KSupport || is4KHint) return "Auto (4K)";
       return "Auto";
     }
 
@@ -1334,7 +1319,7 @@ export function NativePlayer({
     if (selectedQualityTier === "480p") return "480p";
     if (selectedQualityTier === "360p") return "360p";
     return "Auto";
-  }, [selectedQualityTier, level, levels, playingHeight, playingWidth, is4KSource, is1080pSource, is4KHint, has4KSupport]);
+  }, [selectedQualityTier, level, levels, playingHeight, playingWidth, activeSrc]);
 
   const activeSub =
     subId === "off"
@@ -1934,18 +1919,16 @@ export function NativePlayer({
                   label: "Auto",
                   sublabel:
                     playingHeight > 0 || playingWidth > 0
-                      ? is4KSource({ height: playingHeight, width: playingWidth })
+                      ? checkIs4KSource({ height: playingHeight, width: playingWidth }, activeSrc)
                         ? "4K (2160p) · Current"
-                        : is1080pSource({ height: playingHeight, width: playingWidth })
+                        : checkIs1080pSource({ height: playingHeight, width: playingWidth }, activeSrc)
                           ? "1080p Full HD · Current"
                           : `${playingHeight}p · Current`
-                      : has4KSupport || is4KHint
-                        ? "4K (2160p) · Ultra HD"
-                        : "Optimal",
+                      : "Optimal",
                   active: selectedQualityTier === "auto",
                   onSelect: () => selectQualityTier("auto"),
                 },
-                ...(has4KSupport || is4KHint || Boolean(fourKSrc)
+                ...(has4KSupport
                   ? [
                       {
                         key: "4k" as const,
@@ -1956,20 +1939,28 @@ export function NativePlayer({
                       },
                     ]
                   : []),
-                {
-                  key: "1080p",
-                  label: "1080p",
-                  sublabel: "Full HD",
-                  active: selectedQualityTier === "1080p",
-                  onSelect: () => selectQualityTier("1080p"),
-                },
-                {
-                  key: "720p",
-                  label: "720p",
-                  sublabel: "HD",
-                  active: selectedQualityTier === "720p",
-                  onSelect: () => selectQualityTier("720p"),
-                },
+                ...(has1080pSupport
+                  ? [
+                      {
+                        key: "1080p" as const,
+                        label: "1080p",
+                        sublabel: "Full HD",
+                        active: selectedQualityTier === "1080p",
+                        onSelect: () => selectQualityTier("1080p"),
+                      },
+                    ]
+                  : []),
+                ...(has720pSupport
+                  ? [
+                      {
+                        key: "720p" as const,
+                        label: "720p",
+                        sublabel: "HD",
+                        active: selectedQualityTier === "720p",
+                        onSelect: () => selectQualityTier("720p"),
+                      },
+                    ]
+                  : []),
                 {
                   key: "480p",
                   label: "480p",
