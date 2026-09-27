@@ -584,5 +584,5 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
      - Verified across all servers: Lisbon, Nebula, Aphelion, Polaris, Bastion, Solara, Athens, Joy, Castle, and Canaias now all deliver the authentic 2007 original show.
   5. Regression Tests: Added automated tests in `src/lib/streaming/direct-stream.test.ts` verifying authentic 2007 playback and rejection of 2021 remake across Lisbon, Nebula, Aphelion, Polaris, Bastion, and Solara.
 - Files: `src/lib/streaming/vidfast-direct.ts`, `src/lib/streaming/direct-stream.ts`, `src/lib/streaming/direct-stream.test.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
-- Result: All 17 tests passed in `direct-stream.test.ts`. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run build` compiled all 41 routes successfully. Strictly local changes; NO git push performed.
+- Result: All 17 tests passed in `direct-stream.test.ts`. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run build` compiled all 41 routes successfully. Commits pushed to `origin/main` upon explicit user instruction.
 
