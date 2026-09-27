@@ -27,4 +27,4 @@ Streaming/playback restored to the exact known-good working state from commit `0
 
 ## Verification Summary
 - `git diff 016aedf src relay package.json`: 0 diff lines (exact match).
-- Zero remote `git push` performed per `AGENTS.md`.
+- Pushed to `origin/main` per explicit user command.
