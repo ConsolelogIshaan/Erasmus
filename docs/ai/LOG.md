@@ -1321,5 +1321,31 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
      - `npm run lint`: 0 errors (12 pre-existing warnings).
      - `npm run test`: 20/20 test files passed (223/223 tests passed, 100% pass rate).
      - `npm run build`: 52/52 routes compiled cleanly.
-     - User explicitly authorized push: Pushed commit `43a4c48` to `origin/main` for automated Cloudflare Workers CI deployment.
+## 2026-09-27 9:28 PM IST | Ishaan | Antigravity
+- Fixed: Resolved Playback Stuttering, Continuous Buffering, and Stuck Spinner in NativePlayer:
+  1. Root Causes Diagnosed:
+     - User reported severe stuttering and buffering on *Avengers: Endgame* and *Suits*.
+     - Cause 1: `highBufferWatchdogPeriod: 3` and `nudgeOffset: 0.3` in `NativePlayer` caused HLS.js to forcefully jump the playhead forward by 0.3s every 3 seconds whenever any buffer underrun occurred, creating rapid stuttering jitter.
+     - Cause 2: `abrEwmaDefaultEstimate: 18_000_000` forced HLS.js to immediately lock into the highest 16.2 Mbps 4K level on initial frame before connection throughput was measured, starving the buffer.
+     - Cause 3: `testBandwidth: true` caused HLS.js to continuously test-fetch segments and flap quality levels.
+     - Cause 4: In `Hls.Events.FRAG_BUFFERED`, `if (!video.paused) setBuffering(false);` caused a race condition where the loading spinner remained stuck on screen when the video paused or stalled.
+     - Cause 5: `relay/sync-tunnel-url.mjs` was setting `PRIMARY_WORKER_URL` to Account 2 (`ishaan-jangid1.workers.dev`), reverting `.env.local` to the slow local residential tunnel.
+  2. Fixes Applied:
+     - In `src/features/streaming/components/native-player.tsx`:
+       - Restored `highBufferWatchdogPeriod: 8`, `nudgeOffset: 0.2`, `nudgeMaxRetry: 5`.
+       - Removed `abrEwmaDefaultEstimate: 18_000_000` and `testBandwidth: true`.
+       - Restored balanced buffer headroom: `maxBufferLength: 60`, `maxMaxBufferLength: 120`, `maxBufferSize: 120 * 1000 * 1000`, `maxBufferHole: 0.8`.
+       - Updated `FRAG_BUFFERED` to unconditionally call `setBuffering(false)`.
+     - In `relay/cloudflare-worker/worker.js`:
+       - Added `Origin` header alongside `Referer` to eliminate 403 blocks from upstream CDNs.
+       - Deployed to `https://erasmus-hls-relay.erasmustv.workers.dev` (Version ID: `bc187618-abdf-4779-a9f6-d5421193a16d`).
+     - In `relay/sync-tunnel-url.mjs`:
+       - Set `PRIMARY_WORKER_URL = 'https://erasmus-hls-relay.erasmustv.workers.dev'` so `.env.local` stays locked to the fast Anycast edge relay.
+  3. Verification:
+     - `npm run typecheck`: 0 errors.
+     - `npm run lint`: 0 errors.
+     - `npm run test`: 20/20 test files passed (223/223 tests passed).
+     - `npm run build`: 52/52 routes compiled cleanly.
+     - Strictly 0 git push without explicit user instruction per `AGENTS.md`.
+
 

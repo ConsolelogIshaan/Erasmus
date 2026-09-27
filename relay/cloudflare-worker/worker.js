@@ -191,7 +191,12 @@ const worker = {
             request.headers.get("User-Agent") ||
               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
           );
-          if (ref) edgeHeaders.set("Referer", ref);
+          if (ref) {
+            edgeHeaders.set("Referer", ref);
+            try {
+              edgeHeaders.set("Origin", new URL(ref).origin);
+            } catch {}
+          }
         }
         const range = request.headers.get("Range");
         if (range) edgeHeaders.set("Range", range);
@@ -294,7 +299,12 @@ const worker = {
             request.headers.get("User-Agent") ||
               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
           );
-          if (ref) edgeHeaders.set("Referer", ref);
+          if (ref) {
+            edgeHeaders.set("Referer", ref);
+            try {
+              edgeHeaders.set("Origin", new URL(ref).origin);
+            } catch {}
+          }
         }
 
         const edgeCtrl = new AbortController();

@@ -642,17 +642,13 @@ export function NativePlayer({
         enableWebVTT: true,
         startFragPrefetch: true,
         progressive: true,
-        // Aggressive bandwidth & buffer optimization:
-        abrEwmaDefaultEstimate: 18_000_000,
-        abrBandWidthFactor: 0.95,
-        abrBandWidthUpFactor: 0.85,
-        maxBufferLength: 90,
-        maxMaxBufferLength: 180,
-        maxBufferSize: 250 * 1000 * 1000,
-        maxBufferHole: 1.5,
-        highBufferWatchdogPeriod: 3,
-        nudgeOffset: 0.3,
-        nudgeMaxRetry: 10,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 120,
+        maxBufferSize: 120 * 1000 * 1000,
+        maxBufferHole: 0.8,
+        highBufferWatchdogPeriod: 8,
+        nudgeOffset: 0.2,
+        nudgeMaxRetry: 5,
         fragLoadingTimeOut: 20000,
         fragLoadingMaxRetry: 6,
         fragLoadingRetryDelay: 500,
@@ -663,7 +659,6 @@ export function NativePlayer({
         levelLoadingMaxRetry: 5,
         lowLatencyMode: false,
         backBufferLength: 30,
-        testBandwidth: true,
       });
       hlsRef.current = hls;
       hls.loadSource(activeSrc);
@@ -816,9 +811,7 @@ export function NativePlayer({
         }
       });
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
-        if (!video.paused) {
-          setBuffering(false);
-        }
+        setBuffering(false);
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {

@@ -1,58 +1,38 @@
 # STATE
 
-Updated: 2026-09-27 8:38 PM IST
-Git: `origin/main` (Clean working tree; verified build, lints, and tests; Error 1102 proactive hardening)
+Updated: 2026-09-27 9:28 PM IST
+Git: `origin/main` (Clean working tree; verified build, lints, and tests; streaming buffering & stuttering fixed)
 
 ## Priority
-Streaming/playback is frozen and stable. Hardened the codebase proactively against Cloudflare Worker **Error 1102** ("Worker exceeded CPU time limit") to eliminate any potential triggers across navigation, searching, and catalog lookups.
+Streaming/playback is stable and rock-solid. Fixed the buffering and stuttering issues reported by the user in `NativePlayer` and deployed the updated Smart Relay worker to Cloudflare.
 
-## Error 1102 Proactive Hardening Completed
-1. **Middleware Isolation Bypass (`src/middleware.ts` & `src/lib/supabase/middleware.ts`)**:
-   - Excluded all `/api/` routes from root middleware matcher.
-   - Prevents Cloudflare Workers from invoking the Edge isolate, parsing cookies, and making remote Supabase `getUser()` network calls on every media/catalog API fetch.
-   - Added link prefetch guard (`x-middleware-prefetch` / `next-router-prefetch` / `purpose: prefetch`): skips redundant remote `getUser()` token revalidations when authenticated users hover over links/posters.
+## Buffering & Stuttering Fixes Applied
+1. **Eliminated Hls.js 3-Second Watchdog Stutter Loop**:
+   - Reverted `highBufferWatchdogPeriod: 3` and `nudgeOffset: 0.3` back to stable defaults (`highBufferWatchdogPeriod: 8`, `nudgeOffset: 0.2`, `nudgeMaxRetry: 5`).
+   - Root Cause: Setting `highBufferWatchdogPeriod: 3` caused HLS.js to violently skip the playhead forward by 0.3s every 3 seconds whenever any buffer underrun occurred, causing rapid play-pause-skip jitter.
 
-2. **Public Edge CDN Caching on Media Routes**:
-   - `src/app/api/media/trending/route.ts`: Removed redundant per-request session checks; added `Cache-Control: public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400` and `CDN-Cache-Control: public, max-age=86400`. Cloudflare Anycast Edge serves trending titles from RAM in 0ms Worker CPU.
-   - `src/app/api/media/tv/[showId]/season/[seasonNumber]/route.ts`: Added `s-maxage=86400` and `CDN-Cache-Control: public, max-age=86400`.
+2. **Removed Forged 18 Mbps Bitrate Bias & Bandwidth Testing**:
+   - Removed `abrEwmaDefaultEstimate: 18_000_000` and `testBandwidth: true`.
+   - Root Cause: Forcing an initial 18 Mbps estimate caused HLS.js to immediately jump straight into the highest 16.2 Mbps 4K stream on initial frame load, starving the buffer on typical residential internet connections. Removed `testBandwidth: true` to prevent continuous test-fetching and quality level flapping.
 
-3. **Search Query Debounce & Guard**:
-   - `src/features/search/hooks/use-media-search.ts` & `src/app/api/media/search/route.ts`:
-   - Raised minimum query threshold from `>= 1` to `>= 2` characters, preventing premature multi-provider search requests on single-character typing pauses.
-   - Added `s-maxage=600` edge caching to search responses.
+3. **Restored Balanced Buffer Headroom & Max Hole Clearance**:
+   - Restored `maxBufferLength: 60`, `maxMaxBufferLength: 120`, `maxBufferSize: 120 * 1000 * 1000`, and `maxBufferHole: 0.8`.
+   - Root Cause: Attempting to buffer 250 MB (180s) ahead with a 1.5s hole tolerance requested too many concurrent fragments and allowed container PTS discontinuities.
 
-4. **In-Memory TTL Caching & Request Deduplication**:
-   - `src/lib/media/providers/omdb/client.ts`: Added in-memory TTL cache (1h TTL, 300 max items) and inflight request deduplication for OMDb ratings.
-   - `src/lib/media/providers/tmdb/client.ts`: Added `cf: { cacheEverything: true, cacheTtl: 300 }` edge caching for native Cloudflare fetches to TMDB.
+4. **Fixed Stuck Loading Spinner in `FRAG_BUFFERED`**:
+   - Removed `if (!video.paused)` guard from `Hls.Events.FRAG_BUFFERED`. The buffering spinner now clears unconditionally whenever fresh media frames arrive, eliminating the permanent spinner trap shown in the user's screenshots.
 
----
-
-## Current Architecture & Status
-
-### Cloudflare Deployment Topology
-1. **Account 1 (`shrdsubscriptions@gmail.com`) — Web Application (`erasmus-web`)**:
-   * **URL**: [https://erasmus-web.erasmustv.workers.dev](https://erasmus-web.erasmustv.workers.dev)
-   * **Role**: Next.js App Router UI, page SSR, catalog discovery, search, TMDB client caching, and user authentication.
-   * **Status**: 100% OK. Optimized for 0ms CPU hits on cached catalog and API routes.
-
-2. **Account 1 Streaming Relay (`erasmus-hls-relay`)**:
-   * **URL**: [https://erasmus-hls-relay.erasmustv.workers.dev](https://erasmus-hls-relay.erasmustv.workers.dev)
-   * **Active Version ID**: `f8ee2da6-f00e-4cc0-ba96-58c2e4eca0b1`
-   * **Role**: Primary Anycast HLS relay handling 100% of all HLS master playlists, child variant playlists, audio tracks, and video segment chunks.
-   * **Edge Caching**: `cf: { cacheEverything: true, cacheTtl: 86400 }` returning segments in <15ms.
-
-3. **Account 2 (`ishaan.jangid1@gmail.com`) — Standby Streaming Relay**:
-   * **URL**: [https://erasmus-hls-relay.ishaan-jangid1.workers.dev](https://erasmus-hls-relay.ishaan-jangid1.workers.dev)
-   * **Role**: Dedicated 100k daily request pool.
-
-4. **Database & Auth Backend**:
-   * **Provider**: Supabase Cloud (`https://jnxflxtizbezqclxfmzc.supabase.co`).
+5. **Cloudflare Smart Relay Deployment**:
+   - Added `Origin` header handling alongside `Referer` to `relay/cloudflare-worker/worker.js` for upstream CDN compatibility.
+   - Deployed to `https://erasmus-hls-relay.erasmustv.workers.dev` (Version ID: `bc187618-abdf-4779-a9f6-d5421193a16d`).
+   - Fixed `PRIMARY_WORKER_URL` in `relay/sync-tunnel-url.mjs` to point to `erasmustv.workers.dev` so background scripts never revert `.env.local` to the slow residential tunnel.
 
 ---
 
 ## Verification Summary
 - `npm run typecheck`: 0 errors.
-- `npm run lint`: 0 errors (12 pre-existing warnings).
+- `npm run lint`: 0 errors.
 - `npm run test`: 20/20 test files passed (223/223 tests passed, 100% pass rate).
 - `npm run build`: 52/52 routes compiled cleanly.
-- Pushed to `origin/main` per explicit user command (Cloudflare CI deployment triggered).
+- Worker deployed: `erasmus-hls-relay.erasmustv.workers.dev` (Version `bc187618-abdf-4779-a9f6-d5421193a16d`).
+- Strictly 0 git push without explicit user instruction per `AGENTS.md`.
