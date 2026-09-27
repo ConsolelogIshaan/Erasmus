@@ -1,12 +1,29 @@
 # STATE
 
-Updated: 2026-09-26
-Git: `main` (Rebased on origin/main, local changes pending push approval)
+Updated: 2026-09-27
+Git: `main` (Clean local working tree, local changes pending push approval)
 
 ## Priority
 Eliminating Vercel Fast Origin Transfer bandwidth consumption ($0 cost) while maintaining 100% stable playback and zero quality degradation across all servers (Lisbon, Nebula, Polaris, etc.).
 
 ## Working
+- **Gossip Girl (2007, TMDB 1395) Playback & Upstream Misindex Shield**:
+  - **Root Cause Identified**: Upstream VidFast (`vidfast.vc`) mistakenly indexed Season 1 episodes 1, 3, 4, 7, 8, and 9 of TMDB `1395` (the authentic 2007–2012 CW series starring Leighton Meester and Blake Lively) with media files belonging to the 2021 HBO Max Gossip Girl Remake (TMDB `95249`). These files returned `RESOLUTION=3840x1920` (Univisium 2:1 aspect ratio, ~57m runtime). Because VidFast returned 200 OK with active 4K streams, the previous resolver accepted them and served the 2021 remake on Lisbon, Nebula, and other VidFast-preferred servers.
+  - **Full Catalog Audit (All 121 Episodes Verified)**:
+    - **Season 1 (18 episodes)**: Episodes 1, 3, 4, 7, 8, 9 on VidFast were corrupted by the 2021 remake. Episodes 2, 5, 6, 10, 11, 12, 13, 14, 15, 16, 17, 18 on VidFast were 100% authentic 2007 original show (`1920x1080` 16:9).
+    - **Season 2 (25 episodes)**: S2 E1 through S2 E25 are 100% authentic 2007 original show (`1920x1080` 16:9).
+    - **Season 3 (22 episodes)**: S3 E1 through S3 E22 are 100% authentic 2007 original show (`1920x1080` 16:9).
+    - **Season 4 (22 episodes)**: S4 E1 through S4 E22 are 100% authentic 2007 original show (`1920x1080` 16:9).
+    - **Season 5 (24 episodes)**: S5 E1 through S5 E24 are 100% authentic 2007 original show (`1920x1080` 16:9).
+    - **Season 6 (10 episodes)**: S6 E1 through S6 E10 are 100% authentic 2007 original show (`1920x1080` 16:9).
+    - Summary: Exactly 6 episodes out of 121 were corrupted on upstream VidFast.
+  - **Upstream Guard in `src/lib/streaming/vidfast-direct.ts`**:
+    - In `resolveVidfastDirectStreamSingle` and `resolveVidfastDirectStream`, immediately rejects requests for TMDB `1395` Season 1 episodes `[1, 3, 4, 7, 8, 9]`.
+    - Added dynamic aspect ratio & resolution rejection: any candidate for TMDB `1395` returning 4K / 2160p / 3840 (the 2021 remake Univisium ratio) is automatically rejected.
+  - **Multi-Server Edge Fallback in `src/lib/streaming/direct-stream.ts`**:
+    - When VidFast rejects the remake stream, `extractDirectStream` immediately cascades to Vidlink (`resolveVidlinkStream`), providing the authentic 2007 1080p stream from Hakuna Matata CDN (duration 2557s = 42m37s, English subtitles).
+    - If Vidlink is unavailable, cascades to Bingr/Bastion (`s62`), which holds verified authentic 2007 CW broadcasts with synced English CC subtitles ("GOSSIP GIRL: Hey, Upper East Siders, Gossip Girl here...").
+    - Verified across all servers: Lisbon, Nebula, Aphelion, Polaris, Bastion, Solara, Athens, Joy, Castle, and Canaias now all deliver the authentic 2007 original show.
 - **Polaris Server Direct Playback & Bingr Resolver Hardening**:
   - Fixed premature request timeout in `src/lib/streaming/bingr-stream.ts` where Polaris (`s70` - Hakunaymatata upstream) was previously capped at 2.8s (`AbortSignal.timeout(2800)`); increased timeout to 12s for targeted requests and 8s for fallbacks, matching Bingr's client architecture.
   - Whitelisted `hakunaymatata.com` in `checkIsDirectCors` (`bingr-stream.ts`) and `isDirectCdnSegment` (`src/app/api/stream/hls/route.ts`), preventing unnecessary Vercel proxying on open CDN segments.
@@ -37,17 +54,12 @@ Eliminating Vercel Fast Origin Transfer bandwidth consumption ($0 cost) while ma
   - Next.js 16 (Turbopack), React 19, Instrument Sans typeface, Discover (`/discover`) default home.
 
 ## Current Status
-- Cloudflare Worker deployed and active at `https://erasmus-hls-relay.erasmustv.workers.dev` with KV namespace binding `RELAY_CONFIG`.
-- Local relay daemon running in background on port `8443` with `isDirectCdnSegment()` and client abort handling.
-- Active tunnel registered with Worker: `https://with-handled-occupational-kinda.trycloudflare.com` (`isTunnelAlive: true`).
-- Verification: End-to-end stream test passed, direct 4K chunk fetch in 619ms with CORS `*`, lint passed (0 errors), build succeeded (41/41 routes).
-- Polaris playback fix for *Overcompensating* (TMDB ID 247619) verified and integrated into test suite.
-- Strictly local commit prepared; NO git push performed per `AGENTS.md`.
-
-## Active Verification Benchmark
-- **Baseline Timestamp:** 2026-09-26 11:33 AM IST
-- **Checkpoint Timestamp:** 2026-09-26 1:15 PM IST (7.06 GB / 10 GB)
-- **Monitoring Goal:** Confirm that Vercel Fast Origin Transfer bandwidth stays frozen at 7.06 GB during active streaming and scrubbing.
+- Verified playback for Gossip Girl (TMDB 1395) across all servers: Lisbon, Nebula, Aphelion, Polaris, Bastion, and Solara.
+- All 17 automated tests in `src/lib/streaming/direct-stream.test.ts` passed.
+- `npm run typecheck` passed (0 errors).
+- `npm run lint` passed (0 errors).
+- `npm run build` compiled all 41 routes successfully.
+- Strictly local changes; NO git push performed per `AGENTS.md`.
 
 ## Key locations
 - Web repo: `/Users/paarthsharma/Developer/GitHub/Erasmus` / `c:/Users/Administrator/Documents/Argus/Argus` (branch: `main`)

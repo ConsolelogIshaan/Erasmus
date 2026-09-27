@@ -158,6 +158,22 @@ async function resolveVidfastDirectStreamSingle(input: {
   isFallback?: boolean;
 }): Promise<{ hit: VidfastDirectHit | null; debug?: string }> {
   const cleanId = input.tmdbId.trim();
+
+  // Guard against TMDB 1395 (Gossip Girl 2007) misindex on upstream VidFast:
+  // Episodes 1, 3, 4, 7, 8, 9 of Season 1 were erroneously indexed with the 2021 HBO Max remake (3840x1920 4K).
+  // Immediately reject these 6 episodes so the resolver diverts to authentic 2007 stream sources (Vidlink / Bastion).
+  if (
+    cleanId === "1395" &&
+    input.type === "tv" &&
+    (input.season ?? 1) === 1 &&
+    [1, 3, 4, 7, 8, 9].includes(input.episode ?? 1)
+  ) {
+    return {
+      hit: null,
+      debug: `TMDB 1395 S1E${input.episode ?? 1} upstream VidFast contains 2021 remake misindex`,
+    };
+  }
+
   const pageUrl =
     input.type === "tv"
       ? `https://vidfast.vc/tv/${cleanId}/${input.season ?? 1}/${input.episode ?? 1}`
@@ -364,6 +380,13 @@ async function resolveVidfastDirectStreamSingle(input: {
             finalUrl.includes("2160") ||
             /(^|[._\s/-])4k([._\s/-]|$)/i.test(finalUrl);
 
+          // TMDB 1395 (Gossip Girl 2007) was broadcast in 1080p/720p 16:9. The 2021 HBO Max remake was shot in 4K/2160p 2:1 Univisium.
+          // Reject any 4K/2160p candidate for TMDB 1395 to guarantee authentic playback.
+          if (cleanId === "1395" && (is4K || finalUrl.includes("2160") || finalUrl.includes("3840"))) {
+            lastError = `${candidate.name}: rejected 4K/2160p stream for TMDB 1395 (2021 remake collision)`;
+            continue;
+          }
+
           // If the CDN returns a specific single-quality playlist (like index-s2160p-v1-a1.m3u8),
           // the master playlist containing all tiers (4K, 1080p, 720p, 480p) is available at /master.m3u8.
           // Using master.m3u8 gives Hls.js full adaptive bitrate (ABR) for smooth, buffer-free playback.
@@ -462,6 +485,19 @@ export async function resolveVidfastDirectStream(input: {
   serverId?: string;
   isFallback?: boolean;
 }): Promise<{ hit: VidfastDirectHit | null; debug?: string }> {
+  // If this is TMDB 1395 S1 anomalous episodes, do not try alternate coordinates either
+  if (
+    input.tmdbId.trim() === "1395" &&
+    input.type === "tv" &&
+    (input.season ?? 1) === 1 &&
+    [1, 3, 4, 7, 8, 9].includes(input.episode ?? 1)
+  ) {
+    return {
+      hit: null,
+      debug: `TMDB 1395 S1E${input.episode ?? 1} upstream VidFast contains 2021 remake misindex`,
+    };
+  }
+
   // 1. Try exact requested coordinates
   const primary = await resolveVidfastDirectStreamSingle(input);
   if (primary.hit) {

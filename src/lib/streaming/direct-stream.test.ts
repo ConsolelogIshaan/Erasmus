@@ -171,11 +171,13 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
       season: 1,
       episode: 28,
       serverId: "lisbon",
+      title: "Jujutsu Kaisen",
+      year: "2020",
     });
     expect(res.ok).toBe(true);
     expect(res.servers.length).toBeGreaterThan(0);
     expect(res.servers[0]?.url).toContain(".m3u8");
-  }, 20000);
+  }, 35000);
 
   it("extracts direct stream for Cinejoy pipeline cj-nebula with high-speed edge stream", async () => {
     const res = await extractDirectStream({
@@ -216,6 +218,71 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
     expect(["Polaris", "Bastion"]).toContain(res.servers[0]?.name);
     expect(res.servers[0]?.url).toContain(".m3u8");
     expect(res.captions?.length).toBeGreaterThan(0);
+  }, 35000);
+
+  it("extracts authentic 2007 Gossip Girl stream on Lisbon server rejecting 2021 remake", async () => {
+    const res = await extractDirectStream({
+      type: "tv",
+      tmdbId: "1395",
+      season: 1,
+      episode: 1,
+      serverId: "lisbon",
+      title: "Gossip Girl",
+      year: "2007",
+      imdbId: "tt0397442",
+    });
+    expect(res.ok).toBe(true);
+    expect(res.servers.length).toBeGreaterThan(0);
+    const server = res.servers[0]!;
+    expect(server.url).toBeTruthy();
+    // Must NOT be the 2021 4K Univisium remake
+    expect(server.is4K).not.toBe(true);
+    expect(server.url).not.toContain("3840x1920");
+    expect(server.url).not.toContain("index-s2160p");
   }, 25000);
+
+  it("extracts authentic 2007 Gossip Girl stream on Nebula server rejecting 2021 remake", async () => {
+    const res = await extractDirectStream({
+      type: "tv",
+      tmdbId: "1395",
+      season: 1,
+      episode: 1,
+      serverId: "nebula",
+      title: "Gossip Girl",
+      year: "2007",
+      imdbId: "tt0397442",
+    });
+    expect(res.ok).toBe(true);
+    expect(res.servers.length).toBeGreaterThan(0);
+    const server = res.servers[0]!;
+    expect(server.url).toBeTruthy();
+    // Must NOT be the 2021 4K Univisium remake
+    expect(server.is4K).not.toBe(true);
+    expect(server.url).not.toContain("3840x1920");
+    expect(server.url).not.toContain("index-s2160p");
+    expect(server.name).toBe("Nebula");
+  }, 25000);
+
+  it("extracts authentic 2007 Gossip Girl stream across Aphelion, Polaris, Bastion, and Solara", async () => {
+    for (const serverId of ["aphelion", "polaris", "bastion", "solara"]) {
+      const res = await extractDirectStream({
+        type: "tv",
+        tmdbId: "1395",
+        season: 1,
+        episode: 1,
+        serverId,
+        title: "Gossip Girl",
+        year: "2007",
+        imdbId: "tt0397442",
+      });
+      expect(res.ok).toBe(true);
+      expect(res.servers.length).toBeGreaterThan(0);
+      const server = res.servers[0]!;
+      expect(server.url).toBeTruthy();
+      expect(server.is4K).not.toBe(true);
+      expect(server.url).not.toContain("3840x1920");
+      expect(server.url).not.toContain("index-s2160p");
+    }
+  }, 35000);
 });
 

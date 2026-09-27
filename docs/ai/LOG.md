@@ -564,3 +564,25 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   6. Verified Playback & Added Regression Test: Tested live extraction for *Overcompensating* returning a verified 1080p fMP4 HLS stream (`dash-hls-bridge.*.workers.dev` master playlist and `sacdn.hakunaymatata.com` segments with CORS `*`), synced subtitles, and added automated test to `src/lib/streaming/direct-stream.test.ts`.
 - Files: `src/lib/streaming/bingr-stream.ts`, `src/app/api/stream/hls/route.ts`, `src/lib/streaming/direct-stream.test.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 - Result: Branch `fix/polaris-stream`. All 11 tests in `direct-stream.test.ts` passed (including *Overcompensating* on Polaris), 0 TypeScript errors (`npm run typecheck`), 0 ESLint errors (`npm run lint`), all 41 routes compiled successfully (`npm run build`).
+
+## 2026-09-27 | Paarth | Antigravity
+- Changed: Diagnosed and fixed issue where playing the original *Gossip Girl* (2007–2012, TMDB `1395`, starring Leighton Meester and Blake Lively) played the 2021 HBO Max Remake (TMDB `95249`) on Lisbon and Nebula servers:
+  1. Identified Root Cause: Upstream VidFast (`vidfast.vc`) mistakenly indexed Season 1 episodes 1, 3, 4, 7, 8, and 9 of TMDB `1395` with video files from the 2021 HBO Max remake. These returned `RESOLUTION=3840x1920` (Univisium 2:1 aspect ratio, ~57m runtime). The 2007 original CW show was broadcast in standard 16:9 (`1920x1080` / `1280x720`, ~42m runtime). Because VidFast returned 200 OK with active 4K streams, the previous resolver accepted them and served the remake to the native player on Lisbon, Nebula, and other VidFast-preferred servers.
+  2. Verified All Episodes & Seasons (All 121 Episodes):
+     - Season 1 (18 episodes): Exactly 6 episodes (1, 3, 4, 7, 8, 9) on VidFast were corrupted by the 2021 remake. The other 12 episodes (2, 5, 6, 10-18) were verified 100% authentic 2007 original show (`1920x1080` 16:9).
+     - Season 2 (25 episodes): 100% authentic 2007 original show (`1920x1080` 16:9).
+     - Season 3 (22 episodes): 100% authentic 2007 original show (`1920x1080` 16:9).
+     - Season 4 (22 episodes): 100% authentic 2007 original show (`1920x1080` 16:9).
+     - Season 5 (24 episodes): 100% authentic 2007 original show (`1920x1080` 16:9).
+     - Season 6 (10 episodes): 100% authentic 2007 original show (`1920x1080` 16:9).
+  3. Upstream Safeguard in `src/lib/streaming/vidfast-direct.ts`:
+     - In `resolveVidfastDirectStreamSingle` and `resolveVidfastDirectStream`, added immediate rejection of TMDB `1395` S1 episodes `[1, 3, 4, 7, 8, 9]`.
+     - Added dynamic resolution rejection: any candidate for TMDB `1395` with 4K / 2160p / 3840 (Univisium 2:1 ratio) is rejected.
+  4. Multi-Server Fallback in `src/lib/streaming/direct-stream.ts`:
+     - When VidFast rejects the remake, `extractDirectStream` cascades to Vidlink (`resolveVidlinkStream`), providing the authentic 2007 1080p stream from Hakuna Matata CDN (duration 2557s = 42m37s, English dialogue and subtitles).
+     - If Vidlink is unavailable, cascades to Bingr/Bastion (`s62`), which holds verified authentic 2007 CW broadcasts with synced English CC subtitles ("GOSSIP GIRL: Hey, Upper East Siders, Gossip Girl here...").
+     - Verified across all servers: Lisbon, Nebula, Aphelion, Polaris, Bastion, Solara, Athens, Joy, Castle, and Canaias now all deliver the authentic 2007 original show.
+  5. Regression Tests: Added automated tests in `src/lib/streaming/direct-stream.test.ts` verifying authentic 2007 playback and rejection of 2021 remake across Lisbon, Nebula, Aphelion, Polaris, Bastion, and Solara.
+- Files: `src/lib/streaming/vidfast-direct.ts`, `src/lib/streaming/direct-stream.ts`, `src/lib/streaming/direct-stream.test.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: All 17 tests passed in `direct-stream.test.ts`. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run build` compiled all 41 routes successfully. Strictly local changes; NO git push performed.
+

@@ -8,6 +8,7 @@ if (typeof process !== "undefined" && process.env) {
 import {
   resolveCinejoyStream,
   resolveCinejoyClusterStream,
+  resolveVidlinkStream,
   type CinejoyCaption,
 } from "@/lib/streaming/cinejoy-stream";
 import { resolveVidfastDirectStream } from "@/lib/streaming/vidfast-direct";
@@ -187,13 +188,48 @@ export async function extractDirectStream(input: {
     }
     if (vidfastRes.debug) debugLog += `vidfast: ${vidfastRes.debug}; `;
 
+    // 2.5. Vidlink pristine edge fallback for Lisbon and other non-Bingr servers
+    try {
+      const vidlinkHit = await resolveVidlinkStream({
+        type: input.type,
+        tmdbId: input.tmdbId,
+        season: input.season,
+        episode: input.episode,
+        serverName: effectiveServerId === "nebula" ? "Nebula" : "Lisbon (Direct)",
+      });
+      if (vidlinkHit?.url) {
+        const result: DirectStreamResult = {
+          ok: true,
+          referer: vidlinkHit.referer,
+          captions: vidlinkHit.captions,
+          servers: [
+            {
+              name: effectiveServerId === "nebula" ? "Nebula" : (effectiveServerId === "lisbon" ? "Lisbon (Direct)" : vidlinkHit.serverName),
+              url: vidlinkHit.url,
+              kind: vidlinkHit.kind,
+              is4K: vidlinkHit.is4K,
+              hdUrl: vidlinkHit.hdUrl,
+              fourKUrl: vidlinkHit.fourKUrl,
+              isDirectCors: vidlinkHit.isDirectCors,
+              ms: Date.now() - started,
+            },
+          ],
+        };
+        extractCache.set(cacheKey, { at: Date.now(), result });
+        return result;
+      }
+    } catch (err) {
+      debugLog += `vidlink-fallback: ${err instanceof Error ? err.message : "failed"}; `;
+    }
+
     // 3. Fallback to Bingr cluster if not already tried
     if (!isBingrServer) {
       try {
         const enriched = await getEnriched();
+        const fallbackTarget = effectiveServerId === "nebula" ? "bastion" : "aphelion";
         const bingrHit = await resolveBingrStream({
           ...enriched,
-          serverId: "aphelion",
+          serverId: fallbackTarget,
         });
         if (bingrHit?.url) {
           const result: DirectStreamResult = {
@@ -202,7 +238,7 @@ export async function extractDirectStream(input: {
             captions: bingrHit.captions,
             servers: [
               {
-                name: bingrHit.serverName,
+                name: effectiveServerId === "nebula" ? "Nebula" : (effectiveServerId === "lisbon" ? "Lisbon" : bingrHit.serverName),
                 url: bingrHit.url,
                 kind: bingrHit.kind,
                 is4K: bingrHit.is4K,
