@@ -3,69 +3,90 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, ChevronDown } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+  Bookmark,
+  Film,
+  Heart,
+  Home,
+  Target,
+  Tv,
+  Users,
+} from "lucide-react";
 
+import { AnimeIcon } from "@/components/layout/anime-icon";
 import { SearchLink } from "@/components/layout/search-link";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { UserMenu, type UserMenuUser } from "@/components/layout/user-menu";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MAIN_NAV } from "@/constants/navigation";
 import { APP_NAME } from "@/constants/app";
 import { ROUTES } from "@/constants/routes";
+import type { NavIcon } from "@/constants/navigation";
 import { cn } from "@/lib/utils";
 
 const PRIMARY_NAV = [
-  { title: "Home", href: ROUTES.discover },
-  { title: "TV Shows", href: ROUTES.tv },
-  { title: "Movies", href: ROUTES.movies },
-  { title: "Anime", href: ROUTES.anime },
+  { title: "Home", href: ROUTES.discover, icon: Home },
+  { title: "TV Shows", href: ROUTES.tv, icon: Tv },
+  { title: "Movies", href: ROUTES.movies, icon: Film },
+  { title: "Anime", href: ROUTES.anime, icon: AnimeIcon },
+  { title: "For You", href: ROUTES.recommendations, icon: Target },
+  { title: "Favorites", href: ROUTES.favorites, icon: Heart },
+  { title: "Friends", href: ROUTES.friends, icon: Users },
 ] as const;
-
-const MORE_ROUTES = new Set<string>([
-  ROUTES.recommendations,
-  ROUTES.favorites,
-  ROUTES.friends,
-]);
-
-const MORE_NAV = MAIN_NAV.filter((item) => MORE_ROUTES.has(item.href));
 
 function isRouteActive(pathname: string, href: string) {
   if (href === ROUTES.discover) return pathname === ROUTES.discover;
   if (href === ROUTES.movies) {
     return pathname === ROUTES.movies || pathname.startsWith("/movie/");
   }
+  if (href === ROUTES.tv) {
+    return pathname === ROUTES.tv || pathname.startsWith("/tv/");
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function NavLink({
-  href,
-  title,
-  active,
-}: {
+interface NavLinkProps {
   href: string;
   title: string;
+  icon: NavIcon;
   active: boolean;
-}) {
+}
+
+function NavLink({ href, title, icon: Icon, active }: NavLinkProps) {
+  const reduceMotion = useReducedMotion();
+
   return (
     <Link
       href={href}
       prefetch={false}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "inline-flex h-10 items-center rounded-full px-3.5 text-[0.9375rem] font-medium whitespace-nowrap",
-        "transition-[background-color,color] duration-[160ms] ease-out",
+        "relative inline-flex h-9 lg:h-10 items-center rounded-full px-2.5 lg:px-3.5 text-xs md:text-[0.84rem] lg:text-[0.9375rem] font-medium whitespace-nowrap",
+        "transition-[background-color,color] duration-[180ms] ease-out",
         "focus-visible:ring-2 focus-visible:ring-white/55 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none",
         active
-          ? "bg-white/[0.11] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]"
+          ? "bg-white/[0.12] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] font-semibold"
           : "text-white/55 hover:bg-white/[0.055] hover:text-white/90",
       )}
     >
-      {title}
+      <AnimatePresence initial={false}>
+        {active ? (
+          <motion.span
+            key={`icon-${title}`}
+            initial={reduceMotion ? false : { opacity: 0, scale: 0.6, width: 0, marginRight: 0 }}
+            animate={
+              reduceMotion
+                ? { opacity: 1, scale: 1, width: "auto" }
+                : { opacity: 1, scale: 1, width: "auto", marginRight: 6 }
+            }
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.6, width: 0, marginRight: 0 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="inline-flex items-center overflow-hidden text-current"
+          >
+            <Icon className="size-3.5 lg:size-4 shrink-0" aria-hidden="true" />
+          </motion.span>
+        ) : null}
+      </AnimatePresence>
+      <span>{title}</span>
     </Link>
   );
 }
@@ -85,7 +106,6 @@ export function ErasmusFloatingNavbar({ user }: { user: UserMenuUser }) {
     return () => scrollRoot.removeEventListener("scroll", update);
   }, [pathname]);
 
-  const moreActive = MORE_NAV.some((item) => isRouteActive(pathname, item.href));
   const watchlistActive = isRouteActive(pathname, ROUTES.watchlist);
 
   return (
@@ -136,11 +156,11 @@ export function ErasmusFloatingNavbar({ user }: { user: UserMenuUser }) {
           <UserMenu user={user} className="ml-0.5" />
         </div>
 
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation">
+        <nav className="hidden items-center gap-0.5 lg:gap-1 md:flex" aria-label="Main navigation">
           <Link
             href={ROUTES.discover}
             prefetch={false}
-            className="mr-1 inline-flex h-10 items-center rounded-full px-3 text-[0.72rem] font-semibold tracking-[0.22em] text-white transition-colors duration-[160ms] hover:bg-white/[0.055] focus-visible:ring-2 focus-visible:ring-white/55 focus-visible:outline-none"
+            className="mr-1 inline-flex h-9 lg:h-10 items-center rounded-full px-2.5 lg:px-3 text-[0.72rem] font-semibold tracking-[0.22em] text-white transition-colors duration-[160ms] hover:bg-white/[0.055] focus-visible:ring-2 focus-visible:ring-white/55 focus-visible:outline-none"
             aria-label={`${APP_NAME} home`}
           >
             {APP_NAME.toUpperCase()}
@@ -151,58 +171,17 @@ export function ErasmusFloatingNavbar({ user }: { user: UserMenuUser }) {
               key={item.href}
               href={item.href}
               title={item.title}
+              icon={item.icon}
               active={isRouteActive(pathname, item.href)}
             />
           ))}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className={cn(
-                  "inline-flex h-10 items-center gap-1 rounded-full px-3 text-[0.9375rem] font-medium",
-                  "transition-colors duration-[160ms] focus-visible:ring-2 focus-visible:ring-white/55 focus-visible:outline-none",
-                  moreActive
-                    ? "bg-white/[0.11] text-white"
-                    : "text-white/55 hover:bg-white/[0.055] hover:text-white/90",
-                )}
-                aria-label="More destinations"
-              >
-                More
-                <ChevronDown className="size-3.5" aria-hidden />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="w-48">
-              {MORE_NAV.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <DropdownMenuItem key={item.href} asChild>
-                    <Link
-                      href={item.href}
-                      prefetch={false}
-                      aria-current={
-                        isRouteActive(pathname, item.href) ? "page" : undefined
-                      }
-                      className={cn(
-                        isRouteActive(pathname, item.href) &&
-                          "bg-white/[0.08] text-white",
-                      )}
-                    >
-                      <Icon aria-hidden="true" />
-                      {item.title}
-                    </Link>
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <span className="mx-1.5 h-6 w-px bg-white/[0.10]" aria-hidden />
+          <span className="mx-1 lg:mx-1.5 h-5 lg:h-6 w-px bg-white/[0.10]" aria-hidden />
 
           <SearchLink
             compact
             className={cn(
-              "h-10 w-10 rounded-full bg-transparent ring-0 dark:bg-transparent",
+              "h-9 w-9 lg:h-10 lg:w-10 rounded-full bg-transparent ring-0 dark:bg-transparent",
               "hover:bg-white/[0.07] dark:hover:bg-white/[0.07]",
             )}
           />
@@ -212,7 +191,7 @@ export function ErasmusFloatingNavbar({ user }: { user: UserMenuUser }) {
             aria-label="Watchlist"
             aria-current={watchlistActive ? "page" : undefined}
             className={cn(
-              "grid h-10 w-10 place-items-center rounded-full text-white/60 transition-colors duration-[160ms]",
+              "grid h-9 w-9 lg:h-10 lg:w-10 place-items-center rounded-full text-white/60 transition-colors duration-[160ms]",
               "hover:bg-white/[0.07] hover:text-white focus-visible:ring-2 focus-visible:ring-white/55 focus-visible:outline-none",
               watchlistActive && "bg-white/[0.11] text-white",
             )}

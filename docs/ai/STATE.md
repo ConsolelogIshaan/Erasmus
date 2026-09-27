@@ -1,6 +1,6 @@
 # STATE
 
-Updated: 2026-09-27 10:00 PM IST
+Updated: 2026-09-27 11:23 PM IST
 Git: `origin/main` (Clean working tree; verified build, lints, and tests; pushed to origin/main per explicit user command)
 
 ## Priority
@@ -28,6 +28,9 @@ Streaming/playback is frozen and stable (restored to pre-1102 baseline commit `0
    - Poster card rank, rating, and status badges: `rounded-full` / `rounded-br-xl`.
    - Library card favorite/pinned badges: `rounded-full`; progress bar: `rounded-b-xl`.
    - Shelf tabs and friend library filter chips: `rounded-full`.
+4. **Floating Navbar Enhancements (`src/components/layout/erasmus-floating-navbar.tsx`)**:
+   - Integrated dropdown options ("For You", "Favorites", "Friends") directly into the horizontal floating navbar, removing the "More ▾" dropdown menu.
+   - Dynamic active icon display: unselected links show clean typography; the selected page smoothly animates its icon into the pill beside the text using Framer Motion, and automatically collapses when navigating away.
 
 ---
 
