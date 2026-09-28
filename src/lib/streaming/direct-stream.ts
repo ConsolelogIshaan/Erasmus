@@ -279,48 +279,44 @@ export async function extractDirectStream(input: {
 
           // A1: Check KV for active quick tunnel URL (bypasses worker-to-worker subrequest limits)
           if (cfEnv?.RELAY_CONFIG) {
-            const [targetUrl, lastPingStr] = await Promise.all([
-              cfEnv.RELAY_CONFIG.get("TARGET_URL"),
-              cfEnv.RELAY_CONFIG.get("LAST_PING"),
-            ]);
-            const lastPing = lastPingStr ? parseInt(lastPingStr, 10) : 0;
-            const isBridgeAlive = Boolean(
-              targetUrl &&
-                (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) &&
-                Date.now() - lastPing < 45_000,
-            );
-
-            if (isBridgeAlive && targetUrl) {
-              bridgeRes = await fetch(`${targetUrl.replace(/\/+$/, "")}/api/stream/direct?${vParams.toString()}`, {
-                headers: { "User-Agent": "Mozilla/5.0" },
-                signal: AbortSignal.timeout(4500),
-              });
+            const targetUrl = await cfEnv.RELAY_CONFIG.get("TARGET_URL");
+            if (targetUrl && (targetUrl.startsWith("http://") || targetUrl.startsWith("https://"))) {
+              try {
+                bridgeRes = await fetch(`${targetUrl.replace(/\/+$/, "")}/api/stream/direct?${vParams.toString()}`, {
+                  headers: { "User-Agent": "Mozilla/5.0" },
+                  signal: AbortSignal.timeout(4500),
+                });
+              } catch {}
             }
           }
 
           // A2: Service Binding direct in-memory invocation
           if ((!bridgeRes || !bridgeRes.ok) && cfEnv?.HLS_RELAY?.fetch) {
-            bridgeRes = await cfEnv.HLS_RELAY.fetch(
-              `https://erasmus-hls-relay/api/stream/direct?${vParams.toString()}`,
-              {
-                headers: { "User-Agent": "Mozilla/5.0" },
-                signal: AbortSignal.timeout(4500),
-              },
-            );
+            try {
+              bridgeRes = await cfEnv.HLS_RELAY.fetch(
+                `https://erasmus-hls-relay/api/stream/direct?${vParams.toString()}`,
+                {
+                  headers: { "User-Agent": "Mozilla/5.0" },
+                  signal: AbortSignal.timeout(4500),
+                },
+              );
+            } catch {}
           }
         } catch {
           // Outside OpenNext Cloudflare runtime (e.g. local dev / build)
         }
 
         // Strategy B: Standard fetch to relayBase
-        if (!bridgeRes && relayBase && relayBase.startsWith("http")) {
-          bridgeRes = await fetch(
-            `${relayBase}/api/stream/direct?${vParams.toString()}`,
-            {
-              headers: { "User-Agent": "Mozilla/5.0" },
-              signal: AbortSignal.timeout(2500),
-            },
-          );
+        if ((!bridgeRes || !bridgeRes.ok) && relayBase && relayBase.startsWith("http")) {
+          try {
+            bridgeRes = await fetch(
+              `${relayBase}/api/stream/direct?${vParams.toString()}`,
+              {
+                headers: { "User-Agent": "Mozilla/5.0" },
+                signal: AbortSignal.timeout(4500),
+              },
+            );
+          } catch {}
         }
 
         if (bridgeRes && bridgeRes.ok) {

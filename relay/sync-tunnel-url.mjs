@@ -23,6 +23,7 @@ async function registerWithWorker(tunnelUrl) {
           'Authorization': `Bearer ${SYNC_SECRET}`,
         },
         body: JSON.stringify({ target: tunnelUrl }),
+        signal: AbortSignal.timeout(5000),
       });
       const data = await res.json();
       console.warn(`[Sync] Registered with Cloudflare Worker (${url}):`, data.status === 'ok' ? 'SUCCESS' : data);
@@ -41,6 +42,7 @@ async function sendHeartbeat() {
         headers: {
           'Authorization': `Bearer ${SYNC_SECRET}`,
         },
+        signal: AbortSignal.timeout(5000),
       });
     } catch {}
   }

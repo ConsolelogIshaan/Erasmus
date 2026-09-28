@@ -1784,3 +1784,38 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
      - Zero git push or remote deploy executed.
 - Files: `src/lib/streaming/vidfast-direct.ts`, `src/lib/streaming/direct-stream.ts`, `src/features/streaming/components/streaming-theater-modal.tsx`, `src/features/streaming/components/native-player.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 
+## 2026-09-28 11:05 PM IST | Antigravity
+- Changed: Diagnosed and resolved post-deploy Cloudflare streaming failure ("Stream unavailable on Lisbon" / 0:00 duration) and hardened relay architecture against KV write quota exhaustion:
+  1. Root cause analysis:
+     - Cloudflare KV Write Quota Exhaustion: `sync-tunnel-url.mjs` was sending heartbeat pings every 10 seconds. On the worker, each ping wrote `LAST_PING` to KV (8,640 writes/day). The Cloudflare free tier limit of 1,000 writes/day was reached, causing Cloudflare API to block all KV writes with error `10048 (free usage limit reached for today)`.
+     - Fragile Heartbeat Expiry Lockout: Both `direct-stream.ts` and `worker.js` checked `Date.now() - lastPing < 45_000` (or `90_000`). Because KV writes were blocked, `LAST_PING` was stuck at an 8-hour-old timestamp.
+     - As a result, both the web application and the relay worker believed the residential tunnel was offline.
+     - The web app fell back to Vidlink / Hakuna Matata CDN (`bcdn.hakunaymatata.com`), and the relay worker attempted direct Cloudflare Edge fetch.
+     - Cloudflare Edge was blocked with HTTP 403 Forbidden by VidFast and HTTP 427 Precondition Required by Hakuna Matata.
+     - The browser received 403/427 on manifest and chunk requests, displaying "Stream unavailable on Lisbon" with 0:00 duration.
+     - Additionally, `worker.js` line 321 had an undefined variable (`targetHost`), and `/api/stream/direct` had a premature 5s timeout that aborted on multi-server cascades like Off Campus S1E4.
+  2. Surgical fixes implemented:
+     - `relay/cloudflare-worker/worker.js`:
+       - Fixed `targetHost = target.hostname.toLowerCase()`.
+       - Completely eliminated KV writes on `/ping`. Pings update in-memory cache without burning KV quota.
+       - Removed brittle `isTunnelAlive` heartbeat gate from Path 1: whenever a tunnel target is available, the worker always routes VidFast / Hakuna Matata requests through the tunnel first with a 5s/18s timeout, cleanly falling back to edge fetch only if the tunnel fails.
+       - Increased direct resolver timeout to 12,000ms.
+       - Configured `DEFAULT_TUNNEL_URL = "https://nurse-autumn-browser-rpg.trycloudflare.com"`.
+       - Deployed live to Cloudflare: `https://erasmus-hls-relay.erasmustv.workers.dev` (Version ID: `f494fa22-2752-4439-9b3c-95ac173add80`).
+     - `src/lib/streaming/direct-stream.ts`:
+       - Removed fragile `Date.now() - lastPing < 45_000` check. Strategies A1, A2, and B query the bridge directly with 4.5s timeouts without failing on stale KV ping timestamps.
+     - `relay/sync-tunnel-url.mjs`:
+       - Added `AbortSignal.timeout(5000)` to all fetch operations to prevent socket hanging.
+  3. Verification:
+     - Live testing against `https://erasmus-hls-relay.erasmustv.workers.dev`:
+       - Breaking Bad S01E01: Resolved `vRapid` (4K: true), manifest HTTP 200 OK (`3840x2160`).
+       - Off Campus S01E04: Resolved `Cobra`, manifest HTTP 200 OK.
+       - Spider-Man: Across the Spider-Verse: Resolved `vRapid` (4K: true), manifest HTTP 200 OK.
+     - Real browser testing in Chrome: `/api/stream/direct` returned 200 OK, relay manifest returned 200 OK with 3840x2160 4K stream info.
+     - Tests: `npm test` passed 224/224 tests across 20 test files.
+     - Lints: `npm run lint` passed with 0 errors (14 warnings).
+     - Build: `npm run build` compiled all 41 routes cleanly with code 0.
+     - Zero unapproved git pushes executed.
+- Files: `relay/cloudflare-worker/worker.js`, `src/lib/streaming/direct-stream.ts`, `relay/sync-tunnel-url.mjs`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+
+

@@ -15,7 +15,7 @@
  */
 
 const SYNC_SECRET = "erasmus_relay_tunnel_key_9247f1";
-const HEARTBEAT_EXPIRY_MS = 90 * 1000; // 90 seconds for rock-solid tunnel stability without KV replication jitter
+const HEARTBEAT_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes for rock-solid tunnel stability without KV replication jitter
 const DEFAULT_REFERER = "https://cinejoy.to/";
 
 // In-memory cache for ultra-fast (0ms) routing without KV read latency on every chunk
@@ -153,32 +153,24 @@ function rewritePlaylist(text, baseUrl, relayBase, referer) {
     .join("\n");
 }
 
-async function getActiveTunnel(env) {
-  const now = Date.now();
-  // Fast path: cached in worker isolate memory and active
-  if (cachedTarget && (now - cachedPing < HEARTBEAT_EXPIRY_MS)) {
-    return cachedTarget;
-  }
+const DEFAULT_TUNNEL_URL = "https://nurse-autumn-browser-rpg.trycloudflare.com";
 
-  // Read from KV if available
+async function getActiveTunnel(env) {
+  if (cachedTarget) return cachedTarget;
+
   if (env && env.RELAY_CONFIG) {
     try {
       const target = await env.RELAY_CONFIG.get("TARGET_URL");
-      const pingStr = await env.RELAY_CONFIG.get("LAST_PING");
-      const ping = pingStr ? parseInt(pingStr, 10) : 0;
-      if (target) {
+      if (target && (target.startsWith("http://") || target.startsWith("https://"))) {
         cachedTarget = target;
-        cachedPing = ping;
-        if (now - ping < HEARTBEAT_EXPIRY_MS) {
-          return target;
-        }
+        return target;
       }
     } catch (err) {
       console.warn("[Worker] KV read error:", err);
     }
   }
 
-  return cachedTarget;
+  return env?.TUNNEL_URL || DEFAULT_TUNNEL_URL;
 }
 
 const worker = {
@@ -215,12 +207,14 @@ const worker = {
 
         // Persist to KV
         if (env && env.RELAY_CONFIG) {
-          ctx.waitUntil(
-            Promise.all([
+          try {
+            await Promise.all([
               env.RELAY_CONFIG.put("TARGET_URL", target),
               env.RELAY_CONFIG.put("LAST_PING", now.toString()),
-            ])
-          );
+            ]);
+          } catch (kvErr) {
+            console.warn("[Worker] KV put error:", kvErr);
+          }
         }
 
         return jsonResponse({
@@ -242,11 +236,6 @@ const worker = {
 
       const now = Date.now();
       cachedPing = now;
-
-      if (env && env.RELAY_CONFIG) {
-        ctx.waitUntil(env.RELAY_CONFIG.put("LAST_PING", now.toString()));
-      }
-
       return jsonResponse({ status: "ok", ping: now, target: cachedTarget });
     }
 
@@ -254,14 +243,13 @@ const worker = {
     if (pathname === "/status" || pathname === "/health") {
       const now = Date.now();
       const target = await getActiveTunnel(env);
-      const isAlive = Boolean(target && (now - cachedPing < HEARTBEAT_EXPIRY_MS));
 
       return jsonResponse({
         status: "ok",
         service: "Erasmus HLS Dynamic Smart Relay",
         activeTunnel: target || "none",
-        isTunnelAlive: isAlive,
-        secondsSincePing: Math.round((now - cachedPing) / 1000),
+        isTunnelAlive: Boolean(target),
+        secondsSincePing: cachedPing ? Math.round((now - cachedPing) / 1000) : 0,
         vercelFree: true,
       });
     }
@@ -269,33 +257,31 @@ const worker = {
     // --- ENDPOINT: /tunnel-url ---
     if (pathname === "/tunnel-url") {
       const target = await getActiveTunnel(env);
-      const now = Date.now();
-      const isAlive = Boolean(target && (now - cachedPing < HEARTBEAT_EXPIRY_MS));
-      return jsonResponse({ ok: isAlive, tunnelUrl: target || null, isAlive });
+      return jsonResponse({ ok: Boolean(target), tunnelUrl: target || null, isAlive: Boolean(target) });
     }
 
     // --- ENDPOINT: /api/stream/direct or /resolve-direct ---
     if (pathname === "/api/stream/direct" || pathname === "/resolve-direct") {
       const target = await getActiveTunnel(env);
-      const now = Date.now();
-      const isAlive = Boolean(target && (now - cachedPing < HEARTBEAT_EXPIRY_MS));
-      if (isAlive) {
+      if (target) {
         try {
           const directTargetUrl = `${target}${pathname}${requestUrl.search}`;
           const dRes = await fetch(directTargetUrl, {
             headers: { "User-Agent": "Mozilla/5.0" },
-            signal: AbortSignal.timeout(5000),
+            signal: AbortSignal.timeout(12000),
           });
-          const dData = await dRes.text();
-          return new Response(dData, {
-            status: dRes.status,
-            headers: {
-              "Content-Type": "application/json",
-              ...CORS_HEADERS,
-            },
-          });
+          if (dRes.ok) {
+            const dData = await dRes.text();
+            return new Response(dData, {
+              status: dRes.status,
+              headers: {
+                "Content-Type": "application/json",
+                ...CORS_HEADERS,
+              },
+            });
+          }
         } catch (dErr) {
-          return jsonResponse({ ok: false, error: "tunnel direct resolver failed", details: dErr.message }, 502);
+          console.warn("[Worker] Direct resolver tunnel attempt failed:", dErr.message);
         }
       }
       return jsonResponse({ ok: false, error: "residential bridge offline" }, 503);
@@ -313,19 +299,18 @@ const worker = {
     }
 
     const activeTunnel = await getActiveTunnel(env);
-    const now = Date.now();
-    const isTunnelAlive = Boolean(activeTunnel && (now - cachedPing < HEARTBEAT_EXPIRY_MS));
 
     const { referer, origin } = refererFor(requestUrl.searchParams.get("referer"));
-    // Referer-locked VidFast streams and residential-restricted Hakuna Matata streams route through residential tunnel when online:
+    const targetHost = target.hostname.toLowerCase();
+    // Referer-locked VidFast streams and residential-restricted Hakuna Matata streams route through residential tunnel when available:
     const isVidfastStream =
       targetHost.endsWith(".top") ||
       targetHost.includes("vidfast") ||
       targetHost.includes("hakunaymatata") ||
       Boolean(referer && referer.includes("vidfast"));
 
-    // Path 1: Forward VidFast streams to local residential PC tunnel when online (Zero-Vercel mode)
-    if (isTunnelAlive && isVidfastStream) {
+    // Path 1: Forward VidFast streams to local residential PC tunnel (Zero-Vercel mode)
+    if (activeTunnel && isVidfastStream) {
       try {
         const tunnelTargetUrl = new URL(request.url);
         const parsedTunnel = new URL(activeTunnel);
