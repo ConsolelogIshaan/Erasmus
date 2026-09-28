@@ -346,8 +346,10 @@ export async function extractDirectStream(input: {
               ...enriched,
               serverId: fallbackTarget,
             });
-            // Guard against Bastion wrong-movie fallback for flagship Lisbon/Sakura/Nebula
-            if (bingrHit?.url && (bingrHit.serverId !== "bastion" || effectiveServerId === "nebula")) {
+            // Guard against Bastion wrong-movie fallback for movies on flagship servers,
+            // but allow for TV shows (unambiguous season/episode) and as Lisbon edge fallback
+            const isTvShow = input.type === "tv";
+            if (bingrHit?.url && (bingrHit.serverId !== "bastion" || isTvShow || effectiveServerId === "nebula" || effectiveServerId === "lisbon")) {
               return {
                 ok: true,
                 referer: bingrHit.referer,

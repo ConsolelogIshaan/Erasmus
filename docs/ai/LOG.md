@@ -1542,3 +1542,19 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
      - All segment manifests and subtitles rewrite through `erasmus-hls-relay` with CORS.
      - `npm run lint` passed (0 errors). No git push performed.
 - Files: `src/lib/streaming/direct-stream.ts`, `src/lib/streaming/cinejoy-stream.ts`, `src/features/streaming/components/native-player.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+
+## 2026-09-28 4:25 PM IST | Antigravity
+- Changed: Diagnosed Modern Family offline loading hang and implemented disguised image segment normalization and TV show edge fallback:
+  1. Root cause identified:
+     - For *Modern Family* (TMDB 1421), primary Aphelion TV (`s40` / Evion) returned 404. Bingr cascaded to Bastion (`s62`).
+     - In `direct-stream.ts`, a hardcoded guard (`bingrHit.serverId !== "bastion"`) blocked Bastion for Lisbon, causing Lisbon to return `502 no stream`.
+     - When switching manually to Aphelion, Bastion was returned (`img1.tlnob.com` / `img1.bwcly.com`), but its video segments are named `0000.jpg` with `Content-Type: image/jpeg`.
+     - Browsers/MSE stall in endless buffering because MediaSource cannot append `image/jpeg` to video buffers.
+  2. Fix:
+     - `direct-stream.ts`: Allowed Bastion for TV shows (`input.type === "tv"`) where season/episode is unambiguous, and for Lisbon edge fallback when the laptop is off.
+     - `worker.js` & `erasmus-relay.mjs`: Added MIME normalization: when chunks have `image/*` or end in `.jpg`/`.png`/`.ts`, normalize `Content-Type` to `video/mp2t`.
+  3. Deployment & Live Verification:
+     - Deployed `erasmus-hls-relay` (Version ID: `d0ffe701-f934-4e4f-bb4d-f7e311ed9866`).
+     - Deployed `erasmus-web` (Version ID: `8c64166e-ebdf-4912-abfc-69c59725e1d3`).
+     - Live tested *Modern Family S01E01*: playlist returned 200 OK; segment `0000.jpg` returned 200 OK with `Content-Type: video/mp2t` (930,224 bytes).
+- Files: `src/lib/streaming/direct-stream.ts`, `relay/cloudflare-worker/worker.js`, `relay/erasmus-relay.mjs`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.

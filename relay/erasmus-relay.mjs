@@ -260,8 +260,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     // 3. Video media segments & MP4 streams
+    const isDisguisedTs = contentType.startsWith('image/') || path.endsWith('.jpg') || path.endsWith('.png') || path.endsWith('.ts');
     const passHeaders = {
-      'Content-Type': contentType || 'video/mp4',
+      'Content-Type': isDisguisedTs ? 'video/mp2t' : (contentType || 'video/mp4'),
       'Accept-Ranges': 'bytes',
       'Cache-Control': 'public, max-age=86400',
     };

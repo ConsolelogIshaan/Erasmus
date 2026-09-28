@@ -340,6 +340,10 @@ const worker = {
           resHeaders.set("Access-Control-Allow-Origin", "*");
           resHeaders.set("Access-Control-Allow-Headers", "*");
           resHeaders.set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
+          const ct = (resHeaders.get("content-type") || "").toLowerCase();
+          if (ct.startsWith("image/") || rawTarget.includes(".jpg") || rawTarget.includes(".png") || rawTarget.includes(".ts")) {
+            resHeaders.set("Content-Type", "video/mp2t");
+          }
           return new Response(tunnelRes.body, {
             status: tunnelRes.status,
             headers: resHeaders,
@@ -429,6 +433,18 @@ const worker = {
       resHeaders.set("Access-Control-Allow-Origin", "*");
       resHeaders.set("Access-Control-Allow-Headers", "*");
       resHeaders.set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
+
+      // Normalize disguised video segments:
+      // Scrapers & CDNs (Bastion, Bxcnm, Tlnob) disguise MPEG-TS chunks as .jpg/.png images with Content-Type: image/jpeg.
+      // Browsers and MSE (MediaSource) cannot append image/jpeg to video SourceBuffers and hang in perpetual loading.
+      if (
+        contentType.startsWith("image/") ||
+        path.endsWith(".jpg") ||
+        path.endsWith(".png") ||
+        path.endsWith(".ts")
+      ) {
+        resHeaders.set("Content-Type", "video/mp2t");
+      }
 
       return new Response(upstream.body, {
         status: upstream.status,
