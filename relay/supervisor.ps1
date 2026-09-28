@@ -20,6 +20,9 @@ $RelayProc = Start-Process -FilePath "node" -ArgumentList "relay/erasmus-relay.m
 if (Test-Path $LogFile) { Remove-Item $LogFile -Force -ErrorAction SilentlyContinue }
 $TunnelProc = Start-Process -FilePath $CloudflaredBin -ArgumentList "tunnel --url http://localhost:8443 --logfile `"$LogFile`"" -WorkingDirectory $RelayDir -WindowStyle Hidden -PassThru
 
+# 3. Start Sync script for Worker KV registration & heartbeats
+$SyncProc = Start-Process -FilePath "node" -ArgumentList "relay/sync-tunnel-url.mjs" -WorkingDirectory $RelayDir -WindowStyle Hidden -PassThru
+
 $LastUrl = ""
 $LastPing = 0
 
@@ -34,6 +37,11 @@ while ($true) {
     # Check and heal Tunnel process if died
     if ($null -eq $TunnelProc -or $TunnelProc.HasExited) {
         $TunnelProc = Start-Process -FilePath $CloudflaredBin -ArgumentList "tunnel --url http://localhost:8443 --logfile `"$LogFile`"" -WorkingDirectory $RelayDir -WindowStyle Hidden -PassThru
+    }
+
+    # Check and heal Sync process if died
+    if ($null -eq $SyncProc -or $SyncProc.HasExited) {
+        $SyncProc = Start-Process -FilePath "node" -ArgumentList "relay/sync-tunnel-url.mjs" -WorkingDirectory $RelayDir -WindowStyle Hidden -PassThru
     }
 
     # Parse and register new tunnel URL when cloudflared outputs it
