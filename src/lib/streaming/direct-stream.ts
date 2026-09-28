@@ -195,42 +195,44 @@ export async function extractDirectStream(input: {
       }
       if (vidfastRes.debug) debugLog += `vidfast: ${vidfastRes.debug}; `;
     } else {
-      // 2.5 Vercel Production Resolver:
-      // Uses Vercel's AWS us-east-1 IP to resolve VidFast with zero blocking.
-      // Returns authentic 4K vRapid master playlist (~1 KB JSON, 0 video bandwidth on Vercel).
+      // 2.5 Bridge Resolver (Cloudflare Pages/Worker):
+      // Queries the active PC tunnel bridge over Reliance Jio residential IP.
+      // Returns authentic 4K vRapid master playlist with ZERO Vercel involvement.
       try {
-        const vParams = new URLSearchParams({
-          id: input.tmdbId,
-          type: input.type,
-          server: effectiveServerId,
-        });
-        if (input.season) vParams.set("season", String(input.season));
-        if (input.episode) vParams.set("episode", String(input.episode));
-        if (title) vParams.set("title", title);
-        if (year) vParams.set("year", year);
-        if (imdbId) vParams.set("imdb", imdbId);
+        const relayBase = process.env.NEXT_PUBLIC_HLS_RELAY_URL?.trim();
+        if (relayBase && relayBase.startsWith("http")) {
+          const vParams = new URLSearchParams({
+            id: input.tmdbId,
+            type: input.type,
+            server: effectiveServerId,
+          });
+          if (input.season) vParams.set("season", String(input.season));
+          if (input.episode) vParams.set("episode", String(input.episode));
+          if (title) vParams.set("title", title);
+          if (year) vParams.set("year", year);
+          if (imdbId) vParams.set("imdb", imdbId);
 
-        const vRes = await fetch(
-          `https://erasmus-nine.vercel.app/api/stream/direct?${vParams.toString()}`,
-          {
-            headers: { "User-Agent": "Mozilla/5.0" },
-            signal: AbortSignal.timeout(8000),
-          },
-        );
-        if (vRes.ok) {
-          const vData = (await vRes.json()) as DirectStreamResult;
-          if (vData.ok && vData.servers?.length > 0 && vData.servers[0]?.url) {
-            // If the server requested was a VidFast server (like Lisbon), ensure we don't return an unrelated Bastion match
-            const vServer = vData.servers[0];
-            const isBastionOnNonBingr = !isBingrServer && vServer.name?.toLowerCase().includes("bastion");
-            if (!isBastionOnNonBingr) {
-              extractCache.set(cacheKey, { at: Date.now(), result: vData });
-              return vData;
+          const bridgeRes = await fetch(
+            `${relayBase}/api/stream/direct?${vParams.toString()}`,
+            {
+              headers: { "User-Agent": "Mozilla/5.0" },
+              signal: AbortSignal.timeout(6000),
+            },
+          );
+          if (bridgeRes.ok) {
+            const bridgeData = (await bridgeRes.json()) as DirectStreamResult;
+            if (bridgeData.ok && bridgeData.servers?.length > 0 && bridgeData.servers[0]?.url) {
+              const vServer = bridgeData.servers[0];
+              const isBastionOnNonBingr = !isBingrServer && vServer.name?.toLowerCase().includes("bastion");
+              if (!isBastionOnNonBingr) {
+                extractCache.set(cacheKey, { at: Date.now(), result: bridgeData });
+                return bridgeData;
+              }
             }
           }
         }
-      } catch (vercelErr) {
-        debugLog += `vercel-resolver: ${vercelErr instanceof Error ? vercelErr.message : "failed"}; `;
+      } catch (bridgeErr) {
+        debugLog += `bridge-resolver: ${bridgeErr instanceof Error ? bridgeErr.message : "failed"}; `;
       }
     }
 

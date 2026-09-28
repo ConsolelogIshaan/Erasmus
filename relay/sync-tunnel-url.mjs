@@ -64,7 +64,6 @@ async function checkAndSync() {
   }
   if (!tunnelUrl) return false;
 
-
   if (tunnelUrl !== lastRegisteredUrl) {
     lastRegisteredUrl = tunnelUrl;
     fs.writeFileSync(currentUrlFile, tunnelUrl, 'utf8');
@@ -83,27 +82,27 @@ async function checkAndSync() {
       console.warn(`[Sync] .env.local configured with permanent Worker URL: ${PRIMARY_WORKER_URL}`);
     }
 
-    // Register active tunnel target with the Cloudflare Worker
+    // Register active tunnel target with Cloudflare Workers
     await registerWithWorker(tunnelUrl);
     return true;
   }
   return true;
 }
 
-// Initial detection loop on startup
+// Ultra-fast sub-second detection loop on startup (checks every 200ms)
 let initialAttempts = 0;
 const startupInterval = setInterval(async () => {
   initialAttempts++;
   const synced = await checkAndSync();
-  if (synced || initialAttempts >= 30) {
+  if (synced || initialAttempts >= 100) {
     clearInterval(startupInterval);
   }
-}, 1000);
+}, 200);
 
-// Ongoing monitor: periodically verify tunnel URL and send heartbeat every 3 minutes
+// Ongoing monitor: periodically verify tunnel URL and send heartbeat every 60s
 setInterval(async () => {
   await checkAndSync();
   if (lastRegisteredUrl) {
     await sendHeartbeat();
   }
-}, 180000);
+}, 60000);

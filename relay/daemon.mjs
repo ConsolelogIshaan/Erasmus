@@ -3,10 +3,20 @@ import path from 'path';
 import fs from 'fs';
 
 const cwd = process.cwd();
+
+// 1. Wipe stale tunnel logs and cached URLs so no dead URL is ever read
+try {
+  const tunnelLogPath = path.join(cwd, 'relay', 'tunnel.log');
+  const currentUrlPath = path.join(cwd, 'relay', 'CURRENT_TUNNEL_URL.txt');
+  if (fs.existsSync(tunnelLogPath)) fs.unlinkSync(tunnelLogPath);
+  if (fs.existsSync(currentUrlPath)) fs.unlinkSync(currentUrlPath);
+} catch {}
+
 const relayLog = fs.openSync(path.join(cwd, 'relay', 'relay.log'), 'a');
 const tunnelLog = fs.openSync(path.join(cwd, 'relay', 'tunnel.log'), 'a');
+const syncLog = fs.openSync(path.join(cwd, 'relay', 'sync.log'), 'a');
 
-console.warn('[Daemon] Spawning independent Relay process...');
+console.warn('[Daemon] Spawning independent Relay process on port 8443...');
 const relayProc = spawn('node', ['relay/erasmus-relay.mjs'], {
   cwd,
   detached: true,
@@ -24,4 +34,13 @@ const tunnelProc = spawn('C:\\Users\\Administrator\\bin\\cloudflared.exe', ['tun
 });
 tunnelProc.unref();
 
-console.warn(`[Daemon] Launched! Relay PID: ${relayProc.pid}, Tunnel PID: ${tunnelProc.pid}`);
+console.warn('[Daemon] Spawning independent Tunnel Sync process...');
+const syncProc = spawn('node', ['relay/sync-tunnel-url.mjs'], {
+  cwd,
+  detached: true,
+  stdio: ['ignore', syncLog, syncLog],
+  windowsHide: true,
+});
+syncProc.unref();
+
+console.warn(`[Daemon] Launched! Relay PID: ${relayProc.pid}, Tunnel PID: ${tunnelProc.pid}, Sync PID: ${syncProc.pid}`);

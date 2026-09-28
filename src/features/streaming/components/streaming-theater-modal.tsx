@@ -542,14 +542,14 @@ export function StreamingTheaterModal({
       query.set("imdb", resolvedImdbId);
     }
     fetch(`/api/stream/direct?${query}`)
-      .then((response) => response.json())
+      .then((response) => response.json() as Promise<{
+        ok?: boolean;
+        referer?: string;
+        captions?: ExternalSubtitle[];
+        servers?: { url: string; kind?: "hls" | "file" }[];
+      }>)
       .then(
-        (data: {
-          ok?: boolean;
-          referer?: string;
-          captions?: ExternalSubtitle[];
-          servers?: { url: string; kind?: "hls" | "file" }[];
-        }) => {
+        (data) => {
           if (cancelled) return;
           const hit = data.servers?.[0];
           if (data.ok && hit?.url) {
@@ -621,8 +621,8 @@ export function StreamingTheaterModal({
       query.set("episode", String(activeEpisode));
     }
     fetch(`/api/stream/subs?${query}`)
-      .then((response) => response.json())
-      .then((data: { tracks?: ExternalSubtitle[] }) => {
+      .then((response) => response.json() as Promise<{ tracks?: ExternalSubtitle[] }>)
+      .then((data) => {
         if (cancelled) return;
         const tracks = data.tracks ?? [];
         if (tracks.length) {
@@ -836,8 +836,8 @@ export function StreamingTheaterModal({
     if (!open || mediaType !== "tv") return;
     let cancelled = false;
     fetch(`/api/media/tv/${tmdbId}/season/${pickerSeason}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: TvSeason | null) => {
+      .then((response) => (response.ok ? (response.json() as Promise<TvSeason>) : null))
+      .then((data) => {
         if (cancelled) return;
         const episodes = (data?.episodes ?? []).filter(
           (episode) => episode.episodeNumber > 0,

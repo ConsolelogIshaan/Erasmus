@@ -1428,3 +1428,31 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   2. Implemented active-only icon display: inactive links display clean text labels, while the selected active page smoothly animates its icon beside the label using Framer Motion (`AnimatePresence` + `motion.span` with smooth width/scale/opacity transitions). When navigating to another page, the previous icon smoothly collapses away and only the newly selected page displays its icon.
 - Files: `src/components/layout/erasmus-floating-navbar.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 - Result: Verified on `main` branch. `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run build` passed (52/52 routes compiled cleanly). Committed and pushed to `origin/main` per explicit user command.
+
+## 2026-09-28 1:00 PM IST | Antigravity
+- Changed: High-speed residential streaming bridge architecture hardened and verified with Zero Vercel involvement:
+  1. `relay/erasmus-relay.mjs`:
+     - Fixed `relayBase` to preserve the caller host (`${proto}://${host}`) rather than forcing child segment URLs to the Cloudflare Worker. When called via localhost, child segments stay on `http://localhost:8443` (0ms external latency). When called via the Cloudflare Quick Tunnel (`*.trycloudflare.com`), all 3,600+ child media chunks stay on the tunnel directly, bypassing the Cloudflare Worker and completely eliminating Error 1102 / 10ms CPU timeouts.
+     - Added English audio stream priority (`enrichAudioTracks`), auto-converting multi-track streams to English default.
+     - Added automatic SRT to WebVTT converter.
+     - Added `/api/stream/direct` endpoint to allow direct stream resolution via the local PC's residential Jio IP.
+  2. `relay/start-relay.bat` & `relay/daemon.mjs`:
+     - Automated startup with detached, unreferenced background processes for `erasmus-relay.mjs`, `cloudflared.exe`, and `sync-tunnel-url.mjs`.
+     - Automatically cleans stale `tunnel.log` and `CURRENT_TUNNEL_URL.txt` before starting to prevent race conditions.
+  3. `relay/sync-tunnel-url.mjs`:
+     - Accelerated tunnel URL polling to 200ms for sub-second startup registration.
+     - Automatically syncs the new tunnel URL to both Cloudflare Workers (`erasmus-hls-relay.erasmustv.workers.dev` and `erasmus-hls-relay.ishaan-jangid1.workers.dev`) via authenticated `POST /set-target`.
+     - Maintains ongoing 60s heartbeats.
+  4. `relay/cloudflare-worker/worker.js`:
+     - Modernized Smart Router with dynamic tunnel forwarding and 30s abort timeouts for 4K video segments.
+     - Stripped all Vercel fallback logic. If residential bridge is sleeping, falls back cleanly to direct edge fetch for open CDNs (Aphelion/Bastion/Vidlink).
+     - Deployed cleanly to `https://erasmus-hls-relay.erasmustv.workers.dev`.
+  5. `src/lib/streaming/direct-stream.ts`:
+     - Completely removed the `https://erasmus-nine.vercel.app/api/stream/direct` fetch block (0 MB on Vercel).
+     - Added residential bridge query when on Cloudflare, falling back cleanly to `resolveVidlinkStream` and `resolveBingrStream`.
+  7. `AGENTS.md`:
+     - Added mandatory major rule under `Always` and `Never` enforcing absolute honesty and transparency with the user at all times: strictly forbidding any misrepresentation, disguise, or false claims about architecture, hosting, data paths, or secret fallbacks.
+- Files: `AGENTS.md`, `relay/erasmus-relay.mjs`, `relay/daemon.mjs`, `relay/start-relay.bat`, `relay/sync-tunnel-url.mjs`, `relay/cloudflare-worker/worker.js`, `src/lib/streaming/direct-stream.ts`, `src/lib/streaming/relay.ts`, `src/features/streaming/components/streaming-theater-modal.tsx`, `src/lib/streaming/vidfast-direct.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: All 4 streaming endpoints verified with 200 master / 206 partial content segment tests. `npx tsc --noEmit` passed (0 errors), `npm run lint` passed (0 errors), `npm run build` compiled all 47 routes with 0 errors. Committed and pushed to `origin/main` per explicit user command.
+
+

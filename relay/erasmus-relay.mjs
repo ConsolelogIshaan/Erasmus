@@ -21,8 +21,69 @@ function proxied(relayBase, absolute, referer) {
   return `${relayBase}?${query.toString()}`;
 }
 
+function isSrtText(text) {
+  const trimmed = text.trimStart().replace(/^\uFEFF/, '');
+  if (trimmed.startsWith('WEBVTT')) return false;
+  return /^\d+\s*\r?\n\d{2}:\d{2}:\d{2}[,.]/.test(trimmed);
+}
+
+function srtToVtt(text) {
+  const body = text
+    .replace(/^\uFEFF/, '')
+    .replace(/\r/g, '')
+    .trim();
+  const stamped = body.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+  if (stamped.startsWith('WEBVTT')) return stamped;
+  return `WEBVTT\n\n${stamped}\n`;
+}
+
+function enrichAudioTracks(text) {
+  const lines = text.split('\n');
+  const audioIndices = [];
+  lines.forEach((l, idx) => {
+    if (l.trim().startsWith('#EXT-X-MEDIA:') && l.includes('TYPE=AUDIO')) {
+      audioIndices.push(idx);
+    }
+  });
+
+  if (audioIndices.length <= 1) return text;
+
+  let hasExplicitEnglish = false;
+  let englishLineIdx = -1;
+
+  audioIndices.forEach((idx) => {
+    const l = lines[idx] ?? '';
+    if (
+      /LANGUAGE="?(en|eng|english)"?/i.test(l) ||
+      /NAME="?[^"]*(english|\beng\b)[^"]*"/i.test(l)
+    ) {
+      hasExplicitEnglish = true;
+      englishLineIdx = idx;
+    }
+  });
+
+  const targetEnglishIdx = hasExplicitEnglish ? englishLineIdx : audioIndices[1];
+
+  audioIndices.forEach((idx) => {
+    let l = lines[idx] ?? '';
+    if (idx === targetEnglishIdx) {
+      l = l.replace(/DEFAULT=(YES|NO)/i, 'DEFAULT=YES');
+      l = l.replace(/AUTOSELECT=(YES|NO)/i, 'AUTOSELECT=YES');
+      if (!/LANGUAGE="[^"]+"/i.test(l)) {
+        l = l.replace(/NAME="([^"]+)"/i, 'NAME="English ($1)",LANGUAGE="en"');
+      }
+    } else {
+      l = l.replace(/DEFAULT=(YES|NO)/i, 'DEFAULT=NO');
+    }
+    lines[idx] = l;
+  });
+
+  return lines.join('\n');
+}
+
 function rewritePlaylist(text, baseUrl, relayBase, referer) {
-  return text
+  const enriched = enrichAudioTracks(text);
+  return enriched
     .split('\n')
     .map((line) => {
       const trimmed = line.trim();
@@ -44,6 +105,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -51,15 +113,34 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost:8443'}`);
+
   const targetRaw = reqUrl.searchParams.get('url');
 
-  if (!targetRaw) {
-    if (reqUrl.pathname === '/' || reqUrl.pathname === '/health') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', service: 'Erasmus High-Speed Video Relay' }));
+  // Route 1: Health check (only when no url query is present)
+  if (reqUrl.pathname === '/health' || reqUrl.pathname === '/status' || (reqUrl.pathname === '/' && !targetRaw)) {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', service: 'Erasmus High-Speed Video Relay', port: PORT }));
+    return;
+  }
+
+  // Route 2: Direct stream resolution proxy (calls local Erasmus Next.js server)
+  if (reqUrl.pathname === '/api/stream/direct' || reqUrl.pathname === '/resolve-direct') {
+    try {
+      const localDirectUrl = `http://localhost:3000/api/stream/direct${reqUrl.search}`;
+      const localRes = await fetch(localDirectUrl, { signal: AbortSignal.timeout(10000) });
+      const localData = await localRes.text();
+      res.writeHead(localRes.status, { 'Content-Type': 'application/json' });
+      res.end(localData);
+      return;
+    } catch (err) {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Local direct resolver unavailable', details: err.message }));
       return;
     }
+  }
+
+  if (!targetRaw) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'missing url' }));
     return;
@@ -103,14 +184,15 @@ const server = http.createServer(async (req, res) => {
       contentType.includes('mpegurl') ||
       contentType.includes('m3u8') ||
       path.endsWith('.m3u8');
+    const looksVtt = contentType.includes('vtt') || path.endsWith('.vtt');
 
-    const proto = req.headers['x-forwarded-proto'] || 'https';
-    const host = req.headers['x-forwarded-host'] || req.headers.host;
-    const isLocalOrTunnel = !host || host.includes('localhost') || host.includes('trycloudflare.com') || host.includes('127.0.0.1');
-    const relayBase = isLocalOrTunnel
-      ? 'https://erasmus-hls-relay.ishaan-jangid1.workers.dev'
-      : `${proto}://${host}`;
+    // Retain caller's host: preserves localhost for local playback, or trycloudflare for tunnel playback
+    const host = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${PORT}`;
+    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+    const proto = req.headers['x-forwarded-proto'] || (isLocal ? 'http' : 'https');
+    const relayBase = `${proto}://${host}`;
 
+    // 1. Playlists (.m3u8): enrich audio and rewrite child URLs to this same relay host
     if (looksPlaylist) {
       const text = await upstream.text();
       const rewritten = rewritePlaylist(text, target.href, relayBase, referer);
@@ -122,7 +204,19 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // Video media segments & MP4 streams
+    // 2. Subtitles (.vtt / .srt)
+    if (looksVtt || path.endsWith('.srt')) {
+      const rawSub = await upstream.text();
+      const body = isSrtText(rawSub) ? srtToVtt(rawSub) : rawSub;
+      res.writeHead(200, {
+        'Content-Type': 'text/vtt; charset=utf-8',
+        'Cache-Control': 'public, max-age=300',
+      });
+      res.end(body);
+      return;
+    }
+
+    // 3. Video media segments & MP4 streams
     const passHeaders = {
       'Content-Type': contentType || 'video/mp4',
       'Accept-Ranges': 'bytes',

@@ -29,13 +29,24 @@ export const LOCAL_HLS_RELAY = "/api/stream/hls";
 export const CLOUDFLARE_HLS_RELAY = "https://erasmus-hls-relay.erasmustv.workers.dev";
 
 function resolveRelayBase(): string {
+  if (typeof window !== "undefined") {
+    // When running in the browser on localhost / 127.0.0.1, connect directly to local relay
+    // to bypass all external network round-trips and achieve 0ms local streaming latency.
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "http://localhost:8443";
+    }
+  }
+
   const raw = process.env.NEXT_PUBLIC_HLS_RELAY_URL?.trim();
   if (raw === "local") return LOCAL_HLS_RELAY;
   if (raw) {
     try {
       const url = new URL(raw);
-      // https only — a http relay would be blocked as mixed content in the browser.
-      if (url.protocol === "https:") {
+      // Allow http only for local loopback development
+      if (
+        url.protocol === "https:" ||
+        (url.protocol === "http:" && (url.hostname === "localhost" || url.hostname === "127.0.0.1"))
+      ) {
         return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
       }
     } catch {
@@ -48,11 +59,14 @@ function resolveRelayBase(): string {
 /** Active relay base: the Cloudflare Worker smart router by default, or overridden via env. */
 export const HLS_RELAY_BASE = resolveRelayBase();
 
-
 /** True when a URL already points at a relay and must not be double-wrapped. */
 export function isRelayUrl(url: string): boolean {
   if (url.startsWith(LOCAL_HLS_RELAY)) return true;
-  return HLS_RELAY_BASE !== LOCAL_HLS_RELAY && url.startsWith(HLS_RELAY_BASE);
+  if (url.includes("trycloudflare.com")) return true;
+  if (url.includes("localhost:8443") || url.includes("127.0.0.1:8443")) return true;
+  if (url.includes("workers.dev")) return true;
+  const currentBase = resolveRelayBase();
+  return currentBase !== LOCAL_HLS_RELAY && url.startsWith(currentBase);
 }
 
 /**
@@ -62,7 +76,8 @@ export function isRelayUrl(url: string): boolean {
  */
 export function buildRelayUrl(url: string, referer?: string): string {
   if (isRelayUrl(url)) return url;
+  const currentBase = resolveRelayBase();
   const query = new URLSearchParams({ url });
   if (referer) query.set("referer", referer);
-  return `${HLS_RELAY_BASE}?${query.toString()}`;
+  return `${currentBase}?${query.toString()}`;
 }

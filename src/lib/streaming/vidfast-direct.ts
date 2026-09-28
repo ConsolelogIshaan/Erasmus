@@ -192,13 +192,26 @@ async function resolveVidfastDirectStreamSingle(input: {
       return { hit: null, debug: `page fetch failed: status ${pageRes.status}` };
     }
     const html = await pageRes.text();
-    const match = html.match(/\\"(?:en|token)\\":\\"([^\\"]+)\\"/);
-    if (!match?.[1]) {
+    let sessionToken = "";
+    const match =
+      html.match(/\\"(?:en|token)\\":\\"([^\\"]+)\\"/) ||
+      html.match(/"(?:en|token)":"([^"]+)"/) ||
+      html.match(/\"(?:en|token)\":\"([^\"]+)\"/);
+    if (match?.[1]) {
+      sessionToken = match[1];
+    } else {
+      const rawMatches = [...html.matchAll(/[a-zA-Z0-9_-]{80,95}/g)];
+      const lastMatch = rawMatches[rawMatches.length - 1];
+      if (lastMatch?.[0]) {
+        sessionToken = lastMatch[0];
+      }
+    }
+    if (!sessionToken) {
       return { hit: null, debug: `no session token found in page payload (html len ${html.length})` };
     }
 
     const encRes = await fetch(
-      `${ENC_API}/enc-vidfast?text=${encodeURIComponent(match[1])}`,
+      `${ENC_API}/enc-vidfast?text=${encodeURIComponent(sessionToken)}`,
       {
         signal: AbortSignal.timeout(4500),
       },
