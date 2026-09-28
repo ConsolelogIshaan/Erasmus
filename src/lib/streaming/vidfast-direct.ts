@@ -387,7 +387,11 @@ async function resolveVidfastDirectStreamSingle(input: {
 
           const is4K =
             cleanId === "224372" ||
+            candidate.name.toLowerCase() === "vfast" ||
+            candidate.name.toLowerCase() === "vrapid" ||
+            finalUrl.includes("/vd/") ||
             Boolean(candidate.description && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(candidate.description) && !candidate.description.includes("4K?")) ||
+            Boolean(candidate.image && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(candidate.image)) ||
             finalUrl.includes("2160") ||
             /(^|[._\s/-])4k([._\s/-]|$)/i.test(finalUrl);
 

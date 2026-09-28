@@ -1,10 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 
-const PRIMARY_WORKER_URL = 'https://erasmus-hls-relay.ishaan-jangid1.workers.dev';
+const PRIMARY_WORKER_URL = 'https://erasmus-hls-relay.erasmustv.workers.dev';
 const WORKER_URLS = [
   PRIMARY_WORKER_URL,
-  'https://erasmus-hls-relay.erasmustv.workers.dev',
 ];
 const SYNC_SECRET = 'erasmus_relay_tunnel_key_9247f1';
 

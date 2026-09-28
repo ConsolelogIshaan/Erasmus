@@ -1455,4 +1455,22 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Files: `AGENTS.md`, `relay/erasmus-relay.mjs`, `relay/daemon.mjs`, `relay/start-relay.bat`, `relay/sync-tunnel-url.mjs`, `relay/cloudflare-worker/worker.js`, `src/lib/streaming/direct-stream.ts`, `src/lib/streaming/relay.ts`, `src/features/streaming/components/streaming-theater-modal.tsx`, `src/lib/streaming/vidfast-direct.ts`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 - Result: All 4 streaming endpoints verified with 200 master / 206 partial content segment tests. `npx tsc --noEmit` passed (0 errors), `npm run lint` passed (0 errors), `npm run build` compiled all 47 routes with 0 errors. Committed and pushed to `origin/main` per explicit user command.
 
+## 2026-09-28 2:10 PM IST | Antigravity
+- Changed: Restored 4K option and Lisbon (VidFast) playback on live Cloudflare Workers deployment (`erasmus-web.erasmustv.workers.dev`):
+  1. Root cause identified:
+     - Cloudflare Error 1042 prevented plain HTTP `fetch()` subrequests from `erasmus-web.erasmustv.workers.dev` to `erasmus-hls-relay.erasmustv.workers.dev` on the same `workers.dev` zone.
+     - The failed subrequest silently fell back to Bingr / Vidlink (`img.rousav.tech`), which only supplied 720p HD. HLS.js detected 0 4K/1080p levels, causing the player to hide the 4K and 1080p quality buttons.
+     - In `vidfast-direct.ts`, `vRapid` master playlists ending in `/master.m3u8` were not flagged with `is4K: true` because the URL string did not contain `"2160"` or `"4k"`.
+  2. Architecture fixes:
+     - `wrangler.jsonc`: Bound `HLS_RELAY` service binding (`erasmus-hls-relay`) and `RELAY_CONFIG` KV namespace (`1b9f4e2fbdc74d6d943c64a37e9d0120`).
+     - `src/lib/streaming/direct-stream.ts`: Implemented dual-strategy resolver: Strategy A1 queries `TARGET_URL` directly from edge KV to connect to the active Quick Tunnel without worker-to-worker overhead (immune to Error 1042); Strategy A2 invokes `HLS_RELAY.fetch()` in-memory via Service Binding.
+     - `src/lib/streaming/vidfast-direct.ts`: Added `vrapid` and `/vd/` recognition to `is4K` evaluator so multi-variant master playlists with 3840x2160 are immediately marked `is4K: true`.
+     - `relay/sync-tunnel-url.mjs` & `.env.local`: Aligned `PRIMARY_WORKER_URL` and `NEXT_PUBLIC_HLS_RELAY_URL` to `https://erasmus-hls-relay.erasmustv.workers.dev`.
+  3. Build & Deployment:
+     - Built with OpenNext and deployed to `https://erasmus-web.erasmustv.workers.dev` (Version ID: `a6d66f78-a21d-4bae-b0ed-400c041b28ca`).
+- Files: `wrangler.jsonc`, `src/lib/streaming/direct-stream.ts`, `src/lib/streaming/vidfast-direct.ts`, `relay/sync-tunnel-url.mjs`, `.env.local`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Verified live: `curl "https://erasmus-web.erasmustv.workers.dev/api/stream/direct?id=385128&type=movie&server=lisbon"` returns `vRapid` (`moon.quietridge.top/vd/.../master.m3u8`), `is4K: true`, `fourKUrl` populated with the 3840x2160 4K stream in 3.0s. `npm run lint` passed (0 errors), `npm run build` compiled all routes cleanly. Strictly local — no git push performed.
+
+
+
 

@@ -18,6 +18,7 @@ import {
 } from "@/lib/streaming/bingr-stream";
 import { isCinejoyServer } from "@/lib/streaming/stream-resolver";
 import { getMovie, getTvShow } from "@/lib/media/catalog";
+import { CLOUDFLARE_HLS_RELAY } from "@/lib/streaming/relay";
 
 export interface DirectServer {
   name: string;
@@ -199,35 +200,79 @@ export async function extractDirectStream(input: {
       // Queries the active PC tunnel bridge over Reliance Jio residential IP.
       // Returns authentic 4K vRapid master playlist with ZERO Vercel involvement.
       try {
-        const relayBase = process.env.NEXT_PUBLIC_HLS_RELAY_URL?.trim();
-        if (relayBase && relayBase.startsWith("http")) {
-          const vParams = new URLSearchParams({
-            id: input.tmdbId,
-            type: input.type,
-            server: effectiveServerId,
-          });
-          if (input.season) vParams.set("season", String(input.season));
-          if (input.episode) vParams.set("episode", String(input.episode));
-          if (title) vParams.set("title", title);
-          if (year) vParams.set("year", year);
-          if (imdbId) vParams.set("imdb", imdbId);
+        const relayBase =
+          process.env.NEXT_PUBLIC_HLS_RELAY_URL?.trim() ||
+          CLOUDFLARE_HLS_RELAY;
 
-          const bridgeRes = await fetch(
+        const vParams = new URLSearchParams({
+          id: input.tmdbId,
+          type: input.type,
+          server: effectiveServerId,
+        });
+        if (input.season) vParams.set("season", String(input.season));
+        if (input.episode) vParams.set("episode", String(input.episode));
+        if (title) vParams.set("title", title);
+        if (year) vParams.set("year", year);
+        if (imdbId) vParams.set("imdb", imdbId);
+
+        let bridgeRes: Response | null = null;
+
+        // Strategy A: Cloudflare Context (Edge KV or Service Binding)
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { getCloudflareContext } = require("@opennextjs/cloudflare");
+          const cf = getCloudflareContext();
+          const cfEnv = cf?.env as
+            | {
+                RELAY_CONFIG?: { get: (key: string) => Promise<string | null> };
+                HLS_RELAY?: { fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> };
+              }
+            | undefined;
+
+          // A1: Check KV for active quick tunnel URL (bypasses worker-to-worker subrequest limits)
+          if (cfEnv?.RELAY_CONFIG) {
+            const targetUrl = await cfEnv.RELAY_CONFIG.get("TARGET_URL");
+            if (targetUrl && (targetUrl.startsWith("http://") || targetUrl.startsWith("https://"))) {
+              bridgeRes = await fetch(`${targetUrl.replace(/\/+$/, "")}/api/stream/direct?${vParams.toString()}`, {
+                headers: { "User-Agent": "Mozilla/5.0" },
+                signal: AbortSignal.timeout(10000),
+              });
+            }
+          }
+
+          // A2: Service Binding direct in-memory invocation
+          if ((!bridgeRes || !bridgeRes.ok) && cfEnv?.HLS_RELAY?.fetch) {
+            bridgeRes = await cfEnv.HLS_RELAY.fetch(
+              `https://erasmus-hls-relay/api/stream/direct?${vParams.toString()}`,
+              {
+                headers: { "User-Agent": "Mozilla/5.0" },
+                signal: AbortSignal.timeout(10000),
+              },
+            );
+          }
+        } catch {
+          // Outside OpenNext Cloudflare runtime (e.g. local dev / build)
+        }
+
+        // Strategy B: Standard fetch to relayBase
+        if (!bridgeRes && relayBase && relayBase.startsWith("http")) {
+          bridgeRes = await fetch(
             `${relayBase}/api/stream/direct?${vParams.toString()}`,
             {
               headers: { "User-Agent": "Mozilla/5.0" },
-              signal: AbortSignal.timeout(6000),
+              signal: AbortSignal.timeout(10000),
             },
           );
-          if (bridgeRes.ok) {
-            const bridgeData = (await bridgeRes.json()) as DirectStreamResult;
-            if (bridgeData.ok && bridgeData.servers?.length > 0 && bridgeData.servers[0]?.url) {
-              const vServer = bridgeData.servers[0];
-              const isBastionOnNonBingr = !isBingrServer && vServer.name?.toLowerCase().includes("bastion");
-              if (!isBastionOnNonBingr) {
-                extractCache.set(cacheKey, { at: Date.now(), result: bridgeData });
-                return bridgeData;
-              }
+        }
+
+        if (bridgeRes && bridgeRes.ok) {
+          const bridgeData = (await bridgeRes.json()) as DirectStreamResult;
+          if (bridgeData.ok && bridgeData.servers?.length > 0 && bridgeData.servers[0]?.url) {
+            const vServer = bridgeData.servers[0];
+            const isBastionOnNonBingr = !isBingrServer && vServer.name?.toLowerCase().includes("bastion");
+            if (!isBastionOnNonBingr) {
+              extractCache.set(cacheKey, { at: Date.now(), result: bridgeData });
+              return bridgeData;
             }
           }
         }

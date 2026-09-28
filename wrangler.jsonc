@@ -16,5 +16,17 @@
   "vars": {
     "NEXT_PUBLIC_IS_CLOUDFLARE": "true",
     "NEXT_PUBLIC_HLS_RELAY_URL": "https://erasmus-hls-relay.erasmustv.workers.dev"
-  }
+  },
+  "services": [
+    {
+      "binding": "HLS_RELAY",
+      "service": "erasmus-hls-relay"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "RELAY_CONFIG",
+      "id": "1b9f4e2fbdc74d6d943c64a37e9d0120"
+    }
+  ]
 }
