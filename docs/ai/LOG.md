@@ -1494,7 +1494,51 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Files: `relay/erasmus-relay.mjs`, `relay/sync-tunnel-url.mjs`, `relay/cloudflare-worker/worker.js`, `src/lib/streaming/direct-stream.ts`, `src/features/streaming/components/streaming-theater-modal.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 - Result: Live verified on deployed URL: `fetch("https://erasmus-web.erasmustv.workers.dev/api/stream/direct?id=385128&type=movie&server=lisbon")` returned `vRapid` (`moon.quietridge.top`), `is4K: true`, `fourKUrl: master.m3u8` in 6.6s. `npm run lint` passed (0 errors), `npm run build` passed (0 errors). All changes strictly local and deployed to Cloudflare; no git push performed.
 
+## 2026-09-28 3:32 PM IST | Antigravity
+- Changed: Completely eliminated brittle AI terminal process dependency by registering a native, self-healing Windows Task Scheduler service:
+  1. Root cause identified:
+     - `cloudflared` and `erasmus-relay` were previously running inside our AI assistant IDE's background terminal tasks. When the IDE or browser session closed or recycled, the IDE sent SIGTERM, instantly killing the tunnel.
+     - `daemon.mjs` was using `spawn().unref()`, which on Windows terminates with the console unless broken out of the job object.
+  2. Architecture implementation:
+     - Created `relay/supervisor.ps1`: Single self-healing supervisor loop that starts `node relay/erasmus-relay.mjs` and `cloudflared.exe`. Continuously checks process health every 3s and auto-resurrects them if killed. Automatically parses new tunnel URLs, syncs to Cloudflare Workers (`POST /set-target`), and sends heartbeats every 25s.
+     - Registered native Windows Task Scheduler task `ErasmusRelay` (`powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File relay/supervisor.ps1`). Configured with `AtLogOn` trigger, unlimited run time, and auto-restart on failure.
+  3. Verification:
+     - Deliberately executed `Stop-Process -Name cloudflared -Force`. Supervisor immediately resurrected `cloudflared` in <5s, registered new tunnel `https://deutschland-cup-recorder-tahoe.trycloudflare.com`, and Cloudflare Worker `/status` confirmed `isTunnelAlive: true`.
+     - Tested live playback on deployed site: Spider-Man (TMDB 634649) on Lisbon returned 4K `vRapid` with 200 manifest and 206 video chunks.
+- Files: `relay/supervisor.ps1`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 
+## 2026-09-28 3:51 PM IST | Antigravity
+- Changed: Diagnosed offline playback failure when PC is off and implemented in-flight HLS playlist rewriting on Cloudflare Edge Worker:
+  1. Root cause analysis:
+     - When user turned off their PC, Lisbon resolver attempted Vidlink fallback, which resolved to Hakuna Matata CDN (`bcdn.hakunaymatata.com`). Hakuna Matata blocks Cloudflare datacenter IPs with HTTP 427.
+     - Because `/api/stream/direct` received a valid URL from Vidlink, it returned `ok: true`, so the frontend believed Lisbon had succeeded and never redirected or fell back to Aphelion. The player then failed inside the video element on HTTP 427.
+     - When switching manually to Aphelion or Vidlink: Vidlink returned the same 427 error; Aphelion returned an open HLS playlist from `img.rousav.tech`, but Cloudflare Worker Path 2 (Direct Edge Fetch) was returning raw `.m3u8` playlists without rewriting child URLs. Relative links like `tiles.m3u8` were requested without `?url=`, causing 400 Bad Request.
+  2. Cloudflare Edge Worker fix:
+     - Updated `relay/cloudflare-worker/worker.js`: In Path 2, detect `.m3u8` playlists and rewrite all child manifests and segments via `rewritePlaylist()` with CORS headers and referer.
+     - Added VTT/SRT subtitle conversion (`srtToVtt`) to Path 2.
+     - Deployed updated relay worker to Cloudflare (`https://erasmus-hls-relay.erasmustv.workers.dev`, Version ID: `4f826a68-05be-41ff-a4d2-b890e5cf909c`).
+  3. Verification:
+     - Live tested edge relay: `fetch("https://erasmus-hls-relay.erasmustv.workers.dev/?url=https%3A%2F%2Fimg.rousav.tech%2Fmedia%2F4247d4ec8b4c8e900afd%2Findex.m3u8")` returned 200 OK with rewritten URLs. Child segment `00000.png` returned 200 OK with 350,808 bytes of binary video data.
+     - `npm run lint` passed (0 errors), `npm run build` passed (0 errors, 40+ routes generated).
+     - No git push performed.
+- Files: `relay/cloudflare-worker/worker.js`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 
-
-
+## 2026-09-28 4:02 PM IST | Antigravity
+- Changed: Implemented automated, seamless offline failover from Lisbon to Aphelion HD and hardened edge players against stubborn CDNs:
+  1. `src/lib/streaming/direct-stream.ts`:
+     - Added guard against Hakuna Matata CDN in edge fallback (`!vidlinkHit.url.includes("hakunaymatata")`).
+     - When user's PC is powered off, Lisbon skips the datacenter-blocked Vidlink stream and cascades directly to Aphelion (`img.rousav.tech` for movies, `media.evion.lol` for TV).
+     - Returns HTTP 200 with working HLS master manifest in 1.4s - 2.2s.
+  2. `src/lib/streaming/cinejoy-stream.ts`:
+     - Added Hakuna Matata filter to `cj-nebula`, `cj-lisbon`, `cj-athens` so manual selection also falls through cleanly.
+  3. `src/features/streaming/components/native-player.tsx`:
+     - Added auto-failover to Aphelion HD backup when Lisbon encounters fatal playback errors, showing a clean toast (*"Switching to Aphelion HD backup..."*) instead of stalling.
+     - Added `video.addEventListener("error")` handler for direct file errors.
+  4. Built and deployed live to Cloudflare Workers:
+     - Web App: `https://erasmus-web.erasmustv.workers.dev` (Version ID: `6f119583-caad-4d52-aad4-f4a5e993a0dc`).
+     - Relay Worker: `https://erasmus-hls-relay.erasmustv.workers.dev` (Version ID: `4f826a68-05be-41ff-a4d2-b890e5cf909c`).
+  5. Live verification:
+     - Tested Lisbon offline fallback on live site: `Spider-Man: No Way Home` returned 200 OK (`img.rousav.tech`) in 2.2s; `Stranger Things S01E01` returned 200 OK (`media.evion.lol`) in 1.4s.
+     - All segment manifests and subtitles rewrite through `erasmus-hls-relay` with CORS.
+     - `npm run lint` passed (0 errors). No git push performed.
+- Files: `src/lib/streaming/direct-stream.ts`, `src/lib/streaming/cinejoy-stream.ts`, `src/features/streaming/components/native-player.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.

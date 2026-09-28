@@ -555,7 +555,7 @@ export async function resolveCinejoyClusterStream(input: {
         episode: input.episode,
         serverName: "Nebula (Cinejoy Edge)",
       });
-      if (vidlinkHit) return vidlinkHit;
+      if (vidlinkHit && !vidlinkHit.url.includes("hakunaymatata")) return vidlinkHit;
 
       // 2. Vidlove edge CDN fallback
       const vidloveHit = await resolveVidloveStream({
@@ -620,7 +620,7 @@ export async function resolveCinejoyClusterStream(input: {
         episode: input.episode,
         serverName: "Lisbon (Cinejoy Mirror)",
       });
-      if (vidlinkHit) return vidlinkHit;
+      if (vidlinkHit && !vidlinkHit.url.includes("hakunaymatata")) return vidlinkHit;
       break;
     }
 
@@ -659,7 +659,7 @@ export async function resolveCinejoyClusterStream(input: {
         episode: input.episode,
         serverName: "Athens (Cinejoy Mirror)",
       });
-      if (vidlinkHit) return vidlinkHit;
+      if (vidlinkHit && !vidlinkHit.url.includes("hakunaymatata")) return vidlinkHit;
       break;
     }
 

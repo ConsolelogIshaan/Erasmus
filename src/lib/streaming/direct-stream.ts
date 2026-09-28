@@ -305,7 +305,9 @@ export async function extractDirectStream(input: {
           episode: input.episode,
           serverName: effectiveServerId === "nebula" ? "Nebula" : "Lisbon (Direct)",
         });
-        if (vidlinkHit?.url) {
+        // Guard: Hakuna Matata CDN (MP4) actively blocks Cloudflare datacenter IPs (HTTP 427).
+        // Only accept Vidlink on edge if it provides an unblocked open HLS stream.
+        if (vidlinkHit?.url && !vidlinkHit.url.includes("hakunaymatata")) {
           const result: DirectStreamResult = {
             ok: true,
             referer: vidlinkHit.referer,

@@ -40,6 +40,7 @@ import {
   type SubtitleCue,
 } from "@/lib/streaming/subtitles";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const AUDIO_LANG_DISPLAY: Record<string, string> = {
   en: "English",
@@ -408,7 +409,7 @@ export function NativePlayer({
   src,
   startAt = 0,
   kind = "hls",
-  serverId: _serverId,
+  serverId = "lisbon",
   serverName,
   is4KHint: _is4KHint = false,
   hdSrc,
@@ -847,7 +848,13 @@ export function NativePlayer({
           }
         } else {
           setBuffering(false);
-          setStreamError(`Stream interrupted on ${serverName || "this server"}. Please try another server.`);
+          if (serverId === "lisbon" && onSelectServer) {
+            console.warn("[NativePlayer] Lisbon interrupted; auto-failing over to Aphelion HD");
+            toast.info("Switching to Aphelion HD backup...");
+            onSelectServer("aphelion");
+          } else {
+            setStreamError(`Stream interrupted on ${serverName || "this server"}. Please try another server.`);
+          }
         }
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
@@ -981,6 +988,17 @@ export function NativePlayer({
       onNextEpisodeRef.current?.();
     };
 
+    const onError = () => {
+      setBuffering(false);
+      if (serverId === "lisbon" && onSelectServer) {
+        console.warn("[NativePlayer] Video error on Lisbon; auto-failing over to Aphelion HD");
+        toast.info("Switching to Aphelion HD backup...");
+        onSelectServer("aphelion");
+      } else {
+        setStreamError(`Stream interrupted on ${serverName || "this server"}. Please try another server.`);
+      }
+    };
+
     video.addEventListener("timeupdate", onTime);
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
@@ -991,6 +1009,7 @@ export function NativePlayer({
     video.addEventListener("seeking", onSeeking);
     video.addEventListener("seeked", onSeeked);
     video.addEventListener("ended", onEnded);
+    video.addEventListener("error", onError);
 
     return () => {
       video.removeEventListener("loadedmetadata", onDimensions);
@@ -1005,6 +1024,7 @@ export function NativePlayer({
       video.removeEventListener("seeking", onSeeking);
       video.removeEventListener("seeked", onSeeked);
       video.removeEventListener("ended", onEnded);
+      video.removeEventListener("error", onError);
     };
   }, [onProgress, revealControls, buffering]);
 
