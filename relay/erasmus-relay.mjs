@@ -5,6 +5,14 @@ try { dns.setServers(['8.8.8.8', '1.1.1.1', '9.9.9.9']); } catch {}
 const PORT = 8443;
 const DEFAULT_REFERER = 'https://cinejoy.to/';
 
+let resolveVidfastDirectStream = null;
+try {
+  const vidfastModule = await import('../src/lib/streaming/vidfast-direct.ts');
+  resolveVidfastDirectStream = vidfastModule.resolveVidfastDirectStream;
+} catch (err) {
+  console.warn('[Relay] Direct import of vidfast-direct.ts unavailable:', err.message);
+}
+
 function refererFor(requested) {
   if (requested) {
     try {
@@ -124,11 +132,46 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Route 2: Direct stream resolution proxy (calls local Erasmus Next.js server)
+  // Route 2: Direct stream resolution (natively uses local residential IP)
   if (reqUrl.pathname === '/api/stream/direct' || reqUrl.pathname === '/resolve-direct') {
+    const started = Date.now();
+    const type = reqUrl.searchParams.get('type') === 'tv' ? 'tv' : 'movie';
+    const tmdbId = reqUrl.searchParams.get('id') || reqUrl.searchParams.get('tmdbId') || '';
+    const season = Number(reqUrl.searchParams.get('season') || 1);
+    const episode = Number(reqUrl.searchParams.get('episode') || 1);
+    const serverId = reqUrl.searchParams.get('server') || 'lisbon';
+
+    if (resolveVidfastDirectStream && tmdbId) {
+      try {
+        const vidfastRes = await resolveVidfastDirectStream({ type, tmdbId, season, episode, serverId });
+        if (vidfastRes.hit?.url) {
+          const result = {
+            ok: true,
+            referer: vidfastRes.hit.referer,
+            servers: [{
+              name: vidfastRes.hit.serverName,
+              url: vidfastRes.hit.url,
+              kind: vidfastRes.hit.kind,
+              is4K: vidfastRes.hit.is4K,
+              hdUrl: vidfastRes.hit.hdUrl,
+              fourKUrl: vidfastRes.hit.fourKUrl,
+              isDirectCors: false,
+              ms: Date.now() - started,
+            }]
+          };
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+      } catch (err) {
+        console.warn('[Relay] Native resolver error:', err);
+      }
+    }
+
+    // Secondary fallback: proxy to localhost:3000 if Next.js dev server is running
     try {
       const localDirectUrl = `http://localhost:3000/api/stream/direct${reqUrl.search}`;
-      const localRes = await fetch(localDirectUrl, { signal: AbortSignal.timeout(10000) });
+      const localRes = await fetch(localDirectUrl, { signal: AbortSignal.timeout(4000) });
       const localData = await localRes.text();
       res.writeHead(localRes.status, { 'Content-Type': 'application/json' });
       res.end(localData);

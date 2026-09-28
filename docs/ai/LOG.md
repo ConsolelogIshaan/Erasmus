@@ -1474,7 +1474,25 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   1. Under `Always`: Added requirement to verify end-to-end on live deployment. Never assume local curl or build success means production works; inspect actual stream provider/URL and manifest resolution (e.g. 3840x2160 for 4K), ensuring silent fallbacks did not mask an edge failure behind an HTTP 200.
   2. Under `Never`: Added explicit rule never to assume local curl or HTTP 200 proves production works, and never to declare streaming fixed without checking the actual stream URL, provider, and resolution tiers on the deployed site.
 - Files: `AGENTS.md`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
-- Result: Updated documentation concisely without unnecessary fluff. No git push performed.
+## 2026-09-28 3:05 PM IST | Antigravity
+- Changed: Implemented smooth, seamless failover/failback between VidFast 4K and Vidlink, and hardened autonomous relay daemon startup:
+  1. `relay/erasmus-relay.mjs`:
+     - Added native in-process import of `resolveVidfastDirectStream` from `src/lib/streaming/vidfast-direct.ts`.
+     - Port 8443 now autonomously resolves `/api/stream/direct` queries over Reliance Jio residential IP without requiring `npm run dev` or `localhost:3000` to be running.
+  2. `relay/sync-tunnel-url.mjs` & `relay/cloudflare-worker/worker.js`:
+     - Shortened heartbeat interval to 25s (from 60s) in `sync-tunnel-url.mjs`.
+     - Reduced `HEARTBEAT_EXPIRY_MS` in `worker.js` from 15 minutes to 90 seconds.
+     - Reduced relay worker fetch timeout to 3500ms.
+     - Deployed updated relay worker to Cloudflare (`https://erasmus-hls-relay.erasmustv.workers.dev`, Version ID: `1014f368-3ccc-4197-8f40-1dce0f867f75`).
+  3. `src/lib/streaming/direct-stream.ts`:
+     - Strategy A1 reads `TARGET_URL` and `LAST_PING` from KV in parallel. If `Date.now() - lastPing >= 90_000`, the tunnel is recognized as offline and skipped in 0ms, eliminating the 10-30 second spinning freeze when the user's PC is turned off.
+     - Tuned tunnel resolution fetch timeout to 7000ms to allow complete 4K extraction over residential IP.
+     - Added degraded fallback cache expiry: when Lisbon falls back to a non-4K stream (Vidlink) because the PC was off, the entry expires in 10 seconds (instead of 3 minutes). As soon as the PC turns on, subsequent requests immediately query the online tunnel and return 4K VidFast.
+  4. `src/features/streaming/components/streaming-theater-modal.tsx`:
+     - Updated `handleSelectServer` and `handleReload` to preserve `lastKnownRef.current.seconds` into `startAt`. Switching servers or upgrading between Vidlink and VidFast 4K resumes playback at the exact second without restarting.
+  5. Built and deployed updated web app to Cloudflare Workers (`https://erasmus-web.erasmustv.workers.dev`, Version ID: `8bcb269c-dad3-4afa-94b5-981c9a787ab1`).
+- Files: `relay/erasmus-relay.mjs`, `relay/sync-tunnel-url.mjs`, `relay/cloudflare-worker/worker.js`, `src/lib/streaming/direct-stream.ts`, `src/features/streaming/components/streaming-theater-modal.tsx`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Live verified on deployed URL: `fetch("https://erasmus-web.erasmustv.workers.dev/api/stream/direct?id=385128&type=movie&server=lisbon")` returned `vRapid` (`moon.quietridge.top`), `is4K: true`, `fourKUrl: master.m3u8` in 6.6s. `npm run lint` passed (0 errors), `npm run build` passed (0 errors). All changes strictly local and deployed to Cloudflare; no git push performed.
 
 
 

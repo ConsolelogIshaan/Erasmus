@@ -78,6 +78,7 @@ relay/CURRENT_TUNNEL_URL.txt
 .open-next/
 .wrangler/
 .dev.vars
+worker-configuration.d.ts
 
 # Temporary scratch scripts
 scratch/

@@ -98,10 +98,10 @@ const startupInterval = setInterval(async () => {
   }
 }, 200);
 
-// Ongoing monitor: periodically verify tunnel URL and send heartbeat every 60s
+// Ongoing monitor: periodically verify tunnel URL and send heartbeat every 25s
 setInterval(async () => {
   await checkAndSync();
   if (lastRegisteredUrl) {
     await sendHeartbeat();
   }
-}, 60000);
+}, 25000);

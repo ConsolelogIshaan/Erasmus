@@ -816,6 +816,9 @@ export function StreamingTheaterModal({
   }, [open, persistProgress]);
 
   const handleReload = () => {
+    if (lastKnownRef.current.seconds > 0) {
+      setStartAt(lastKnownRef.current.seconds);
+    }
     setDirectSrc(null);
     setEmbedSrc(null);
     setLoadError(null);
@@ -826,6 +829,9 @@ export function StreamingTheaterModal({
 
   const handleSelectServer = (serverId: string) => {
     setSelectedServerId(serverId);
+    if (lastKnownRef.current.seconds > 0) {
+      setStartAt(lastKnownRef.current.seconds);
+    }
     setDirectSrc(null);
     setEmbedSrc(null);
     setLoadError(null);

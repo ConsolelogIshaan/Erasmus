@@ -57,7 +57,11 @@ export async function extractDirectStream(input: {
   const effectiveServerId = input.serverId ?? "lisbon";
   const cacheKey = `${effectiveServerId}:${input.type}:${input.tmdbId}:${input.season ?? 1}:${input.episode ?? 1}`;
   const cached = extractCache.get(cacheKey);
-  if (cached && Date.now() - cached.at < CACHE_MS) {
+  // If the cached entry is a degraded non-4K fallback for a 4K server like Lisbon,
+  // expire it in only 10 seconds so turning on the PC upgrades immediately!
+  const isDegradedCached = effectiveServerId === "lisbon" && !cached?.result.servers.some((s) => s.is4K);
+  const effectiveCacheMs = isDegradedCached ? 10_000 : CACHE_MS;
+  if (cached && Date.now() - cached.at < effectiveCacheMs) {
     return cached.result;
   }
 
@@ -231,11 +235,21 @@ export async function extractDirectStream(input: {
 
           // A1: Check KV for active quick tunnel URL (bypasses worker-to-worker subrequest limits)
           if (cfEnv?.RELAY_CONFIG) {
-            const targetUrl = await cfEnv.RELAY_CONFIG.get("TARGET_URL");
-            if (targetUrl && (targetUrl.startsWith("http://") || targetUrl.startsWith("https://"))) {
+            const [targetUrl, lastPingStr] = await Promise.all([
+              cfEnv.RELAY_CONFIG.get("TARGET_URL"),
+              cfEnv.RELAY_CONFIG.get("LAST_PING"),
+            ]);
+            const lastPing = lastPingStr ? parseInt(lastPingStr, 10) : 0;
+            const isBridgeAlive = Boolean(
+              targetUrl &&
+                (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) &&
+                Date.now() - lastPing < 90_000,
+            );
+
+            if (isBridgeAlive && targetUrl) {
               bridgeRes = await fetch(`${targetUrl.replace(/\/+$/, "")}/api/stream/direct?${vParams.toString()}`, {
                 headers: { "User-Agent": "Mozilla/5.0" },
-                signal: AbortSignal.timeout(10000),
+                signal: AbortSignal.timeout(7000),
               });
             }
           }
@@ -246,7 +260,7 @@ export async function extractDirectStream(input: {
               `https://erasmus-hls-relay/api/stream/direct?${vParams.toString()}`,
               {
                 headers: { "User-Agent": "Mozilla/5.0" },
-                signal: AbortSignal.timeout(10000),
+                signal: AbortSignal.timeout(7000),
               },
             );
           }
@@ -260,7 +274,7 @@ export async function extractDirectStream(input: {
             `${relayBase}/api/stream/direct?${vParams.toString()}`,
             {
               headers: { "User-Agent": "Mozilla/5.0" },
-              signal: AbortSignal.timeout(10000),
+              signal: AbortSignal.timeout(7000),
             },
           );
         }

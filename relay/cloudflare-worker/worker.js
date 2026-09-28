@@ -15,7 +15,7 @@
  */
 
 const SYNC_SECRET = "erasmus_relay_tunnel_key_9247f1";
-const HEARTBEAT_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+const HEARTBEAT_EXPIRY_MS = 90 * 1000; // 90 seconds max for fast failover when PC is off
 const DEFAULT_REFERER = "https://cinejoy.to/";
 
 // In-memory cache for ultra-fast (0ms) routing without KV read latency on every chunk
@@ -199,7 +199,7 @@ const worker = {
           const directTargetUrl = `${target}${pathname}${requestUrl.search}`;
           const dRes = await fetch(directTargetUrl, {
             headers: { "User-Agent": "Mozilla/5.0" },
-            signal: AbortSignal.timeout(8000),
+            signal: AbortSignal.timeout(3500),
           });
           const dData = await dRes.text();
           return new Response(dData, {
