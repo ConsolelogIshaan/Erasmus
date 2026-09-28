@@ -136,15 +136,7 @@ export function getAlternateTvCoordinates(
     add(1, (season - 1) * 12 + episode, `s1-calc-12x${season - 1}`);
     add(1, (season - 1) * 25 + episode, `s1-calc-25x${season - 1}`);
     add(1, (season - 1) * 13 + episode, `s1-calc-13x${season - 1}`);
-    add(1, episode, "s1-same-episode");
-    add(season - 1, episode, "season-minus-1");
   }
-
-  // Offsets by 1 (recap episodes, specials, or 0-indexed catalog)
-  if (episode > 1) {
-    add(season, episode - 1, "episode-minus-1");
-  }
-  add(season, episode + 1, "episode-plus-1");
 
   return candidates;
 }
@@ -160,13 +152,14 @@ async function resolveVidfastDirectStreamSingle(input: {
   const cleanId = input.tmdbId.trim();
 
   // Guard against TMDB 1395 (Gossip Girl 2007) misindex on upstream VidFast:
-  // Episodes 1, 3, 4, 7, 8, 9 of Season 1 were erroneously indexed with the 2021 HBO Max remake (3840x1920 4K).
-  // Immediately reject these 6 episodes so the resolver diverts to authentic 2007 stream sources (Vidlink / Bastion).
+  // Episodes 1, 3, 4, 8, 9 of Season 1 were erroneously indexed with the 2021 HBO Max remake on vRapid.
+  // Reject these 5 episodes so the resolver diverts to authentic 2007 1080p stream sources (Vidlink / Hakuna Matata).
+  // Note: Episode 7 is handled by prioritizing Server Cobra (authentic 2007 broadcast), since Vidlink 504s on S1E7.
   if (
     cleanId === "1395" &&
     input.type === "tv" &&
     (input.season ?? 1) === 1 &&
-    [1, 3, 4, 7, 8, 9].includes(input.episode ?? 1)
+    [1, 3, 4, 8, 9].includes(input.episode ?? 1)
   ) {
     return {
       hit: null,
@@ -264,22 +257,31 @@ async function resolveVidfastDirectStreamSingle(input: {
 
     const serverList = decServersJson.result;
     const requestedServer = input.serverId || "lisbon";
-    const preferredNames =
-      SERVER_PREFERENCES[requestedServer] || ["vEdge", "vRapid", "vFast"];
+    const isGossipGirlS1E7 =
+      cleanId === "1395" &&
+      input.type === "tv" &&
+      (input.season ?? 1) === 1 &&
+      (input.episode ?? 1) === 7;
+
+    const preferredNames = isGossipGirlS1E7
+      ? ["Cobra", "Horizon"]
+      : SERVER_PREFERENCES[requestedServer] || ["vEdge", "vRapid", "vFast"];
 
     const orderedCandidates: DecryptedServer[] = [];
     const addedNames = new Set<string>();
 
     const pushCandidate = (s: DecryptedServer) => {
       if (s.data && !addedNames.has(s.name)) {
-        if (s.name.toLowerCase() === "horizon") return;
+        if (s.name.toLowerCase() === "horizon" && !isGossipGirlS1E7) return;
         addedNames.add(s.name);
         orderedCandidates.push(s);
       }
     };
 
     if (requestedServer === "lisbon" || requestedServer === "athens") {
-      const fourKOrder = ["vRapid", "vBlaze", "Cobra", "vEdge", "Cine", "vFast", "Bravo", "Horizon"];
+      const fourKOrder = isGossipGirlS1E7
+        ? ["Cobra", "Horizon"]
+        : ["vRapid", "vBlaze", "vFast", "vEdge", "Cine", "Bravo", "Cobra", "Horizon"];
       for (const name of fourKOrder) {
         const match = serverList.find(
           (s) => s.name.toLowerCase() === name.toLowerCase() && s.data,
@@ -369,7 +371,10 @@ async function resolveVidfastDirectStreamSingle(input: {
         });
         const decStreamJson = (await decStreamRes.json()) as {
           status?: number;
-          result?: { url?: string };
+          result?: {
+            url?: string;
+            "4kAvailable"?: boolean;
+          };
         };
         const streamResult = decStreamJson.result;
         if (decStreamJson.status === 200 && streamResult?.url) {
@@ -387,17 +392,34 @@ async function resolveVidfastDirectStreamSingle(input: {
 
           const is4K =
             cleanId === "224372" ||
-            candidate.name.toLowerCase() === "vfast" ||
-            candidate.name.toLowerCase() === "vrapid" ||
-            finalUrl.includes("/vd/") ||
-            Boolean(candidate.description && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(candidate.description) && !candidate.description.includes("4K?")) ||
-            Boolean(candidate.image && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(candidate.image)) ||
+            (cleanId !== "1395" && (
+              candidate.name.toLowerCase() === "vfast" ||
+              candidate.name.toLowerCase() === "vrapid" ||
+              candidate.name.toLowerCase() === "vblaze" ||
+              Boolean(streamResult?.["4kAvailable"]) ||
+              finalUrl.includes("/vd/") ||
+              finalUrl.includes("/vdb/") ||
+              Boolean(candidate.description && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(candidate.description) && !candidate.description.includes("4K?")) ||
+              Boolean(candidate.image && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(candidate.image))
+            )) ||
             finalUrl.includes("2160") ||
+            finalUrl.includes("3840") ||
             /(^|[._\s/-])4k([._\s/-]|$)/i.test(finalUrl);
 
+          // TMDB 1395 (Gossip Girl 2007) S1E7: vRapid and vBlaze contain the 2021 reboot (59m runtime).
+          // Reject vRapid/vBlaze for S1E7 to ensure Cobra (authentic 2007 original, 42.3m) is selected.
+          if (
+            isGossipGirlS1E7 &&
+            (candidate.name.toLowerCase() === "vrapid" ||
+              candidate.name.toLowerCase() === "vblaze")
+          ) {
+            lastError = `${candidate.name}: skipped 2021 remake for TMDB 1395 S1E7`;
+            continue;
+          }
+
           // TMDB 1395 (Gossip Girl 2007) was broadcast in 1080p/720p 16:9. The 2021 HBO Max remake was shot in 4K/2160p 2:1 Univisium.
-          // Reject any 4K/2160p candidate for TMDB 1395 to guarantee authentic playback.
-          if (cleanId === "1395" && (is4K || finalUrl.includes("2160") || finalUrl.includes("3840"))) {
+          // Reject genuine 4K/2160p remake candidates for TMDB 1395 while allowing authentic 1080p/720p/480p vRapid master playlists.
+          if (cleanId === "1395" && (finalUrl.includes("2160") || finalUrl.includes("3840") || /(^|[._\s/-])4k([._\s/-]|$)/i.test(finalUrl))) {
             lastError = `${candidate.name}: rejected 4K/2160p stream for TMDB 1395 (2021 remake collision)`;
             continue;
           }
@@ -416,7 +438,7 @@ async function resolveVidfastDirectStreamSingle(input: {
           // Only perform companion lookup for non-fallback queries to keep fallback fast
           if (!input.isFallback) {
             if (is4K) {
-              fourKUrl = finalUrl;
+              fourKUrl = masterUrl;
               const hdCandidate = serverList.find(
                 (s) =>
                   s.data &&
@@ -437,7 +459,11 @@ async function resolveVidfastDirectStreamSingle(input: {
                 (s) =>
                   s.data &&
                   s.name.toLowerCase() !== candidate.name.toLowerCase() &&
-                  Boolean(s.description && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(s.description) && !s.description.includes("4K?")),
+                  (s.name.toLowerCase() === "vrapid" ||
+                    s.name.toLowerCase() === "vblaze" ||
+                    s.name.toLowerCase() === "vfast" ||
+                    Boolean(s.description && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(s.description) && !s.description.includes("4K?")) ||
+                    Boolean(s.image && /(^|[._\s/-])(4k|2160p?)([._\s/-]|$)/i.test(s.image))),
               );
               if (fourKCandidate) {
                 const companionUrl = await resolveCandidateUrl(fourKCandidate);
@@ -453,7 +479,7 @@ async function resolveVidfastDirectStreamSingle(input: {
             serverName: candidate.name,
             is4K,
             hdUrl: hdUrl || masterUrl,
-            fourKUrl: fourKUrl || (is4K ? finalUrl : undefined),
+            fourKUrl: fourKUrl || (is4K ? masterUrl : undefined),
             isDirectCors: false,
           };
 
@@ -503,7 +529,7 @@ export async function resolveVidfastDirectStream(input: {
     input.tmdbId.trim() === "1395" &&
     input.type === "tv" &&
     (input.season ?? 1) === 1 &&
-    [1, 3, 4, 7, 8, 9].includes(input.episode ?? 1)
+    [1, 3, 4, 8, 9].includes(input.episode ?? 1)
   ) {
     return {
       hit: null,

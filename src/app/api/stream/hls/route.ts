@@ -159,8 +159,9 @@ export async function GET(request: Request) {
     isHtmlMediaSegment ||
     isObfuscatedSegment;
   const forwardedHost = request.headers.get("x-forwarded-host");
-  const relay = forwardedHost && !forwardedHost.includes("erasmus-web") && !forwardedHost.includes("erasmustv")
-    ? `https://${forwardedHost}`
+  const isLocalHost = forwardedHost?.includes("localhost") || forwardedHost?.includes("127.0.0.1");
+  const relay = forwardedHost && !isLocalHost && !forwardedHost.includes("erasmus-web") && !forwardedHost.includes("erasmustv")
+    ? `https://${forwardedHost}/api/stream/hls`
     : HLS_RELAY_BASE;
 
   const playlistResponse = (text: string) =>

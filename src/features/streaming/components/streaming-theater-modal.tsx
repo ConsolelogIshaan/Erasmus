@@ -557,7 +557,7 @@ export function StreamingTheaterModal({
             const rawHit = hit as { hdUrl?: string; fourKUrl?: string };
             const resolvedFourK = rawHit.fourKUrl ? relayUrl(rawHit.fourKUrl, data.referer) : null;
             const resolvedHd = rawHit.hdUrl ? relayUrl(rawHit.hdUrl, data.referer) : null;
-            const primarySrc = relayUrl(hit.url, data.referer);
+            const primarySrc = resolvedFourK || relayUrl(hit.url, data.referer);
             setDirectSrc(primarySrc);
             setDirectIs4K(Boolean((hit as { is4K?: boolean })?.is4K || resolvedFourK));
             setDirectHdSrc(resolvedHd);

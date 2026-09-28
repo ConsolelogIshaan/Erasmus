@@ -15,7 +15,7 @@
  */
 
 const SYNC_SECRET = "erasmus_relay_tunnel_key_9247f1";
-const HEARTBEAT_EXPIRY_MS = 90 * 1000; // 90 seconds max for fast failover when PC is off
+const HEARTBEAT_EXPIRY_MS = 90 * 1000; // 90 seconds for rock-solid tunnel stability without KV replication jitter
 const DEFAULT_REFERER = "https://cinejoy.to/";
 
 // In-memory cache for ultra-fast (0ms) routing without KV read latency on every chunk
@@ -284,7 +284,7 @@ const worker = {
           const directTargetUrl = `${target}${pathname}${requestUrl.search}`;
           const dRes = await fetch(directTargetUrl, {
             headers: { "User-Agent": "Mozilla/5.0" },
-            signal: AbortSignal.timeout(3500),
+            signal: AbortSignal.timeout(5000),
           });
           const dData = await dRes.text();
           return new Response(dData, {
@@ -307,12 +307,25 @@ const worker = {
       return jsonResponse({ error: "missing url query parameter" }, 400);
     }
 
+    const target = isHttpsUrl(rawTarget);
+    if (!target) {
+      return jsonResponse({ error: "invalid target url" }, 400);
+    }
+
     const activeTunnel = await getActiveTunnel(env);
     const now = Date.now();
     const isTunnelAlive = Boolean(activeTunnel && (now - cachedPing < HEARTBEAT_EXPIRY_MS));
 
-    // Path 1: Forward to local residential PC tunnel (Zero-Vercel mode)
-    if (isTunnelAlive) {
+    const { referer, origin } = refererFor(requestUrl.searchParams.get("referer"));
+    // Referer-locked VidFast streams and residential-restricted Hakuna Matata streams route through residential tunnel when online:
+    const isVidfastStream =
+      targetHost.endsWith(".top") ||
+      targetHost.includes("vidfast") ||
+      targetHost.includes("hakunaymatata") ||
+      Boolean(referer && referer.includes("vidfast"));
+
+    // Path 1: Forward VidFast streams to local residential PC tunnel when online (Zero-Vercel mode)
+    if (isTunnelAlive && isVidfastStream) {
       try {
         const tunnelTargetUrl = new URL(request.url);
         const parsedTunnel = new URL(activeTunnel);
@@ -324,8 +337,10 @@ const worker = {
         forwardHeaders.set("X-Forwarded-Host", requestUrl.host);
         forwardHeaders.set("X-Forwarded-Proto", "https");
 
+        const isPlaylist = target.pathname.toLowerCase().endsWith(".m3u8") || rawTarget.includes(".m3u8");
+        const timeoutMs = isPlaylist ? 6000 : 18000;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout for large 4K chunks
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         const tunnelRes = await fetch(tunnelTargetUrl.toString(), {
           method: request.method,
@@ -355,13 +370,8 @@ const worker = {
     }
 
     // Path 2: Direct edge fetch fallback for open CDNs (Zero Vercel)
-    const target = isHttpsUrl(rawTarget);
-    if (!target) {
-      return jsonResponse({ error: "invalid target url" }, 400);
-    }
 
     const isHakuna = target.hostname.toLowerCase().includes("hakunaymatata");
-    const { referer, origin } = refererFor(requestUrl.searchParams.get("referer"));
     const range = request.headers.get("Range");
 
     const upstreamHeaders = new Headers();

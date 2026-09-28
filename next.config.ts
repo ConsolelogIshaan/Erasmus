@@ -126,7 +126,13 @@ function contentSecurityPolicy(): string {
       "https://*.vidrift.in",
       "https://vidrift.in",
     ],
-    "media-src": ["'self'", "blob:", "https:", "data:"],
+    "media-src": [
+      "'self'",
+      "blob:",
+      "https:",
+      "data:",
+      ...(isDev ? ["http://localhost:*", "http://127.0.0.1:*"] : []),
+    ],
     "worker-src": ["'self'", "blob:"],
     "manifest-src": ["'self'"],
   };

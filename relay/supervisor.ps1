@@ -63,9 +63,9 @@ while ($true) {
         } catch {}
     }
 
-    # Heartbeat every 25 seconds
+    # Heartbeat every 10 seconds
     $Now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    if ($Now - $LastPing -ge 25 -and $LastUrl) {
+    if ($Now - $LastPing -ge 10 -and $LastUrl) {
         $LastPing = $Now
         try {
             Invoke-RestMethod -Uri "$PrimaryWorker/ping" -Method POST -Headers @{ "Authorization" = "Bearer $Secret" } -TimeoutSec 5 -ErrorAction SilentlyContinue

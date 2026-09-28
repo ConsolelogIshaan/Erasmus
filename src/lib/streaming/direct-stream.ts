@@ -77,15 +77,16 @@ export async function extractDirectStream(input: {
   const getEnriched = async () => {
     if (!title || !year || !imdbId) {
       try {
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
         if (input.type === "movie") {
-          const details = await getMovie(input.tmdbId);
+          const details = await Promise.race([getMovie(input.tmdbId), timeoutPromise]);
           if (details) {
             title = title || details.title;
             year = year || (details.releaseDate ? details.releaseDate.slice(0, 4) : undefined);
             imdbId = imdbId || details.imdbId || undefined;
           }
         } else {
-          const details = await getTvShow(input.tmdbId);
+          const details = await Promise.race([getTvShow(input.tmdbId), timeoutPromise]);
           if (details) {
             title = title || details.title;
             year = year || (details.firstAirDate ? details.firstAirDate.slice(0, 4) : undefined);
@@ -179,6 +180,49 @@ export async function extractDirectStream(input: {
     if (!isCloudflare) {
       const vidfastRes = await resolveVidfastDirectStream(input);
       if (vidfastRes.hit?.url) {
+        // Quality Floor / Upgrade for Lisbon:
+        // If VidFast only yielded a sub-1080p fallback stream (e.g. Cobra or Horizon 720p),
+        // check if Vidlink has a pristine 1080p Full HD stream so Lisbon users receive full 1080p.
+        const isLowResFallback =
+          !vidfastRes.hit.is4K &&
+          (vidfastRes.hit.serverName.toLowerCase() === "cobra" ||
+            vidfastRes.hit.serverName.toLowerCase() === "horizon");
+
+        if (isLowResFallback && (effectiveServerId === "lisbon" || !effectiveServerId)) {
+          try {
+            const vidlinkHit = await resolveVidlinkStream({
+              type: input.type,
+              tmdbId: input.tmdbId,
+              season: input.season,
+              episode: input.episode,
+              serverName: "Lisbon",
+            });
+            if (vidlinkHit?.url) {
+              const result: DirectStreamResult = {
+                ok: true,
+                referer: vidlinkHit.referer,
+                captions: vidlinkHit.captions,
+                servers: [
+                  {
+                    name: "Lisbon",
+                    url: vidlinkHit.url,
+                    kind: vidlinkHit.kind,
+                    is4K: vidlinkHit.is4K,
+                    hdUrl: vidlinkHit.url,
+                    fourKUrl: undefined,
+                    isDirectCors: vidlinkHit.isDirectCors,
+                    ms: Date.now() - started,
+                  },
+                ],
+              };
+              extractCache.set(cacheKey, { at: Date.now(), result });
+              return result;
+            }
+          } catch {
+            // Vidlink upgrade failed, proceed with VidFast stream
+          }
+        }
+
         const result: DirectStreamResult = {
           ok: true,
           referer: vidfastRes.hit.referer,
@@ -243,13 +287,13 @@ export async function extractDirectStream(input: {
             const isBridgeAlive = Boolean(
               targetUrl &&
                 (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) &&
-                Date.now() - lastPing < 90_000,
+                Date.now() - lastPing < 45_000,
             );
 
             if (isBridgeAlive && targetUrl) {
               bridgeRes = await fetch(`${targetUrl.replace(/\/+$/, "")}/api/stream/direct?${vParams.toString()}`, {
                 headers: { "User-Agent": "Mozilla/5.0" },
-                signal: AbortSignal.timeout(7000),
+                signal: AbortSignal.timeout(4500),
               });
             }
           }
@@ -260,7 +304,7 @@ export async function extractDirectStream(input: {
               `https://erasmus-hls-relay/api/stream/direct?${vParams.toString()}`,
               {
                 headers: { "User-Agent": "Mozilla/5.0" },
-                signal: AbortSignal.timeout(7000),
+                signal: AbortSignal.timeout(4500),
               },
             );
           }
@@ -274,7 +318,7 @@ export async function extractDirectStream(input: {
             `${relayBase}/api/stream/direct?${vParams.toString()}`,
             {
               headers: { "User-Agent": "Mozilla/5.0" },
-              signal: AbortSignal.timeout(7000),
+              signal: AbortSignal.timeout(2500),
             },
           );
         }
@@ -295,26 +339,25 @@ export async function extractDirectStream(input: {
       }
     }
 
-    // 2.6. Vidlink pristine edge fallback for Lisbon and other non-Bingr servers
-    if (!isBingrServer || effectiveServerId === "nebula") {
+    // 2.6. Vidlink pristine 1080p edge stream for Lisbon and non-Bingr servers
+    if (!isBingrServer || effectiveServerId === "nebula" || effectiveServerId === "lisbon") {
       try {
         const vidlinkHit = await resolveVidlinkStream({
           type: input.type,
           tmdbId: input.tmdbId,
           season: input.season,
           episode: input.episode,
-          serverName: effectiveServerId === "nebula" ? "Nebula" : "Lisbon (Direct)",
+          serverName: effectiveServerId === "nebula" ? "Nebula" : "Lisbon",
         });
-        // Guard: Hakuna Matata CDN (MP4) actively blocks Cloudflare datacenter IPs (HTTP 427).
-        // Only accept Vidlink on edge if it provides an unblocked open HLS stream.
-        if (vidlinkHit?.url && !vidlinkHit.url.includes("hakunaymatata")) {
+        // Allow Vidlink pristine streams (including authentic 1080p Hakuna Matata streams)
+        if (vidlinkHit?.url) {
           const result: DirectStreamResult = {
             ok: true,
             referer: vidlinkHit.referer,
             captions: vidlinkHit.captions,
             servers: [
               {
-                name: effectiveServerId === "nebula" ? "Nebula" : (effectiveServerId === "lisbon" ? "Lisbon (Direct)" : vidlinkHit.serverName),
+                name: effectiveServerId === "nebula" ? "Nebula" : (effectiveServerId === "lisbon" ? "Lisbon" : vidlinkHit.serverName),
                 url: vidlinkHit.url,
                 kind: vidlinkHit.kind,
                 is4K: vidlinkHit.is4K,
@@ -346,17 +389,23 @@ export async function extractDirectStream(input: {
               ...enriched,
               serverId: fallbackTarget,
             });
-            // Guard against Bastion wrong-movie fallback for movies on flagship servers,
-            // but allow for TV shows (unambiguous season/episode) and as Lisbon edge fallback
+            // Guard against Bastion wrong-movie/remake collision:
+            // Bastion mistakenly returns the 2021 HBO Max reboot for TMDB 1395 (Gossip Girl 2007).
             const isTvShow = input.type === "tv";
-            if (bingrHit?.url && (bingrHit.serverId !== "bastion" || isTvShow || effectiveServerId === "nebula" || effectiveServerId === "lisbon")) {
+            const isGossipGirlOriginal = input.tmdbId.trim() === "1395";
+            const isBastionRemake = isGossipGirlOriginal && bingrHit?.serverId === "bastion";
+            if (
+              bingrHit?.url &&
+              !isBastionRemake &&
+              (bingrHit.serverId !== "bastion" || isTvShow || effectiveServerId === "nebula")
+            ) {
               return {
                 ok: true,
                 referer: bingrHit.referer,
                 captions: bingrHit.captions,
                 servers: [
                   {
-                    name: effectiveServerId === "nebula" ? "Nebula" : (effectiveServerId === "lisbon" ? "Lisbon" : bingrHit.serverName),
+                    name: effectiveServerId === "nebula" ? "Nebula" : bingrHit.serverName,
                     url: bingrHit.url,
                     kind: bingrHit.kind,
                     is4K: bingrHit.is4K,

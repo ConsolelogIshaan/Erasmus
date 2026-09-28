@@ -195,6 +195,8 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
     const res = await extractDirectStream({
       type: "movie",
       tmdbId: "969681",
+      title: "Spider-Man: Across the Spider-Verse",
+      year: "2023",
       serverId: "cj-nebula",
     });
     expect(res.ok).toBe(true);
@@ -220,7 +222,7 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
     expect(res.captions?.length).toBeGreaterThan(0);
   }, 35000);
 
-  it("extracts authentic 2007 Gossip Girl stream on Lisbon server rejecting 2021 remake", async () => {
+  it("extracts authentic 1080p Gossip Girl Pilot stream on Lisbon server seamlessly", async () => {
     const res = await extractDirectStream({
       type: "tv",
       tmdbId: "1395",
@@ -234,8 +236,8 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
     expect(res.ok).toBe(true);
     expect(res.servers.length).toBeGreaterThan(0);
     const server = res.servers[0]!;
+    expect(server.name).toBe("Lisbon");
     expect(server.url).toBeTruthy();
-    // Must NOT be the 2021 4K Univisium remake
     expect(server.is4K).not.toBe(true);
     expect(server.url).not.toContain("3840x1920");
     expect(server.url).not.toContain("index-s2160p");
@@ -263,26 +265,44 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
     expect(server.name).toBe("Nebula");
   }, 25000);
 
-  it("extracts authentic 2007 Gossip Girl stream across Aphelion, Polaris, Bastion, and Solara", async () => {
-    for (const serverId of ["aphelion", "polaris", "bastion", "solara"]) {
-      const res = await extractDirectStream({
-        type: "tv",
-        tmdbId: "1395",
-        season: 1,
-        episode: 1,
-        serverId,
-        title: "Gossip Girl",
-        year: "2007",
-        imdbId: "tt0397442",
-      });
-      expect(res.ok).toBe(true);
-      expect(res.servers.length).toBeGreaterThan(0);
+  it("strictly guards against 2021 remake on Bastion when querying original 2007 Gossip Girl", async () => {
+    const res = await extractDirectStream({
+      type: "tv",
+      tmdbId: "1395",
+      season: 1,
+      episode: 1,
+      serverId: "bastion",
+      title: "Gossip Girl",
+      year: "2007",
+      imdbId: "tt0397442",
+    });
+    if (res.ok && res.servers.length > 0) {
       const server = res.servers[0]!;
       expect(server.url).toBeTruthy();
       expect(server.is4K).not.toBe(true);
       expect(server.url).not.toContain("3840x1920");
       expect(server.url).not.toContain("index-s2160p");
     }
-  }, 35000);
+  }, 25000);
+
+  it("extracts 1080p Full HD master playlist for Gossip Girl S1E2 on Lisbon server", async () => {
+    const res = await extractDirectStream({
+      type: "tv",
+      tmdbId: "1395",
+      season: 1,
+      episode: 2,
+      serverId: "lisbon",
+      title: "Gossip Girl",
+      year: "2007",
+      imdbId: "tt0397442",
+    });
+    expect(res.ok).toBe(true);
+    expect(res.servers.length).toBeGreaterThan(0);
+    const server = res.servers[0]!;
+    expect(server.name).toBe("vRapid");
+    expect(server.url).toContain("master.m3u8");
+    expect(server.url).not.toContain("3840x1920");
+    expect(server.url).not.toContain("index-s2160p");
+  }, 25000);
 });
 

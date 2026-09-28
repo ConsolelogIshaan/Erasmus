@@ -555,7 +555,7 @@ export async function resolveCinejoyClusterStream(input: {
         episode: input.episode,
         serverName: "Nebula (Cinejoy Edge)",
       });
-      if (vidlinkHit && !vidlinkHit.url.includes("hakunaymatata")) return vidlinkHit;
+      if (vidlinkHit) return vidlinkHit;
 
       // 2. Vidlove edge CDN fallback
       const vidloveHit = await resolveVidloveStream({

@@ -112,6 +112,10 @@ export function checkIsDirectCors(url: string): boolean {
       host.includes("shadowmoonwanderer.lol") ||
       host.includes("vidrock.ru") ||
       host.includes("fodcyy.com") ||
+      host.includes("evion.lol") ||
+      host.includes("kwbly.com") ||
+      host.includes("kmocx.com") ||
+      host.includes("kocxm.com") ||
       host.includes("hakunaymatata.com") ||
       host.includes("imdb-video.media-imdb.com")
     );
@@ -439,6 +443,11 @@ export async function resolveBingrStream(input: {
         const ryuuHit = await resolveAnimexStream({ anilistId, episode });
         if (ryuuHit) return ryuuHit;
       }
+      continue;
+    }
+
+    // Bastion (s62) incorrectly serves the 2021 HBO Max reboot for original Gossip Girl (2007, TMDB 1395)
+    if (srvKey === "bastion" && String(tmdbId).trim() === "1395") {
       continue;
     }
 

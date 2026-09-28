@@ -24,6 +24,9 @@ Streaming/playback is currently frozen and stable. Do NOT work on or modify stre
 - Absolute honesty and transparency with the user at all times: NEVER misrepresent, sugarcoat, disguise, or falsely claim an architecture is running somewhere it isn't (e.g., claiming a service is "100% cloud/Cloudflare native" when it secretly depends on a local machine, or claiming Vercel is eliminated when secret server-to-server fallback calls to Vercel still exist). Clearly explain the exact path of all data, what runs where, and what each component is doing. Deceiving or clickbaiting the user is strictly forbidden.
 - Verify end-to-end on live deployment: Never assume a local curl or build success means production works. Test the live deployed URL directly, inspect the actual stream provider/URL and manifest resolution (e.g. 3840x2160 for 4K), and ensure silent fallbacks did not mask an edge failure behind an HTTP 200.
 - Keep Erasmus's own player/UI.
+- Local HLS relay (`http://localhost:8443`): `resolveRelayBase()` in `src/lib/streaming/relay.ts` must return `"http://localhost:8443"` on localhost. Never route local HLS to `/api/stream/hls`.
+- Direct CORS media: Streams with `kind === "file"` and open CORS must be assigned directly to `<video src>` without proxying.
+- Strict Server Selection: Stay strictly on the user's selected server. Never silently redirect or failover to another server.
 - Run `npm run build` and `npm run lint` before finishing any code change.
 - Keep the verified streaming files working. Backups are in `c:/Users/Administrator/Documents/BACKUP/stream_fix_backups/`.
 - Update `docs/ai/STATE.md` and append to `docs/ai/LOG.md` before finishing.
@@ -39,6 +42,8 @@ Streaming/playback is currently frozen and stable. Do NOT work on or modify stre
 - Mislead, disguise, or deceive the user about architecture, data paths, or hosting: Never claim a solution is "100% in the cloud" if a local PC, residential IP, or bridge is secretly required. Never claim a service (like Vercel) has been removed if background calls to it remain. Always state the exact technical truth, including limitations and dependencies.
 - Assume local curl or HTTP 200 proves production works: Never declare streaming fixed without checking the actual stream URL, provider, and resolution tiers on the deployed site.
 - Work on or modify streaming/playback unless explicitly instructed by the user.
+- Break local HLS playback by changing `resolveRelayBase()` in `relay.ts` on localhost.
+- Silently redirect the user to another server (e.g. auto-switching Lisbon to Aphelion on error).
 - Push to git remote (`git push`) under ANY circumstances unless the user explicitly and directly commands you to push. All work, commits, tests, lints, and builds must remain strictly local until explicit user instruction is given.
 - Add iframe embeds (ad/redirect behavior).
 - Commit secrets or `.env` files.
