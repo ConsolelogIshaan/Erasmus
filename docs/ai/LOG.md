@@ -1469,7 +1469,13 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
   3. Build & Deployment:
      - Built with OpenNext and deployed to `https://erasmus-web.erasmustv.workers.dev` (Version ID: `a6d66f78-a21d-4bae-b0ed-400c041b28ca`).
 - Files: `wrangler.jsonc`, `src/lib/streaming/direct-stream.ts`, `src/lib/streaming/vidfast-direct.ts`, `relay/sync-tunnel-url.mjs`, `.env.local`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
-- Result: Verified live: `curl "https://erasmus-web.erasmustv.workers.dev/api/stream/direct?id=385128&type=movie&server=lisbon"` returns `vRapid` (`moon.quietridge.top/vd/.../master.m3u8`), `is4K: true`, `fourKUrl` populated with the 3840x2160 4K stream in 3.0s. `npm run lint` passed (0 errors), `npm run build` compiled all routes cleanly. Strictly local — no git push performed.
+## 2026-09-28 2:37 PM IST | Antigravity
+- Changed: Updated `AGENTS.md` with explicit operational verification rules to prevent false-positive streaming tests and unverified deployments:
+  1. Under `Always`: Added requirement to verify end-to-end on live deployment. Never assume local curl or build success means production works; inspect actual stream provider/URL and manifest resolution (e.g. 3840x2160 for 4K), ensuring silent fallbacks did not mask an edge failure behind an HTTP 200.
+  2. Under `Never`: Added explicit rule never to assume local curl or HTTP 200 proves production works, and never to declare streaming fixed without checking the actual stream URL, provider, and resolution tiers on the deployed site.
+- Files: `AGENTS.md`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
+- Result: Updated documentation concisely without unnecessary fluff. No git push performed.
+
 
 
 
