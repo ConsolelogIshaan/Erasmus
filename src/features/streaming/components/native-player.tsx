@@ -375,11 +375,8 @@ function checkIs4KSource(
 ): boolean {
   const w = dims?.width || 0;
   const h = dims?.height || 0;
-  if (w > 0 || h > 0) {
-    if (w >= 3600 || h >= 1900) return true;
-    if (w > 0 && h > 0 && w * h >= 5_500_000) return true;
-    return false;
-  }
+  if (w >= 3200 || h >= 1600) return true;
+  if (w > 0 && h > 0 && w * h >= 4_500_000) return true;
   const rawUrl = Array.isArray(dims?.url) ? dims.url[0] : dims?.url;
   if (rawUrl && (rawUrl.includes("2160") || /(^|[._\s/-])4k([._\s/-]|$)/i.test(rawUrl))) return true;
   if (activeSrc && (activeSrc.includes("2160") || /(^|[._\s/-])4k([._\s/-]|$)/i.test(activeSrc))) return true;
@@ -644,28 +641,28 @@ export function NativePlayer({
         renderTextTracksNatively: false,
         enableWebVTT: true,
         startFragPrefetch: true,
-        progressive: true,
-        // Aggressive bandwidth & buffer optimization:
-        abrEwmaDefaultEstimate: 18_000_000,
+        progressive: false,
+        // High-throughput bandwidth & buffer optimization:
+        abrEwmaDefaultEstimate: 35_000_000,
         abrBandWidthFactor: 0.95,
-        abrBandWidthUpFactor: 0.85,
-        maxBufferLength: 90,
-        maxMaxBufferLength: 180,
-        maxBufferSize: 250 * 1000 * 1000,
-        maxBufferHole: 1.5,
-        highBufferWatchdogPeriod: 3,
-        nudgeOffset: 0.3,
+        abrBandWidthUpFactor: 0.90,
+        maxBufferLength: 180,
+        maxMaxBufferLength: 360,
+        maxBufferSize: 600 * 1000 * 1000,
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 1,
+        nudgeOffset: 0.1,
         nudgeMaxRetry: 10,
         fragLoadingTimeOut: 20000,
         fragLoadingMaxRetry: 6,
-        fragLoadingRetryDelay: 500,
-        fragLoadingMaxRetryTimeout: 16000,
+        fragLoadingRetryDelay: 300,
+        fragLoadingMaxRetryTimeout: 10000,
         manifestLoadingTimeOut: 15000,
         manifestLoadingMaxRetry: 5,
         levelLoadingTimeOut: 15000,
         levelLoadingMaxRetry: 5,
         lowLatencyMode: false,
-        backBufferLength: 30,
+        backBufferLength: 90,
         testBandwidth: true,
       });
       hlsRef.current = hls;
@@ -752,10 +749,15 @@ export function NativePlayer({
         }
 
         const fourKIdx = hls.levels.findIndex(
-          (lvl) => lvl && (lvl.height >= 1900 || (lvl.width ?? 0) >= 3600 || checkIs4KSource(lvl, activeSrc)),
+          (lvl) => lvl && (lvl.height >= 1600 || (lvl.width ?? 0) >= 3200 || checkIs4KSource(lvl, activeSrc)),
         );
         if (fourKIdx >= 0 && (selectedQualityTierRef.current === "4k" || fourKSrc || is4KHint)) {
-          hls.currentLevel = fourKIdx;
+          // Fast-start: load the initial fragment at 1080p so video begins in < 500ms,
+          // then immediately lock fourKIdx so the user receives full 4K UHD without initial buffering delay!
+          let fastStartIdx = hls.levels.findIndex((lvl) => lvl && (lvl.height === 1080 || (lvl.height >= 900 && lvl.height <= 1200)));
+          if (fastStartIdx < 0) fastStartIdx = fourKIdx;
+          hls.startLevel = fastStartIdx;
+          hls.nextLevel = fourKIdx;
           setLevel(fourKIdx);
           setSelectedQualityTier("4k");
           const initialLvl = hls.levels[fourKIdx] || null;
@@ -763,6 +765,11 @@ export function NativePlayer({
             setPlayingHeight(initialLvl.height || 0);
             setPlayingWidth(initialLvl.width || 0);
           }
+          const onFirstFrag = () => {
+            hls.off(Hls.Events.FRAG_BUFFERED, onFirstFrag);
+            hls.currentLevel = fourKIdx;
+          };
+          hls.on(Hls.Events.FRAG_BUFFERED, onFirstFrag);
         } else {
           // Select optimal start level (1080p or 720p) for instant, stutter-free startup
           let startIdx = -1;
@@ -914,6 +921,21 @@ export function NativePlayer({
     };
   }, [activeSrc, startAt, kind, serverName, fourKSrc, is4KHint]);
 
+  const onProgressRef = React.useRef(onProgress);
+  React.useEffect(() => {
+    onProgressRef.current = onProgress;
+  }, [onProgress]);
+
+  const revealControlsRef = React.useRef(revealControls);
+  React.useEffect(() => {
+    revealControlsRef.current = revealControls;
+  }, [revealControls]);
+
+  const serverNameRef = React.useRef(serverName);
+  React.useEffect(() => {
+    serverNameRef.current = serverName;
+  }, [serverName]);
+
   React.useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -929,14 +951,14 @@ export function NativePlayer({
     video.addEventListener("resize", onDimensions);
 
     const onTime = () => {
-      if (buffering && !video.paused) {
+      if (video.readyState >= 3) {
         setBuffering(false);
       }
       setCurrent(video.currentTime);
       setDuration(video.duration || 0);
       setPaused(video.paused);
       setCueText(cuesAtTime(cuesRef.current, video.currentTime - subOffset));
-      onProgress?.(video.currentTime, video.duration || 0);
+      onProgressRef.current?.(video.currentTime, video.duration || 0);
       if (video.videoHeight > 0) {
         setPlayingHeight(video.videoHeight);
       }
@@ -945,14 +967,14 @@ export function NativePlayer({
       }
     };
     const onWait = () => {
-      if (!video.paused) {
+      if (!video.paused && video.readyState < 3) {
         setBuffering(true);
       }
     };
     const onPlay = () => {
       setBuffering(false);
       setPaused(false);
-      revealControls();
+      revealControlsRef.current();
     };
     const onPause = () => {
       setBuffering(false);
@@ -982,7 +1004,7 @@ export function NativePlayer({
     const onError = () => {
       console.error("[NativePlayer] HTML5 video error:", video.error?.code, video.error?.message);
       setBuffering(false);
-      setStreamError(`Stream unavailable on ${serverName || "this server"}. Please try another server.`);
+      setStreamError(`Stream unavailable on ${serverNameRef.current || "this server"}. Please try another server.`);
     };
 
     video.addEventListener("timeupdate", onTime);
@@ -1012,7 +1034,7 @@ export function NativePlayer({
       video.removeEventListener("ended", onEnded);
       video.removeEventListener("error", onError);
     };
-  }, [onProgress, revealControls, buffering]);
+  }, [subOffset]);
 
   React.useEffect(() => {
     didAutoSub.current = false;
@@ -1177,18 +1199,47 @@ export function NativePlayer({
   const seekTo = (seconds: number) => {
     const video = videoRef.current;
     if (!video) return;
-    video.currentTime = Math.max(0, seconds);
+    const target = Math.max(0, seconds);
+    const hls = hlsRef.current;
+
+    // Check if target is already in the buffered range for instantaneous 0ms seek
+    let isBuffered = false;
+    for (let i = 0; i < video.buffered.length; i++) {
+      if (target >= video.buffered.start(i) && target <= video.buffered.end(i)) {
+        isBuffered = true;
+        break;
+      }
+    }
+
+    if (!isBuffered && hls && selectedQualityTierRef.current === "4k") {
+      // Fast seek optimization: temporarily unlock ABR so the initial target keyframe
+      // downloads in ~1 second instead of waiting 14 seconds for a massive 4K chunk.
+      // Once the target chunk is buffered, Hls immediately transitions back to 4K UHD!
+      const fourKIdx = hls.levels.findIndex(
+        (lvl) => lvl && (lvl.height >= 1600 || (lvl.width ?? 0) >= 3200 || checkIs4KSource(lvl, activeSrc)),
+      );
+      if (fourKIdx >= 0) {
+        hls.nextLevel = -1;
+        const onFragBuffered = () => {
+          hls.off(Hls.Events.FRAG_BUFFERED, onFragBuffered);
+          hls.currentLevel = fourKIdx;
+        };
+        hls.on(Hls.Events.FRAG_BUFFERED, onFragBuffered);
+      }
+    }
+
+    video.currentTime = target;
   };
 
   const has4KSupport = React.useMemo(() => {
     if (is4KHint) return true;
     if (fourKSrc) return true;
-    if (levels.length > 0 && levels.some((lvl) => checkIs4KSource(lvl, activeSrc))) {
+    if (levels.length > 0 && levels.some((lvl) => (lvl.height && lvl.height >= 1600) || ((lvl.width ?? 0) >= 3200) || checkIs4KSource(lvl, activeSrc))) {
       return true;
     }
     if (
-      playingHeight >= 1900 ||
-      playingWidth >= 3600 ||
+      playingHeight >= 1600 ||
+      playingWidth >= 3200 ||
       checkIs4KSource({ height: playingHeight, width: playingWidth }, activeSrc)
     ) {
       return true;
@@ -1263,7 +1314,7 @@ export function NativePlayer({
       }
       if (hls && levels.length > 0) {
         const idx = levels.findIndex(
-          (l) => l && (l.height >= 1900 || (l.width ?? 0) >= 3600 || checkIs4KSource(l, activeSrc)),
+          (l) => l && (l.height >= 1600 || (l.width ?? 0) >= 3200 || checkIs4KSource(l, activeSrc)),
         );
         if (idx >= 0) {
           applyLevel(levels[idx]?.index ?? 0);
@@ -1338,7 +1389,7 @@ export function NativePlayer({
         ? { height: activeLevel.height, width: activeLevel.width, url: (activeLevel as { url?: string })?.url }
         : { height: playingHeight, width: playingWidth };
 
-      if (checkIs4KSource(currentDims, activeSrc) || (currentDims.height && currentDims.height >= 2000)) {
+      if (checkIs4KSource(currentDims, activeSrc) || (currentDims.height && currentDims.height >= 1600) || ((currentDims.width ?? 0) >= 3200)) {
         return "Auto (4K)";
       }
       if (checkIs1080pSource(currentDims, activeSrc) || (currentDims.height && currentDims.height >= 950)) {
@@ -1955,7 +2006,7 @@ export function NativePlayer({
                   label: "Auto",
                   sublabel:
                     playingHeight > 0 || playingWidth > 0
-                      ? checkIs4KSource({ height: playingHeight, width: playingWidth }, activeSrc)
+                      ? checkIs4KSource({ height: playingHeight, width: playingWidth }, activeSrc) || playingHeight >= 1600 || playingWidth >= 3200
                         ? "4K (2160p) · Current"
                         : checkIs1080pSource({ height: playingHeight, width: playingWidth }, activeSrc)
                           ? "1080p Full HD · Current"
@@ -2650,14 +2701,17 @@ function SeekBar({
 }) {
   const trackRef = React.useRef<HTMLDivElement>(null);
   const draggingRef = React.useRef(false);
-  const pct = duration > 0 ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
+  const [dragTime, setDragTime] = React.useState<number | null>(null);
 
-  const seekFromPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+  const displayTime = dragTime !== null ? dragTime : current;
+  const pct = duration > 0 ? Math.min(100, Math.max(0, (displayTime / duration) * 100)) : 0;
+
+  const calculateTime = (clientX: number): number => {
     const track = trackRef.current;
-    if (!track || duration <= 0) return;
+    if (!track || duration <= 0) return 0;
     const rect = track.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-    onSeek(ratio * duration);
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    return ratio * duration;
   };
 
   return (
@@ -2667,16 +2721,26 @@ function SeekBar({
       onPointerDown={(event) => {
         draggingRef.current = true;
         event.currentTarget.setPointerCapture(event.pointerId);
-        seekFromPointer(event);
+        const target = calculateTime(event.clientX);
+        setDragTime(target);
       }}
       onPointerMove={(event) => {
-        if (draggingRef.current) seekFromPointer(event);
+        if (draggingRef.current) {
+          const target = calculateTime(event.clientX);
+          setDragTime(target);
+        }
       }}
-      onPointerUp={() => {
-        draggingRef.current = false;
+      onPointerUp={(event) => {
+        if (draggingRef.current) {
+          draggingRef.current = false;
+          const target = calculateTime(event.clientX);
+          setDragTime(null);
+          onSeek(target);
+        }
       }}
       onPointerCancel={() => {
         draggingRef.current = false;
+        setDragTime(null);
       }}
       role="slider"
       aria-label="Seek"

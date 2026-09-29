@@ -29,6 +29,36 @@ export function ServersModal({
   onSelectServer,
   servers = TOTAL_STREAMING_SERVERS,
 }: ServersModalProps) {
+  const [tunnelInfo, setTunnelInfo] = React.useState<{
+    relay?: { status: string; port: number };
+    tunnel?: { status: string; url: string | null; verified: boolean };
+    worker?: { synced: boolean };
+  } | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch("/api/stream/tunnel-status");
+        if (res.ok) {
+          const data = (await res.json()) as {
+            relay?: { status: string; port: number };
+            tunnel?: { status: string; url: string | null; verified: boolean };
+            worker?: { synced: boolean };
+          };
+          if (!cancelled) setTunnelInfo(data);
+        }
+      } catch {}
+    };
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const cinejoyServers = servers.filter((s) => isCinejoyServer(s.id));
@@ -117,6 +147,38 @@ export function ServersModal({
             >
               <X className="h-4 w-4" />
             </Button>
+          </div>
+        </div>
+
+        {/* Live Local Relay & Cloudflare Tunnel Status Indicator */}
+        <div className="mb-3 flex items-center justify-between rounded-xl bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-[11px]">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "h-2 w-2 rounded-full",
+                tunnelInfo?.relay?.status === "online"
+                  ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"
+                  : "bg-rose-500",
+              )}
+            />
+            <span className="font-medium text-white/90">
+              Relay: {tunnelInfo?.relay?.status === "online" ? "Port 8443 (0ms)" : "Offline"}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 text-white/60">
+            <span
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                tunnelInfo?.tunnel?.verified
+                  ? "bg-emerald-400"
+                  : tunnelInfo?.tunnel?.status === "connected"
+                    ? "bg-emerald-400"
+                    : "bg-amber-400 animate-pulse",
+              )}
+            />
+            <span className="truncate max-w-[130px]" title={tunnelInfo?.tunnel?.url || undefined}>
+              Tunnel: {tunnelInfo?.tunnel?.verified ? "Connected" : tunnelInfo?.tunnel?.status || "Connecting"}
+            </span>
           </div>
         </div>
 

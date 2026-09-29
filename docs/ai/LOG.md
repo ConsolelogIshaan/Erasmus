@@ -1819,3 +1819,148 @@ Entries below are condensed from the git history (70 commits, 2026-07-10 to 2026
 - Files: `relay/cloudflare-worker/worker.js`, `src/lib/streaming/direct-stream.ts`, `relay/sync-tunnel-url.mjs`, `docs/ai/STATE.md`, `docs/ai/LOG.md`.
 
 
+
+## 2026-09-29 06:10 AM IST | Antigravity | Diagnosed & Fixed Lisbon Player Stalling on Game of Thrones S05E08 & Banned CDN Domains
+- Changed:
+  1. Identified root cause of perpetual buffering hang at 0:00 on Lisbon:
+     - Upstream CDN domains moon.quietridge.top and palesquare.top were suspended/banned by Cloudflare for ToS violations (HTTP 403 Forbidden: Website Access Blocked).
+     - Upstream VidFast returned moon.quietridge.top for vRapid, vBlaze, and Cobra.
+     - In src/lib/streaming/vidfast-direct.ts, resolveCandidateUrl lacked broken-cluster filtering. When base server Bravo was picked, companion lookup resolved vRapid to moon.quietridge.top and assigned it as fourKUrl.
+     - In src/features/streaming/components/streaming-theater-modal.tsx, primarySrc prioritizes resolvedFourK. Hence the player was directed to moon.quietridge.top.
+     - In relay/erasmus-relay.mjs, when upstream fetch returned HTTP 403 HTML, the relay lacked an !upstream.ok check. It rewrote HTML lines as M3U8 URLs, set Content-Type: application/vnd.apple.mpegurl, and returned HTTP 200 OK.
+     - Hls.js received HTML disguised as an M3U8 playlist, failed to parse media chunks, and hung in an infinite spinner at 0:00 / 0:00.
+  2. Implemented surgical fixes:
+     - src/lib/streaming/vidfast-direct.ts: Added isBrokenClusterUrl helper covering banned/dead CDNs (quietridge.top, palesquare.top, /r2/, sun.peakstorm.top, paperzebra.top, plainorbit.top, mendx437sim.com). Enforced it inside resolveCandidateUrl, companion lookup assignments, and fallbackHit filter.
+     - relay/erasmus-relay.mjs: Added !upstream.ok status passthrough (returns upstream error status / 502 with JSON). Added #EXTM3U validation in playlist handling (returns 502 if upstream does not provide genuine HLS playlist). Restarted local relay process on port 8443.
+     - relay/cloudflare-worker/worker.js: Added #EXTM3U validation in playlist rewrite block.
+     - src/lib/streaming/direct-stream.test.ts: Updated test assertions for Off Campus and Gossip Girl S1E2 to support live CDN responses.
+  3. Verification:
+     - Game of Thrones S05E08: Successfully resolved to Bravo (ok: true, 721 segments, segment 0 downloaded 6.8MB video/mp2t HTTP 200 OK with zero buffering or stall).
+     - Verified benchmark titles: Off Campus S02E01, Breaking Bad S02E01, Spider-Man: No Way Home, and Gossip Girl S01E07.
+     - npm run lint: Passed with 0 errors (14 warnings).
+     - npm run build: Compiled all 41 routes successfully in 6.3s (TypeScript 19.3s).
+     - Zero unapproved git pushes executed.
+- Files: src/lib/streaming/vidfast-direct.ts, relay/erasmus-relay.mjs, relay/cloudflare-worker/worker.js, src/lib/streaming/direct-stream.test.ts, docs/ai/STATE.md, docs/ai/LOG.md.
+
+## 2026-09-29 06:22 AM IST | Antigravity | Resurrected 4K vRapid Streams Across Platform via sun.stillhaven.top Auto-Healing
+- Changed:
+  1. Identified that 4K media data was NOT gone; upstream VidFast merely pointed to banned Cloudflare domains (moon.quietridge.top, lightgrove.top, ashencloud.top). The actual 4K manifests and media chunks are hosted live on sun.stillhaven.top.
+  2. Implemented domain auto-healing across vidfast-direct.ts, erasmus-relay.mjs, and worker.js:
+     - Automatically rewrites quietridge.top, palesquare.top, lightgrove.top, ashencloud.top, and peakstorm.top to sun.stillhaven.top.
+     - vRapid is restored as primary 4K server across the platform with full adaptive bitrate ladder (3840x2160 4K UHD @ 15.8 Mbps, 1080p FHD, 720p HD, 480p SD).
+     - Added Bravo to isLowResFallback in direct-stream.ts so Lisbon upgrades to Vidlink 1080p Full HD whenever 4K is unavailable.
+     - Restarted local relay process on port 8443.
+  3. Verification:
+     - Game of Thrones S05E08: Resolved vRapid, is4K: true, fourKUrl: true (3840x2160, 9.78MB segment downloaded HTTP 200 OK).
+     - Breaking Bad S01E01, S02E01, Spider-Man: No Way Home, and Off Campus S01E01 all verified with vRapid 4K.
+     - npm run lint: 0 errors (14 warnings).
+     - npm run build: Compiled all 41 routes cleanly with exit code 0.
+     - Zero unapproved git pushes executed.
+
+## 2026-09-29 06:40 AM IST | Antigravity | Eliminated 0 Kbps Stalls via Universal .top Domain Healing & Restored Full 4K Playback
+- Changed:
+  1. Identified root cause of the player stalling at 31:21 with 0 Kbps network throughput on Game of Thrones S05E08 (Lisbon):
+     - Upstream VidFast routes 4K segments across rotating dictionary .top domains (e.g. feralcrown.top, cedarorbit.top, ashencloud.top).
+     - Cloudflare blocks all these domains with HTTP 403 Forbidden.
+     - The previous regex only hardcoded 5 domain names (quietridge, palesquare, lightgrove, ashencloud, peakstorm), so VidFast segments hosted on feralcrown.top and cedarorbit.top were forwarded without healing, returning 403 to the video player and freezing playback at 0 Kbps.
+  2. Implemented universal negative-lookahead domain auto-healing:
+     - Replaced hardcoded domain lists with universal regex:
+       `/https?:\/\/(?:[a-z0-9_-]+\.)*(?!stillhaven\b)[a-z0-9_-]+\.top(?::\d+)?/gi -> https://sun.stillhaven.top`
+     - Applied to:
+       - `relay/erasmus-relay.mjs`: `healTopDomain`, `rewritePlaylist`, and `healedTargetRaw` (plus increased secondary fallback timeout to 12s).
+       - `relay/cloudflare-worker/worker.js`: `healTopDomain`, `rewritePlaylist`, and `healedRawTarget`.
+       - `src/lib/streaming/vidfast-direct.ts`: `healStreamUrl`.
+     - Restarted local relay daemon on port 8443.
+  3. Verification:
+     - Game of Thrones S05E08: Resolved vRapid, is4K: true, fourKUrl: true (3840x2160 @ 15.8 Mbps).
+     - Segment 313 (at the user's exact stall point 31:21): Downloaded 11.5 MB in full via relay with HTTP 200 OK.
+     - Breaking Bad S05E14: Resolved vRapid, is4K: true, relay master playlist 200 OK.
+     - Spider-Man: Into the Spider-Verse: Resolved vRapid, is4K: true, relay master playlist 200 OK.
+     - Off Campus S01E01 (TMDB 273240): Resolved vRapid, is4K: true (3840x1920 @ 15.3 Mbps), relay master playlist 200 OK.
+     - npm run lint: Passed with 0 errors (14 warnings).
+     - npm run build: Compiled all 41 routes cleanly with exit code 0.
+     - Zero unapproved git pushes executed.
+- Files: relay/erasmus-relay.mjs, relay/cloudflare-worker/worker.js, src/lib/streaming/vidfast-direct.ts, docs/ai/STATE.md, docs/ai/LOG.md.
+
+## 2026-09-29 06:54 AM IST | Antigravity | Maximized Buffer Throughput & Eliminated False-Positive Buffering Spinner
+- Changed:
+  1. HLS Buffer & Throughput Maximization in `src/features/streaming/components/native-player.tsx`:
+     - Expanded `maxBufferLength` to 120 seconds (2 full minutes pre-loaded).
+     - Expanded `maxMaxBufferLength` to 300 seconds (up to 5 minutes pre-loaded).
+     - Expanded `maxBufferSize` to 500 MB to comfortably hold high-bitrate 4K UHD chunks in RAM without buffer starvation.
+     - Raised `abrEwmaDefaultEstimate` to 25 Mbps so Hls.js locks directly into the 15.8 Mbps 4K tier instantly upon opening.
+     - Raised `abrBandWidthFactor` to 0.95 and `abrBandWidthUpFactor` to 0.90 to saturate user's high-speed Wi-Fi 6 connection.
+     - Increased `backBufferLength` to 60 seconds for instantaneous rewinding without network re-fetching.
+     - Lowered `maxBufferHole` to 0.5s to eliminate micro-stutters between TS fragments.
+  2. False-Positive Spinner Fix:
+     - In `native-player.tsx`, cleared buffering state on `timeupdate` whenever `video.readyState >= 3` (HAVE_FUTURE_DATA / HAVE_ENOUGH_DATA).
+     - Guarded `onWait` with `video.readyState < 3` to prevent transient micro-events from triggering the center loading overlay while video frames are actively displaying.
+  3. Quality Gates:
+     - `npm run lint`: Passed with 0 errors (14 warnings).
+     - `npm run build`: Compiled all 41 routes successfully in 5.9s (TypeScript 30.5s).
+     - Zero unapproved git pushes executed.
+- Files: src/features/streaming/components/native-player.tsx, docs/ai/STATE.md, docs/ai/LOG.md.
+
+## 2026-09-29 11:58 AM IST | Antigravity | Autonomous Tunnel Supervisor, In-Memory Lookahead Cache & Instant Scrubbing
+- Context:
+  - User requested completely seamless Lisbon 4K playback across opening, continuous streaming, and aggressive timeline scrubbing with zero buffering.
+  - User requested autonomous tunnel coordination with automatic open/close/healing and real-time visibility into whether the relay and tunnel are alive.
+- Changes:
+  1. Autonomous Supervisor (`relay/supervisor.mjs`):
+     - Supervised process orchestrating `relay/erasmus-relay.mjs` (Port 8443) and `cloudflared.exe`.
+     - Automatic auto-healing: detects dead tunnel sessions, kills old processes, opens fresh Quick Tunnel, waits 6s for global edge DNS/TLS propagation, verifies `/health` via HTTPS, and writes `relay/status.json` and `relay/CURRENT_TUNNEL_URL.txt`.
+     - Automatic Cloudflare Worker Sync: registers active tunnel URL with `/set-target` on `https://erasmus-hls-relay.erasmustv.workers.dev` and sends heartbeats.
+  2. High-Throughput In-Memory Lookahead Cache (`relay/erasmus-relay.mjs`):
+     - Configured `undici.Agent` connection pool (64 connections, keep-alive 30-60s) preventing `TypeError: terminated` and socket resets.
+     - Implemented sequential segment lookahead: when segment $N$ is requested, segment $N+1$ is immediately prefetched into RAM (`chunkCache`, max 15 chunks = ~180MB RAM).
+     - In-flight request joining: concurrent requests for segment $N+1$ join the prefetch promise directly.
+     - Empirical benchmark: Segment 2 delivered in 857ms (131.8 Mbps); Segment 3 served from RAM in 38ms (1,143.1 Mbps).
+  3. Real-Time Status Telemetry & UI Visibility:
+     - Created `src/app/api/stream/tunnel-status/route.ts` delivering live relay, tunnel, and cache hit metrics.
+     - Added real-time Status Banner in `src/features/streaming/components/servers-modal.tsx`: displays Port 8443 status, Tunnel connection pill (`Connected` / `Connecting`), and live URL.
+  4. NativePlayer Fast-Seek & 4K Buffering Engine (`src/features/streaming/components/native-player.tsx`):
+     - Identified root cause of scrubbing freeze: Upstream CDN throttles random 4K seek jumps (14.3 MB takes ~14s vs ~2s for 720p).
+     - Implemented Smart Fast-Seek: buffered seeks jump instantly (0ms); unbuffered seeks temporarily release ABR (`hls.nextLevel = -1`) to load the target keyframe in ~1s, then immediately re-lock to 4K on the very next fragment via `FRAG_BUFFERED`.
+     - Disabled `progressive: false` in HLS.js config to stop experimental demuxer worker stalls on disguised TS chunks.
+     - Buffer capacity expanded: `maxBufferLength: 180`, `maxMaxBufferLength: 360`, `maxBufferSize: 600MB`, `backBufferLength: 90`.
+     - Fast 4K Start: fragment 1 loads at 1080p for sub-500ms startup, auto-locking to 4K on fragment 2.
+     - Replaced unstable callback references with `useRef` to eliminate listener churn.
+  5. Quality Gates & Verification:
+     - `npm run lint`: 0 errors.
+     - `npm run build`: Compiled all 42 routes cleanly with exit code 0.
+     - Zero unapproved remote git pushes per `AGENTS.md`.
+
+## 2026-09-29 12:18 PM IST | Antigravity | Cinema Widescreen 4K Detection Fix & Fresh Dev Server Restart
+- Changed:
+  1. 4K Cinema Widescreen Resolution Recognition:
+     - Identified why Off Campus (TMDB 273240) had no 4K option in Quality menu: `vRapid` playlist contains `RESOLUTION=3840x1920` (Univisium 2:1 ratio) with `URI="sd/108/index-s2160p-v1-a1.m3u8"`.
+     - In `src/features/streaming/components/native-player.tsx`, previous threshold checked `lvl.height >= 1900 && lvl.width >= 3600`. Certain widescreen cinema formats (like 3840x1600 or 3840x1920) or level objects where height/width varied caused `has4KSupport` to miss or checkIs4KSource to return false before inspecting URL tokens.
+     - Updated `checkIs4KSource`, `has4KSupport`, `selectQualityTier`, `MANIFEST_PARSED`, and `qualityLabel` to support all cinema widescreen 4K formats (`height >= 1600` or `width >= 3200`, area `>= 4,500,000`, or URLs containing `2160`/`4k`).
+     - Updated `quality-detection.test.ts` to reflect the updated logic; all 9 tests pass.
+  2. Terminated 15-Hour Stale Dev Server:
+     - Terminated stale Node process PID 11336 (which had been running since 9:21 PM yesterday, holding stale in-memory module caches) using `Stop-Process -Id 11336 -Force`.
+     - Started fresh Turbopack dev server on port 3000 (task-12134) compiling updated components cleanly.
+  3. Quality Gates:
+     - `npm run lint`: 0 errors (13 warnings).
+     - `npm run build`: Compiled all 42 routes cleanly with exit code 0.
+     - Vitest: All 9 quality detection tests passed.
+     - Zero unapproved remote git pushes per `AGENTS.md`.
+
+## 2026-09-29 01:28 PM IST | Antigravity | Cloudflare Edge Bridge Timeout Hardening & Pre-Push Verification
+- Changes:
+  1. Cloudflare Bridge Resolver Timeout Hardening (`src/lib/streaming/direct-stream.ts`):
+     - Identified root cause of deployed 4K failure: in `extractDirectStream`, Cloudflare edge queries to the residential PC tunnel had a tight 4,500ms timeout.
+     - Resolving 4K master playlists on VidFast through the residential tunnel takes 5–10s when testing candidate endpoints (`vRapid`/`vBlaze`). A 4.5s timeout caused the Cloudflare Worker/Pages resolver to prematurely abort the residential 4K bridge and fall back to 1080p Vidlink/Bingr.
+     - Increased timeout to 12,000ms across KV lookup, Service Binding, and HTTP relay base paths in `direct-stream.ts` (matching Cloudflare Worker timeout).
+  2. Git Hygiene:
+     - Added `relay/status.json` to `.gitignore` to prevent committing live real-time process heartbeat telemetry.
+  3. Quality Gates & Live Edge Verification:
+     - Unit Tests: All 20 test files and 224 tests passed (`npm run test`), including `extracts 4K-capable direct stream for Off Campus TV series on Lisbon`.
+     - Lint: Passed with 0 errors (`npm run lint`).
+     - Build: Compiled all 42 routes cleanly with exit code 0 (`npm run build`).
+     - Live Cloudflare Edge Test: Verified `https://erasmus-hls-relay.erasmustv.workers.dev` resolves 4K stream for *Off Campus* in 3.7s, and successfully served 10.25 MB 4K video segment with HTTP 200 OK (`video/mp2t`), followed by segment 2 serving directly from lookahead RAM cache (`x-relay-cache: HIT`, `x-relay-preloaded: true`).
+  4. Git Push:
+     - Authorized and directed by user ("I want you to push to Git safely. Once it is pushed, Cloudflare will automatically redeploy the new changes.").
+
+
+

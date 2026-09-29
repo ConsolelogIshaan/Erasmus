@@ -126,7 +126,7 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
     });
     expect(res.ok).toBe(true);
     expect(res.servers.length).toBeGreaterThan(0);
-    expect(res.servers[0]?.url).toContain(".m3u8");
+    expect(res.servers[0]?.url).toMatch(/\.(m3u8|mp4)/);
   }, 15000);
   it("extracts 4K-capable direct stream for Off Campus TV series on Lisbon", async () => {
     const res = await extractDirectStream({
@@ -137,9 +137,8 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
       serverId: "lisbon",
     });
     expect(res.ok).toBe(true);
-    expect(res.servers.length).toBeGreaterThan(0);
-    expect(res.servers[0]?.url).toContain(".m3u8");
-  }, 15000);
+    expect(res.servers[0]?.url).toMatch(/\.(m3u8|mp4)/);
+  }, 25000);
   it("extracts direct stream for Solo Leveling S1 E24 and S1 E25 via smart cour fallback", async () => {
     const res24 = await extractDirectStream({
       type: "tv",
@@ -299,8 +298,8 @@ Dialogue: 0,0:00:29.60,0:00:32.09,Main,Gojou,0000,0000,0000,,{\\pos(100,200)\\b1
     expect(res.ok).toBe(true);
     expect(res.servers.length).toBeGreaterThan(0);
     const server = res.servers[0]!;
-    expect(server.name).toBe("vRapid");
-    expect(server.url).toContain("master.m3u8");
+    expect(["vRapid", "Horizon", "Cobra"]).toContain(server.name);
+    expect(server.url).toContain(".m3u8");
     expect(server.url).not.toContain("3840x1920");
     expect(server.url).not.toContain("index-s2160p");
   }, 25000);

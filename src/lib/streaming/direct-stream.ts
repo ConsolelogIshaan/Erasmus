@@ -185,7 +185,8 @@ export async function extractDirectStream(input: {
         // check if Vidlink has a pristine 1080p Full HD stream so Lisbon users receive full 1080p.
         const isLowResFallback =
           !vidfastRes.hit.is4K &&
-          (vidfastRes.hit.serverName.toLowerCase() === "cobra" ||
+          (vidfastRes.hit.serverName.toLowerCase() === "bravo" ||
+            vidfastRes.hit.serverName.toLowerCase() === "cobra" ||
             vidfastRes.hit.serverName.toLowerCase() === "horizon");
 
         if (isLowResFallback && (effectiveServerId === "lisbon" || !effectiveServerId)) {
@@ -284,7 +285,7 @@ export async function extractDirectStream(input: {
               try {
                 bridgeRes = await fetch(`${targetUrl.replace(/\/+$/, "")}/api/stream/direct?${vParams.toString()}`, {
                   headers: { "User-Agent": "Mozilla/5.0" },
-                  signal: AbortSignal.timeout(4500),
+                  signal: AbortSignal.timeout(12000),
                 });
               } catch {}
             }
@@ -297,7 +298,7 @@ export async function extractDirectStream(input: {
                 `https://erasmus-hls-relay/api/stream/direct?${vParams.toString()}`,
                 {
                   headers: { "User-Agent": "Mozilla/5.0" },
-                  signal: AbortSignal.timeout(4500),
+                  signal: AbortSignal.timeout(12000),
                 },
               );
             } catch {}
@@ -313,7 +314,7 @@ export async function extractDirectStream(input: {
               `${relayBase}/api/stream/direct?${vParams.toString()}`,
               {
                 headers: { "User-Agent": "Mozilla/5.0" },
-                signal: AbortSignal.timeout(4500),
+                signal: AbortSignal.timeout(12000),
               },
             );
           } catch {}

@@ -1123,9 +1123,7 @@ export function StreamingTheaterModal({
                 externalSubtitles={externalSubtitles}
                 isFullscreen={isFullscreen}
                 onToggleFullscreen={toggleFullscreen}
-                onProgress={(seconds, duration) => {
-                  persistProgress(seconds, duration);
-                }}
+                onProgress={persistProgress}
                 title={title}
                 mediaType={mediaType}
                 season={activeSeason}

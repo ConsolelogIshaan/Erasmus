@@ -4,11 +4,8 @@ describe("Truthful Stream Quality Detection", () => {
   const is4K = (dims?: { height?: number; width?: number; url?: string; activeSrc?: string }) => {
     const w = dims?.width || 0;
     const h = dims?.height || 0;
-    if (w > 0 || h > 0) {
-      if (w >= 3600 || h >= 1900) return true;
-      if (w > 0 && h > 0 && w * h >= 5_500_000) return true;
-      return false;
-    }
+    if (w >= 3200 || h >= 1600) return true;
+    if (w > 0 && h > 0 && w * h >= 4_500_000) return true;
     if (dims?.url && (dims.url.includes("2160") || /(^|[._\s/-])4k([._\s/-]|$)/i.test(dims.url))) return true;
     if (dims?.activeSrc && (dims.activeSrc.includes("2160") || /(^|[._\s/-])4k([._\s/-]|$)/i.test(dims.activeSrc))) return true;
     return false;

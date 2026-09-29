@@ -134,8 +134,17 @@ function enrichAudioTracks(text) {
   return lines.join("\n");
 }
 
+function healTopDomain(urlStr) {
+  if (!urlStr || typeof urlStr !== "string") return urlStr;
+  return urlStr.replace(
+    /https?:\/\/(?:[a-z0-9_-]+\.)*(?!stillhaven\b)[a-z0-9_-]+\.top(?::\d+)?/gi,
+    "https://sun.stillhaven.top",
+  );
+}
+
 function rewritePlaylist(text, baseUrl, relayBase, referer) {
-  const enriched = enrichAudioTracks(text);
+  const healedText = healTopDomain(text);
+  const enriched = enrichAudioTracks(healedText);
   return enriched
     .split("\n")
     .map((line) => {
@@ -144,11 +153,13 @@ function rewritePlaylist(text, baseUrl, relayBase, referer) {
       if (trimmed.startsWith("#")) {
         return trimmed.replace(/URI="([^"]+)"/gi, (_, uri) => {
           const absolute = new URL(uri, baseUrl).href;
-          return `URI="${proxied(relayBase, absolute, referer)}"`;
+          const healedAbsolute = healTopDomain(absolute);
+          return `URI="${proxied(relayBase, healedAbsolute, referer)}"`;
         });
       }
       const absolute = new URL(trimmed, baseUrl).href;
-      return proxied(relayBase, absolute, referer);
+      const healedAbsolute = healTopDomain(absolute);
+      return proxied(relayBase, healedAbsolute, referer);
     })
     .join("\n");
 }
@@ -293,7 +304,8 @@ const worker = {
       return jsonResponse({ error: "missing url query parameter" }, 400);
     }
 
-    const target = isHttpsUrl(rawTarget);
+    const healedRawTarget = healTopDomain(rawTarget);
+    const target = isHttpsUrl(healedRawTarget);
     if (!target) {
       return jsonResponse({ error: "invalid target url" }, 400);
     }
@@ -399,6 +411,9 @@ const worker = {
       // 1. Playlists (.m3u8): enrich audio and rewrite child URLs to Cloudflare Worker relay
       if (looksPlaylist) {
         const text = await upstream.text();
+        if (!text.includes("#EXTM3U")) {
+          return jsonResponse({ error: "upstream returned invalid non-HLS playlist content" }, 502);
+        }
         const rewritten = rewritePlaylist(text, target.href, relayBase, referer);
         return new Response(rewritten, {
           status: 200,

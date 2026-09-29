@@ -272,7 +272,6 @@ async function resolveVidfastDirectStreamSingle(input: {
 
     const pushCandidate = (s: DecryptedServer) => {
       if (s.data && !addedNames.has(s.name)) {
-        if (s.name.toLowerCase() === "horizon" && !isGossipGirlS1E7) return;
         addedNames.add(s.name);
         orderedCandidates.push(s);
       }
@@ -317,6 +316,22 @@ async function resolveVidfastDirectStreamSingle(input: {
       };
     }
 
+    const healStreamUrl = (url: string): string => {
+      return url.replace(
+        /https?:\/\/(?:[a-z0-9_-]+\.)*(?!stillhaven\b)[a-z0-9_-]+\.top(?::\d+)?/gi,
+        "https://sun.stillhaven.top",
+      );
+    };
+
+    const isBrokenClusterUrl = (url: string): boolean => {
+      return (
+        url.includes("/r2/") ||
+        url.includes("paperzebra.top") ||
+        url.includes("plainorbit.top") ||
+        url.includes("mendx437sim.com")
+      );
+    };
+
     const resolveCandidateUrl = async (cand?: DecryptedServer): Promise<string | null> => {
       if (!cand?.data) return null;
       try {
@@ -335,7 +350,11 @@ async function resolveVidfastDirectStreamSingle(input: {
           signal: AbortSignal.timeout(2000),
         });
         const dJson = (await dRes.json()) as { status?: number; result?: { url?: string } };
-        return dJson.status === 200 && dJson.result?.url ? dJson.result.url : null;
+        const candUrl = dJson.status === 200 && dJson.result?.url ? healStreamUrl(dJson.result.url) : null;
+        if (candUrl && isBrokenClusterUrl(candUrl)) {
+          return null;
+        }
+        return candUrl;
       } catch {
         return null;
       }
@@ -378,17 +397,11 @@ async function resolveVidfastDirectStreamSingle(input: {
         };
         const streamResult = decStreamJson.result;
         if (decStreamJson.status === 200 && streamResult?.url) {
-          const finalUrl = streamResult.url;
-          // Reject known dead / hanging CDN clusters:
+          const finalUrl = healStreamUrl(streamResult.url);
+          // Reject known dead / hanging / banned CDN clusters:
           // 1. /r2/cdn1/ and /r2/cdn2/ (paperzebra.top and plainorbit.top stall indefinitely on segment requests)
-          // 2. sun.peakstorm.top (Horizon returns 502 Bad Gateway)
-          const isBrokenCluster =
-            finalUrl.includes("/r2/") ||
-            finalUrl.includes("sun.peakstorm.top") ||
-            finalUrl.includes("paperzebra.top") ||
-            finalUrl.includes("plainorbit.top") ||
-            finalUrl.includes("mendx437sim.com") ||
-            candidate.name.toLowerCase() === "horizon";
+          // 2. mendx437sim.com (dead host)
+          const isBrokenCluster = isBrokenClusterUrl(finalUrl);
 
           const is4K =
             cleanId === "224372" ||
@@ -438,7 +451,7 @@ async function resolveVidfastDirectStreamSingle(input: {
           // Only perform companion lookup for non-fallback queries to keep fallback fast
           if (!input.isFallback) {
             if (is4K) {
-              fourKUrl = masterUrl;
+              fourKUrl = isBrokenCluster ? undefined : masterUrl;
               const hdCandidate = serverList.find(
                 (s) =>
                   s.data &&
@@ -450,7 +463,7 @@ async function resolveVidfastDirectStreamSingle(input: {
               );
               if (hdCandidate) {
                 const companionUrl = await resolveCandidateUrl(hdCandidate);
-                if (companionUrl) hdUrl = companionUrl;
+                if (companionUrl && !isBrokenClusterUrl(companionUrl)) hdUrl = companionUrl;
               }
               if (!hdUrl) hdUrl = finalUrl;
             } else {
@@ -467,7 +480,7 @@ async function resolveVidfastDirectStreamSingle(input: {
               );
               if (fourKCandidate) {
                 const companionUrl = await resolveCandidateUrl(fourKCandidate);
-                if (companionUrl) fourKUrl = companionUrl;
+                if (companionUrl && !isBrokenClusterUrl(companionUrl)) fourKUrl = companionUrl;
               }
             }
           }
@@ -477,14 +490,19 @@ async function resolveVidfastDirectStreamSingle(input: {
             kind: finalUrl.includes(".mp4") ? "file" : "hls",
             referer: VIDFAST_REFERER,
             serverName: candidate.name,
-            is4K,
+            is4K: Boolean(is4K && !isBrokenCluster),
             hdUrl: hdUrl || masterUrl,
-            fourKUrl: fourKUrl || (is4K ? masterUrl : undefined),
+            fourKUrl: fourKUrl || (is4K && !isBrokenCluster ? masterUrl : undefined),
             isDirectCors: false,
           };
 
           if (isBrokenCluster) {
-            if (!fallbackHit && !finalUrl.includes("mendx437sim.com")) {
+            if (
+              !fallbackHit &&
+              !finalUrl.includes("mendx437sim.com") &&
+              !finalUrl.includes("quietridge.top") &&
+              !finalUrl.includes("palesquare.top")
+            ) {
               fallbackHit = candidateHit;
             }
             lastError = `${candidate.name}: skipped hanging/broken cluster (${finalUrl})`;
