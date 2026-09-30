@@ -55,6 +55,7 @@ import {
 import { cn } from "@/lib/utils";
 import { stillUrl } from "@/lib/media/image";
 import { buildRelayUrl } from "@/lib/streaming/relay";
+import { resolveClientStream } from "@/lib/streaming/client-resolution";
 import { fetchClientMediaDetails } from "@/lib/media/client-details";
 
 /**
@@ -62,8 +63,8 @@ import { fetchClientMediaDetails } from "@/lib/media/client-details";
  * Uses the Cloudflare Worker when NEXT_PUBLIC_HLS_RELAY_URL is set, otherwise
  * the local /api/stream/hls route (unchanged default behaviour).
  */
-function relayUrl(url: string, referer?: string) {
-  return buildRelayUrl(url, referer);
+function relayUrl(url: string, referer?: string, cloudOnly = false) {
+  return buildRelayUrl(url, referer, cloudOnly);
 }
 
 interface StreamingTheaterModalProps {
@@ -383,6 +384,7 @@ export function StreamingTheaterModal({
   }, [open, mediaType, tmdbId, title]);
   const [_key, setKey] = React.useState(0);
   const [extractNonce, setExtractNonce] = React.useState(0);
+  const refreshedNonceRef = React.useRef(0);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [directSrc, setDirectSrc] = React.useState<string | null>(null);
   const [embedSrc, setEmbedSrc] = React.useState<string | null>(null);
@@ -541,13 +543,9 @@ export function StreamingTheaterModal({
     if (resolvedImdbId) {
       query.set("imdb", resolvedImdbId);
     }
-    fetch(`/api/stream/direct?${query}`)
-      .then((response) => response.json() as Promise<{
-        ok?: boolean;
-        referer?: string;
-        captions?: ExternalSubtitle[];
-        servers?: { url: string; kind?: "hls" | "file" }[];
-      }>)
+    const refresh = extractNonce !== refreshedNonceRef.current;
+    refreshedNonceRef.current = extractNonce;
+    resolveClientStream(query, refresh)
       .then(
         (data) => {
           if (cancelled) return;
@@ -555,9 +553,11 @@ export function StreamingTheaterModal({
           if (data.ok && hit?.url) {
             setDirectKind(hit.kind === "file" ? "file" : "hls");
             const rawHit = hit as { hdUrl?: string; fourKUrl?: string };
-            const resolvedFourK = rawHit.fourKUrl ? relayUrl(rawHit.fourKUrl, data.referer) : null;
-            const resolvedHd = rawHit.hdUrl ? relayUrl(rawHit.hdUrl, data.referer) : null;
-            const primarySrc = resolvedFourK || relayUrl(hit.url, data.referer);
+            const resolvedFourK = rawHit.fourKUrl ? relayUrl(rawHit.fourKUrl, data.referer, hit.cloudOnly) : null;
+            const resolvedHd = rawHit.hdUrl ? relayUrl(rawHit.hdUrl, data.referer, hit.cloudOnly) : null;
+            const primarySrc = hit.kind === "file" && hit.isDirectCors
+              ? hit.url
+              : resolvedFourK || relayUrl(hit.url, data.referer, hit.cloudOnly);
             setDirectSrc(primarySrc);
             setDirectIs4K(Boolean((hit as { is4K?: boolean })?.is4K || resolvedFourK));
             setDirectHdSrc(resolvedHd);

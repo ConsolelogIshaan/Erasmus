@@ -6,6 +6,7 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  "browser": { "binding": "VIDCORE_BROWSER", "remote": true },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"

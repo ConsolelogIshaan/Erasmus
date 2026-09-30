@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { backdropUrl, logoUrl } from "@/lib/media/image";
 import { formatVote, formatYear } from "@/lib/media/format";
 import { mediaHref } from "@/lib/media/routes";
+import { markPlaybackClick, prepareClientStream } from "@/lib/streaming/client-resolution";
+import { readPreferredServer } from "@/features/streaming/components/servers-modal";
 import { StreamingTheaterModal } from "@/features/streaming/components/streaming-theater-modal";
 import { getTvShowResume } from "@/lib/streaming/playback-progress";
 import type { MediaSummary } from "@/types/media";
@@ -330,7 +332,9 @@ export function HeroBanner({ items, item, intervalMs = 6000, ctaHref }: HeroBann
               {/* Circular White Play Button */}
               <button
                 type="button"
-                onClick={() => setTheaterOpen(true)}
+                onPointerEnter={() => prepareClientStream({ type: active.mediaType, id: String(active.id), title: active.title, server: readPreferredServer(), season: playSeason, episode: playEpisode })}
+                onFocus={() => prepareClientStream({ type: active.mediaType, id: String(active.id), title: active.title, server: readPreferredServer(), season: playSeason, episode: playEpisode })}
+                onClick={() => { markPlaybackClick(); setTheaterOpen(true); }}
                 className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white text-black shadow-xl shadow-black/50 transition-all duration-200 hover:scale-105 hover:bg-white/90 active:scale-95 sm:h-13 sm:w-13"
                 aria-label={`Play ${active.title}`}
               >

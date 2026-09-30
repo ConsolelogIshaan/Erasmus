@@ -1,8 +1,27 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'node:url';
+import dns from 'node:dns';
+import { Agent } from 'undici';
 
-const CWD = process.cwd();
+const tunnelDns = new dns.promises.Resolver();
+tunnelDns.setServers(['1.1.1.1', '8.8.8.8']);
+// Fresh Quick Tunnel names can be negatively cached by the PC's DNS resolver.
+// Use public DNS only if the ordinary lookup fails; TLS validation stays enabled.
+const tunnelProbeAgent = new Agent({ connect: {
+  lookup(hostname, options, callback) {
+    dns.lookup(hostname, options, (error, address, family) => {
+      if (!error) return callback(null, address, family);
+      tunnelDns.resolve4(hostname).then((addresses) => {
+        if (options.all) callback(null, addresses.map((entry) => ({ address: entry, family: 4 })));
+        else callback(null, addresses[0], 4);
+      }).catch(() => callback(error));
+    });
+  },
+} });
+
+const CWD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLOUDFLARED_BIN = 'C:\\Users\\Administrator\\bin\\cloudflared.exe';
 const PRIMARY_WORKER_URL = 'https://erasmus-hls-relay.erasmustv.workers.dev';
 const SYNC_SECRET = 'erasmus_relay_tunnel_key_9247f1';
@@ -19,6 +38,29 @@ let isTunnelVerified = false;
 let lastVerificationTime = 0;
 let consecutiveTunnelFailures = 0;
 let tunnelSpawnTime = 0;
+let syncedTunnelUrl = '';
+let verificationRunning = false;
+let lastSyncCheck = 0;
+let shuttingDown = false;
+const PID_FILE = path.join(CWD, 'relay', 'supervisor.pid');
+// All launchers share one supervisor so they cannot race over the tunnel URL.
+if (fs.existsSync(PID_FILE)) {
+  const previousPid = Number(fs.readFileSync(PID_FILE, 'utf8'));
+  if (Number.isInteger(previousPid) && previousPid > 0) {
+    try {
+      process.kill(previousPid, 0);
+      console.warn('[Supervisor] Already running.');
+      process.exit(0);
+    } catch {}
+  }
+  fs.unlinkSync(PID_FILE);
+}
+try {
+  fs.writeFileSync(PID_FILE, String(process.pid), { flag: 'wx' });
+} catch {
+  console.warn('[Supervisor] Another supervisor is starting.');
+  process.exit(0);
+}
 
 function writeStatus(extra = {}) {
   const status = {
@@ -37,7 +79,7 @@ function writeStatus(extra = {}) {
     },
     worker: {
       url: PRIMARY_WORKER_URL,
-      synced: isTunnelVerified,
+      synced: isTunnelVerified && syncedTunnelUrl === currentTunnelUrl,
     },
     updatedAt: new Date().toISOString(),
     ...extra,
@@ -48,31 +90,35 @@ function writeStatus(extra = {}) {
 }
 
 function startRelay() {
+  if (shuttingDown) return;
   if (relayProc && !relayProc.killed) return;
   console.log('[Supervisor] Starting local HLS relay on port 8443...');
   const outLog = fs.openSync(RELAY_LOG_FILE, 'a');
-  relayProc = spawn('node', ['relay/erasmus-relay.mjs'], {
+  relayProc = spawn(process.execPath, ['relay/erasmus-relay.mjs'], {
     cwd: CWD,
     stdio: ['ignore', outLog, outLog],
     windowsHide: true,
   });
+  fs.closeSync(outLog);
 
   relayProc.on('exit', (code) => {
     console.warn(`[Supervisor] Relay exited with code ${code}. Restarting in 2s...`);
     relayProc = null;
     writeStatus();
-    setTimeout(startRelay, 2000);
+    if (!shuttingDown) setTimeout(startRelay, 2000);
   });
 
   writeStatus();
 }
 
 function startTunnel() {
+  if (shuttingDown) return;
   if (tunnelProc && !tunnelProc.killed) return;
 
   // Clear stale tunnel URL & log
   currentTunnelUrl = '';
   isTunnelVerified = false;
+  syncedTunnelUrl = '';
   consecutiveTunnelFailures = 0;
   tunnelSpawnTime = Date.now();
   writeStatus();
@@ -119,8 +165,10 @@ function startTunnel() {
     console.warn(`[Supervisor] Tunnel process exited with code ${code}. Restarting in 4s...`);
     tunnelProc = null;
     isTunnelVerified = false;
+    currentTunnelUrl = '';
+    syncedTunnelUrl = '';
     writeStatus();
-    setTimeout(startTunnel, 4000);
+    if (!shuttingDown) setTimeout(startTunnel, 4000);
   });
 
   writeStatus();
@@ -138,13 +186,17 @@ function killTunnel() {
 }
 
 async function verifyTunnelAndSync() {
-  if (!currentTunnelUrl) return false;
+  if (!currentTunnelUrl || verificationRunning) return false;
+  verificationRunning = true;
+  const probingUrl = currentTunnelUrl;
 
   try {
     const res = await fetch(`${currentTunnelUrl}/health`, {
       signal: AbortSignal.timeout(6000),
+      dispatcher: tunnelProbeAgent,
     });
     if (res.ok) {
+      if (probingUrl !== currentTunnelUrl) return false;
       isTunnelVerified = true;
       lastVerificationTime = Date.now();
       consecutiveTunnelFailures = 0;
@@ -152,12 +204,32 @@ async function verifyTunnelAndSync() {
       writeStatus();
 
       // Register with Cloudflare Worker
-      await registerTargetWithWorker(currentTunnelUrl);
+      if (syncedTunnelUrl !== currentTunnelUrl || Date.now() - lastSyncCheck > 60_000) {
+        lastSyncCheck = Date.now();
+        try {
+        const targetRes = await fetch(`${PRIMARY_WORKER_URL}/tunnel-url`, {
+          signal: AbortSignal.timeout(6000),
+        });
+        const targetData = await targetRes.json();
+        if (targetRes.ok && targetData.tunnelUrl === currentTunnelUrl) {
+          syncedTunnelUrl = currentTunnelUrl;
+        } else {
+          syncedTunnelUrl = '';
+          await registerTargetWithWorker(currentTunnelUrl);
+        }
+        } catch (err) {
+          syncedTunnelUrl = '';
+          console.warn('[Supervisor] Worker registry check failed:', err.message);
+          await registerTargetWithWorker(currentTunnelUrl);
+        }
+      }
+      writeStatus();
       return true;
     } else {
       throw new Error(`HTTP ${res.status}`);
     }
   } catch (err) {
+    isTunnelVerified = false;
     consecutiveTunnelFailures++;
     console.warn(`[Supervisor] Tunnel verification probe (${consecutiveTunnelFailures}/8): ${err.message}`);
     if (consecutiveTunnelFailures >= 8) {
@@ -165,6 +237,9 @@ async function verifyTunnelAndSync() {
       killTunnel();
     }
     return false;
+  } finally {
+    verificationRunning = false;
+    writeStatus();
   }
 }
 
@@ -180,6 +255,10 @@ async function registerTargetWithWorker(targetUrl) {
       signal: AbortSignal.timeout(6000),
     });
     const data = await res.json();
+    if (!res.ok || data.status !== 'ok' || data.target !== targetUrl) {
+      throw new Error(`Registration failed: HTTP ${res.status}`);
+    }
+    if (targetUrl === currentTunnelUrl) syncedTunnelUrl = targetUrl;
     console.log('[Supervisor] Registered target with Cloudflare Worker:', data.status === 'ok' ? 'SUCCESS' : data);
   } catch (err) {
     console.warn('[Supervisor] Could not register with Cloudflare Worker:', err.message);
@@ -216,15 +295,19 @@ setInterval(async () => {
 }, 12000);
 
 // Cleanup on exit
-process.on('SIGINT', () => {
+function shutdown() {
+  shuttingDown = true;
   console.log('[Supervisor] Shutting down gracefully...');
   if (relayProc) try { relayProc.kill(); } catch {}
   if (tunnelProc) try { tunnelProc.kill(); } catch {}
+  relayProc = null;
+  tunnelProc = null;
+  isTunnelVerified = false;
+  syncedTunnelUrl = '';
+  writeStatus();
+  try { fs.unlinkSync(PID_FILE); } catch {}
   process.exit(0);
-});
+}
 
-process.on('SIGTERM', () => {
-  if (relayProc) try { relayProc.kill(); } catch {}
-  if (tunnelProc) try { tunnelProc.kill(); } catch {}
-  process.exit(0);
-});
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

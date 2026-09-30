@@ -74,6 +74,7 @@ vendor/
 relay/*.log
 relay/CURRENT_TUNNEL_URL.txt
 relay/status.json
+relay/supervisor.pid
 
 # Cloudflare OpenNext
 .open-next/

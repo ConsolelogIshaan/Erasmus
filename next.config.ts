@@ -1,11 +1,13 @@
 import type { NextConfig } from "next";
 import dns from "node:dns";
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
 try {
   dns.setDefaultResultOrder("ipv4first");
 } catch {}
 
 const isDev = process.env.NODE_ENV === "development";
+if (isDev) initOpenNextCloudflareForDev();
 
 /**
  * Content-Security-Policy, built from the origins this app actually uses.

@@ -13,6 +13,8 @@ import { posterUrl } from "@/lib/media/image";
 import { formatNumber, formatVote, formatYear } from "@/lib/media/format";
 import { mediaHref } from "@/lib/media/routes";
 import { actionUpsertAndSetStatus } from "@/features/library/actions/library-actions";
+import { markPlaybackClick, prepareClientStream } from "@/lib/streaming/client-resolution";
+import { readPreferredServer } from "@/features/streaming/components/servers-modal";
 import { StreamingTheaterModal } from "@/features/streaming/components/streaming-theater-modal";
 import { getTvShowResume } from "@/lib/streaming/playback-progress";
 import type { MediaSummary } from "@/types/media";
@@ -265,10 +267,13 @@ export function PosterCard({
             >
               <button
                 type="button"
+                onPointerEnter={() => prepareClientStream({ type: item.mediaType, id: String(item.id), title: item.title, server: readPreferredServer(), season: playSeason, episode: playEpisode })}
+                onFocus={() => prepareClientStream({ type: item.mediaType, id: String(item.id), title: item.title, server: readPreferredServer(), season: playSeason, episode: playEpisode })}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   void actionUpsertAndSetStatus(toIdentity(item), "watching").catch(() => {});
+                  markPlaybackClick();
                   setTheaterOpen(true);
                 }}
                 className={cn(

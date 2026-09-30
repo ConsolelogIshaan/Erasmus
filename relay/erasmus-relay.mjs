@@ -1,6 +1,10 @@
 import http from 'http';
 import dns from 'node:dns';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { once } from 'node:events';
 import { Agent, setGlobalDispatcher } from 'undici';
+import { resolveVidlinkStream } from '../src/lib/streaming/vidlink-direct.ts';
 
 try { dns.setServers(['8.8.8.8', '1.1.1.1', '9.9.9.9']); } catch {}
 
@@ -15,7 +19,26 @@ setGlobalDispatcher(undiciAgent);
 
 const PORT = 8443;
 const DEFAULT_REFERER = 'https://cinejoy.to/';
-const MAX_CACHE_CHUNKS = 15; // Hold ~180MB of active high-bitrate video in RAM for instant 0ms lookahead delivery
+const MAX_CACHE_CHUNKS = 15;
+const MAX_CACHE_BYTES = 96 * 1024 * 1024;
+const MAX_SEGMENT_BYTES = 32 * 1024 * 1024;
+const MAX_PREFETCHES = 4;
+const LOOKAHEAD_SEGMENTS = 3;
+let cancelledPrefetches = 0;
+let cacheBytes = 0;
+function storeChunk(url, entry) {
+  if (entry.buffer.length > MAX_SEGMENT_BYTES) return;
+  const old = chunkCache.get(url);
+  if (old) { cacheBytes -= old.buffer.length; chunkCache.delete(url); }
+  while (chunkCache.size >= MAX_CACHE_CHUNKS || cacheBytes + entry.buffer.length > MAX_CACHE_BYTES) {
+    const first = chunkCache.keys().next().value;
+    if (!first) break;
+    cacheBytes -= chunkCache.get(first).buffer.length;
+    chunkCache.delete(first);
+  }
+  chunkCache.set(url, entry);
+  cacheBytes += entry.buffer.length;
+}
 
 // In-memory lookahead pipeline
 const segmentGraph = new Map(); // currentSegUrl -> { next: nextSegUrl, referer }
@@ -24,6 +47,29 @@ const inFlightPrefetches = new Set();
 let cacheHits = 0;
 let cacheMisses = 0;
 const serverStartTime = Date.now();
+const resolverCache = new Map();
+const playlistCache = new Map();
+let playlistBytes = 0;
+function storePlaylist(key, text) {
+  // Only immutable VOD media and master playlists. Live media must refresh.
+  if (!text.includes('#EXT-X-ENDLIST') && !text.includes('#EXT-X-STREAM-INF:')) return;
+  const bytes = Buffer.byteLength(text);
+  if (bytes > 1024 * 1024) return;
+  const old = playlistCache.get(key);
+  if (old) { playlistBytes -= old.bytes; playlistCache.delete(key); }
+  while (playlistCache.size >= 64 || playlistBytes + bytes > 8 * 1024 * 1024) {
+    const first = playlistCache.keys().next().value;
+    if (!first) break;
+    playlistBytes -= playlistCache.get(first).bytes;
+    playlistCache.delete(first);
+  }
+  playlistCache.set(key, { text, bytes, expires: Date.now() + 45_000 });
+  playlistBytes += bytes;
+}
+function cacheResolution(key, result) {
+  if (resolverCache.size >= 100) resolverCache.delete(resolverCache.keys().next().value);
+  resolverCache.set(key, { result, expires: Date.now() + 90_000 });
+}
 
 let resolveVidfastDirectStream = null;
 try {
@@ -142,13 +188,11 @@ function rewritePlaylist(text, baseUrl, relayBase, referer) {
     .join('\n');
 
   // Build lookahead graph for prefetching sequential media segments
-  if (segmentUrls.length > 1) {
+  if (segmentUrls.length > 0 && !text.includes('#EXT-X-STREAM-INF')) {
     for (let i = 0; i < segmentUrls.length; i++) {
       const cur = segmentUrls[i];
       const next = segmentUrls[i + 1] || null;
-      if (next) {
-        segmentGraph.set(cur, { next, referer });
-      }
+      segmentGraph.set(cur, { next, referer, playlist: baseUrl, index: i });
     }
   }
 
@@ -157,15 +201,44 @@ function rewritePlaylist(text, baseUrl, relayBase, referer) {
 
 const inFlightPromises = new Map();
 
-function triggerPrefetch(currentUrl) {
-  const node = segmentGraph.get(currentUrl);
-  if (!node || !node.next) return;
-  const nextUrl = node.next;
-  if (chunkCache.has(nextUrl) || inFlightPromises.has(nextUrl)) return;
+function triggerPrefetch(currentUrl, prioritize = false) {
+  const current = segmentGraph.get(currentUrl);
+  if (!current) return;
+  const window = new Set([currentUrl]);
+  const nextSegments = [];
+  for (let distance = 0; distance < LOOKAHEAD_SEGMENTS; distance++) {
+    const node = segmentGraph.get(currentUrl);
+    if (!node?.next) break;
+    window.add(node.next);
+    nextSegments.push({ url: node.next, referer: node.referer });
+    currentUrl = node.next;
+  }
 
+  if (prioritize) {
+    // Reclaim speculative work behind a seek or an ABR change. Never cancel
+    // a shared download that is currently feeding any viewer.
+    for (const [url, pending] of inFlightPromises) {
+      const node = segmentGraph.get(url);
+      if (node?.playlist !== current.playlist || window.has(url) || pending.consumers > 0) continue;
+      pending.controller.abort();
+      inFlightPromises.delete(url);
+      inFlightPrefetches.delete(url);
+      cancelledPrefetches++;
+    }
+  }
+  for (const segment of nextSegments) prefetchSegment(segment.url, segment.referer);
+}
+
+function prefetchSegment(nextUrl, requestedReferer) {
+  if (chunkCache.has(nextUrl) || inFlightPromises.has(nextUrl)) return;
+  if (inFlightPromises.size >= MAX_PREFETCHES) return;
+  inFlightPrefetches.add(nextUrl);
+
+  const pending = { chunks: [], done: false, error: null, headers: null, status: 200, waiters: new Set(), controller: new AbortController(), consumers: 0 };
+  const wake = () => { for (const resolve of pending.waiters) resolve(); pending.waiters.clear(); };
   const promise = (async () => {
     try {
-      const { referer, origin } = refererFor(node.referer);
+      const { referer, origin } = refererFor(requestedReferer);
       const isHakuna = nextUrl.toLowerCase().includes('hakunaymatata');
       const headers = isHakuna
         ? { 'User-Agent': 'ExoPlayer/1.5.1 (Linux; Android TV)' }
@@ -175,11 +248,19 @@ function triggerPrefetch(currentUrl) {
             'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
           };
-      const upstream = await fetch(nextUrl, { headers, redirect: 'follow' });
+      const upstream = await fetch(nextUrl, { headers, redirect: 'follow', signal: AbortSignal.any([pending.controller.signal, AbortSignal.timeout(30000)]) });
       if (upstream.ok || upstream.status === 206) {
+        // Oversized segments use the normal streaming path without speculative
+        // accumulation, so the size limit never truncates a known large body.
+        const length = Number(upstream.headers.get('content-length'));
+        if (length > MAX_SEGMENT_BYTES) {
+          await upstream.body?.cancel();
+          return null;
+        }
         const contentType = upstream.headers.get('content-type') || '';
         const parsedPath = new URL(nextUrl).pathname.toLowerCase();
         const isDisguisedTs =
+          segmentGraph.has(nextUrl) ||
           contentType.startsWith('image/') ||
           parsedPath.endsWith('.jpg') ||
           parsedPath.endsWith('.png') ||
@@ -192,23 +273,34 @@ function triggerPrefetch(currentUrl) {
           'X-Relay-Preloaded': 'true',
         };
 
-        const buf = Buffer.from(await upstream.arrayBuffer());
-        if (chunkCache.size >= MAX_CACHE_CHUNKS) {
-          const firstKey = chunkCache.keys().next().value;
-          if (firstKey) chunkCache.delete(firstKey);
+        pending.headers = passHeaders;
+        pending.status = upstream.status;
+        wake();
+        let bytes = 0;
+        for await (const chunk of upstream.body) {
+          bytes += chunk.length;
+          if (bytes > MAX_SEGMENT_BYTES) throw new Error('Prefetch segment exceeds memory limit');
+          pending.chunks.push(Buffer.from(chunk));
+          wake();
         }
-        const entry = { status: upstream.status, headers: passHeaders, buffer: buf };
-        chunkCache.set(nextUrl, entry);
+        const entry = { status: upstream.status, headers: passHeaders, buffer: Buffer.concat(pending.chunks) };
+        storeChunk(nextUrl, entry);
         return entry;
       }
-    } catch {}
+    } catch (error) { pending.error = error; }
     finally {
-      inFlightPromises.delete(nextUrl);
+      pending.done = true;
+      wake();
+      if (inFlightPromises.get(nextUrl) === pending) {
+        inFlightPromises.delete(nextUrl);
+        inFlightPrefetches.delete(nextUrl);
+      }
     }
     return null;
   })();
 
-  inFlightPromises.set(nextUrl, promise);
+  pending.promise = promise;
+  inFlightPromises.set(nextUrl, pending);
 }
 
 const server = http.createServer(async (req, res) => {
@@ -238,11 +330,15 @@ const server = http.createServer(async (req, res) => {
       uptimeSeconds: Math.floor((Date.now() - serverStartTime) / 1000),
       cache: {
         activeChunks: chunkCache.size,
+        bytes: cacheBytes,
+        maxBytes: MAX_CACHE_BYTES,
         cacheHits,
         cacheMisses,
         ratio: (cacheHits + cacheMisses) > 0 ? (cacheHits / (cacheHits + cacheMisses)).toFixed(2) : '0.00',
       },
       prefetchesInFlight: inFlightPrefetches.size,
+      cancelledPrefetches,
+      lookaheadSegments: LOOKAHEAD_SEGMENTS,
     }));
     return;
   }
@@ -255,10 +351,37 @@ const server = http.createServer(async (req, res) => {
     const season = Number(reqUrl.searchParams.get('season') || 1);
     const episode = Number(reqUrl.searchParams.get('episode') || 1);
     const serverId = reqUrl.searchParams.get('server') || 'lisbon';
+    const resolutionKey = JSON.stringify([type, tmdbId, season, episode, serverId]);
+    const cachedResolution = resolverCache.get(resolutionKey);
+    if (cachedResolution && cachedResolution.expires > Date.now()) {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(cachedResolution.result));
+      return;
+    }
 
     if (resolveVidfastDirectStream && tmdbId) {
       try {
         const vidfastRes = await resolveVidfastDirectStream({ type, tmdbId, season, episode, serverId });
+        // Apply the same Lisbon quality floor as the local Next.js resolver.
+        // The residential bridge must not return the low-resolution Cobra source
+        // before the existing 1080p upgrade has been considered.
+        const lowResolution = vidfastRes.hit && !vidfastRes.hit.is4K &&
+          ['bravo', 'cobra', 'horizon'].includes(vidfastRes.hit.serverName.toLowerCase());
+        if (serverId === 'lisbon' && (!vidfastRes.hit || lowResolution)) {
+          const upgrade = await resolveVidlinkStream({ type, tmdbId, season, episode, serverName: 'Lisbon' });
+          if (upgrade?.url) {
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+            const result = {
+              ok: true,
+              referer: upgrade.referer,
+              captions: upgrade.captions,
+              servers: [{ ...upgrade, name: 'Lisbon', ms: Date.now() - started }],
+            };
+            cacheResolution(resolutionKey, result);
+            res.end(JSON.stringify(result));
+            return;
+          }
+        }
         if (vidfastRes.hit?.url) {
           const result = {
             ok: true,
@@ -274,7 +397,8 @@ const server = http.createServer(async (req, res) => {
               ms: Date.now() - started,
             }]
           };
-          res.writeHead(200, { 'Content-Type': 'application/json' });
+          cacheResolution(resolutionKey, result);
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
           res.end(JSON.stringify(result));
           return;
         }
@@ -315,10 +439,36 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Check in-memory chunk cache or await in-flight prefetch for instant RAM delivery
-  let cachedChunk = chunkCache.get(target.href);
-  if (!cachedChunk && inFlightPromises.has(target.href)) {
-    cachedChunk = await inFlightPromises.get(target.href);
+  const range = req.headers['range'];
+  const cachedChunk = !range && chunkCache.get(target.href);
+  const pending = !range && req.method !== 'HEAD' && inFlightPromises.get(target.href);
+  if (!range && req.method !== 'HEAD' && (cachedChunk || pending)) triggerPrefetch(target.href, true);
+  if (!cachedChunk && pending) {
+    // Share the ongoing download and send bytes as they arrive.
+    pending.consumers++;
+    try {
+      while (!pending.headers && !pending.done) {
+        await new Promise((resolve) => pending.waiters.add(resolve));
+      }
+      if (pending.headers && !pending.error) {
+        cacheHits++;
+        res.writeHead(pending.status, { ...pending.headers, 'X-Relay-Cache': 'PREFETCH' });
+        const chunks = async function* () {
+          let index = 0;
+          while (true) {
+            while (index < pending.chunks.length) yield pending.chunks[index++];
+            if (pending.error) throw pending.error;
+            if (pending.done) break;
+            await new Promise((resolve) => pending.waiters.add(resolve));
+          }
+        };
+        try { await pipeline(Readable.from(chunks()), res); } catch { res.destroy(); }
+        if (res.writableFinished) triggerPrefetch(target.href);
+        return;
+      }
+    } finally {
+      pending.consumers--;
+    }
   }
 
   if (cachedChunk) {
@@ -333,7 +483,17 @@ const server = http.createServer(async (req, res) => {
 
   const isHakuna = target.hostname.toLowerCase().includes('hakunaymatata');
   const { referer, origin } = refererFor(reqUrl.searchParams.get('referer'));
-  const range = req.headers['range'];
+  const playlistKey = JSON.stringify([target.href, referer]);
+  const preparedPlaylist = !range && req.method !== 'HEAD' && playlistCache.get(playlistKey);
+  if (preparedPlaylist && preparedPlaylist.expires > Date.now()) {
+    // Rewrite for this request's host so local and tunnel URLs never mix.
+    const host = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${PORT}`;
+    const local = host.includes('localhost') || host.includes('127.0.0.1');
+    const proto = req.headers['x-forwarded-proto'] || (local ? 'http' : 'https');
+    res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Relay-Playlist-Cache': 'HIT' });
+    res.end(rewritePlaylist(preparedPlaylist.text, target.href, `${proto}://${host}`, referer));
+    return;
+  }
 
   const upstreamHeaders = isHakuna
     ? {
@@ -352,6 +512,7 @@ const server = http.createServer(async (req, res) => {
     const upstream = await fetch(target.href, {
       headers: upstreamHeaders,
       redirect: 'follow',
+      method: req.method === 'HEAD' ? 'HEAD' : 'GET',
     });
 
     if (!upstream.ok && upstream.status !== 206) {
@@ -384,9 +545,11 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const rewritten = rewritePlaylist(text, target.href, relayBase, referer);
+      storePlaylist(playlistKey, text);
       res.writeHead(200, {
         'Content-Type': 'application/vnd.apple.mpegurl; charset=utf-8',
         'Cache-Control': 'no-cache',
+        'X-Relay-Playlist-Cache': 'MISS',
       });
       res.end(rewritten);
       return;
@@ -406,6 +569,7 @@ const server = http.createServer(async (req, res) => {
 
     // 3. Video media segments & MP4 streams
     const isDisguisedTs =
+      segmentGraph.has(target.href) ||
       contentType.startsWith('image/') ||
       path.endsWith('.jpg') ||
       path.endsWith('.png') ||
@@ -418,7 +582,11 @@ const server = http.createServer(async (req, res) => {
       'X-Relay-Cache': 'MISS',
     };
     if (upstream.headers.get('content-range')) passHeaders['Content-Range'] = upstream.headers.get('content-range');
-    if (upstream.headers.get('content-length')) passHeaders['Content-Length'] = upstream.headers.get('content-length');
+    // fetch decompresses bodies; the upstream length describes the compressed
+    // representation and would truncate decoded data through the HTTPS tunnel.
+    if (!upstream.headers.get('content-encoding') && upstream.headers.get('content-length')) {
+      passHeaders['Content-Length'] = upstream.headers.get('content-length');
+    }
 
     res.writeHead(upstream.status, passHeaders);
 
@@ -429,34 +597,41 @@ const server = http.createServer(async (req, res) => {
     }
 
     let aborted = false;
-    req.on('close', () => {
+    res.on('close', () => {
+      if (res.writableFinished) return;
       aborted = true;
       try { reader.cancel(); } catch {}
     });
 
     const collectedChunks = [];
+    let collectedBytes = 0;
+    let cacheable = !range && req.method !== 'HEAD' && segmentGraph.has(target.href);
+    // The requested download gets its connection and headers first. Overlap
+    // lookahead with its body transfer instead of waiting for completion.
+    if (cacheable) triggerPrefetch(target.href, true);
 
     try {
       while (!aborted) {
         const { done, value } = await reader.read();
         if (done || aborted) break;
         if (!res.writableEnded && !res.destroyed) {
-          res.write(value);
+          if (!res.write(value)) await once(res, 'drain', { signal: AbortSignal.timeout(30000) });
         }
-        collectedChunks.push(value);
+        // Range responses and whole MP4 movies must not enter the segment cache.
+        if (cacheable) {
+          collectedBytes += value.length;
+          if (collectedBytes <= MAX_SEGMENT_BYTES) collectedChunks.push(value);
+          else { cacheable = false; collectedChunks.length = 0; }
+        }
       }
       if (!aborted && !res.writableEnded) {
         res.end();
       }
 
       // If segment completed without abort, save to cache and trigger prefetch for next
-      if (!aborted && collectedChunks.length > 0) {
+      if (!aborted && cacheable && collectedChunks.length > 0) {
         const fullBuf = Buffer.concat(collectedChunks);
-        if (chunkCache.size >= MAX_CACHE_CHUNKS) {
-          const firstKey = chunkCache.keys().next().value;
-          if (firstKey) chunkCache.delete(firstKey);
-        }
-        chunkCache.set(target.href, { status: upstream.status, headers: passHeaders, buffer: fullBuf });
+        storeChunk(target.href, { status: upstream.status, headers: passHeaders, buffer: fullBuf });
         triggerPrefetch(target.href);
       }
     } catch {
