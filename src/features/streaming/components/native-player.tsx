@@ -641,14 +641,14 @@ export function NativePlayer({
         renderTextTracksNatively: false,
         enableWebVTT: true,
         startFragPrefetch: true,
-        progressive: false,
+        progressive: true,
         // High-throughput bandwidth & buffer optimization:
-        abrEwmaDefaultEstimate: 35_000_000,
-        abrBandWidthFactor: 0.95,
-        abrBandWidthUpFactor: 0.90,
-        maxBufferLength: 180,
-        maxMaxBufferLength: 360,
-        maxBufferSize: 600 * 1000 * 1000,
+        abrEwmaDefaultEstimate: 10_000_000,
+        abrBandWidthFactor: 0.8,
+        abrBandWidthUpFactor: 0.7,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 120,
+        maxBufferSize: 120 * 1000 * 1000,
         maxBufferHole: 0.5,
         highBufferWatchdogPeriod: 1,
         nudgeOffset: 0.1,
@@ -662,7 +662,7 @@ export function NativePlayer({
         levelLoadingTimeOut: 15000,
         levelLoadingMaxRetry: 5,
         lowLatencyMode: false,
-        backBufferLength: 90,
+        backBufferLength: 30,
         testBandwidth: true,
       });
       hlsRef.current = hls;
@@ -748,62 +748,16 @@ export function NativePlayer({
           }
         }
 
-        const fourKIdx = hls.levels.findIndex(
-          (lvl) => lvl && (lvl.height >= 1600 || (lvl.width ?? 0) >= 3200 || checkIs4KSource(lvl, activeSrc)),
-        );
-        if (fourKIdx >= 0 && (selectedQualityTierRef.current === "4k" || fourKSrc || is4KHint)) {
-          // Fast-start: load the initial fragment at 1080p so video begins in < 500ms,
-          // then immediately lock fourKIdx so the user receives full 4K UHD without initial buffering delay!
-          let fastStartIdx = hls.levels.findIndex((lvl) => lvl && (lvl.height === 1080 || (lvl.height >= 900 && lvl.height <= 1200)));
-          if (fastStartIdx < 0) fastStartIdx = fourKIdx;
-          hls.startLevel = fastStartIdx;
-          hls.nextLevel = fourKIdx;
-          setLevel(fourKIdx);
-          setSelectedQualityTier("4k");
-          const initialLvl = hls.levels[fourKIdx] || null;
-          if (initialLvl) {
-            setPlayingHeight(initialLvl.height || 0);
-            setPlayingWidth(initialLvl.width || 0);
-          }
-          const onFirstFrag = () => {
-            hls.off(Hls.Events.FRAG_BUFFERED, onFirstFrag);
-            hls.currentLevel = fourKIdx;
-          };
-          hls.on(Hls.Events.FRAG_BUFFERED, onFirstFrag);
-        } else {
-          // Select optimal start level (1080p or 720p) for instant, stutter-free startup
-          let startIdx = -1;
-          for (let i = 0; i < hls.levels.length; i++) {
-            const lvl = hls.levels[i];
-            if (lvl && (lvl.height === 1080 || (lvl.height >= 900 && lvl.height <= 1200))) {
-              startIdx = i;
-              break;
-            }
-          }
-          if (startIdx < 0) {
-            for (let i = 0; i < hls.levels.length; i++) {
-              const lvl = hls.levels[i];
-              if (lvl && (lvl.height === 720 || (lvl.height >= 600 && lvl.height < 900))) {
-                startIdx = i;
-                break;
-              }
-            }
-          }
-          if (startIdx >= 0) {
-            hls.startLevel = startIdx;
-          }
-
-          // Enable Auto Adaptive Bitrate so Hls.js adapts smoothly to network speed without stalls/freezes
-          hls.currentLevel = -1;
-          setLevel(-1);
-          setSelectedQualityTier("auto");
-
-          const initialLvl = (startIdx >= 0 ? hls.levels[startIdx] : null) || hls.levels[0] || null;
-          if (initialLvl) {
-            setPlayingHeight(initialLvl.height || 0);
-            setPlayingWidth(initialLvl.width || 0);
-          }
-        }
+        // Use a smaller HD fragment for the first frame, then let measured
+        // delivery speed choose up to 4K without a buffer-flushing restart.
+        // Changing currentLevel here flushes the buffer and interrupts playback.
+        let startIdx = hls.levels.findIndex((lvl) => lvl.height >= 600 && lvl.height < 900);
+        if (startIdx < 0) startIdx = hls.levels.findIndex((lvl) => lvl.height >= 900 && lvl.height <= 1200);
+        if (startIdx >= 0) hls.startLevel = startIdx;
+        hls.loadLevel = -1;
+        selectedQualityTierRef.current = "auto";
+        setSelectedQualityTier("auto");
+        setLevel(-1);
         startPlayback();
       });
       hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_event, data) => {
@@ -821,24 +775,15 @@ export function NativePlayer({
         }
       });
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
-        if (!video.paused) {
+        if (!video.paused && video.readyState >= 3) {
           setBuffering(false);
         }
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
-          // If the user manually locked a quality tier (e.g. 4K or 1080p),
-          // DO NOT reset currentLevel to -1 (Auto ABR)! Keep the level locked and simply buffer the next chunk.
-          if (selectedQualityTierRef.current === "auto") {
-            if (hls.currentLevel !== -1) {
-              hls.currentLevel = -1;
-            }
-          }
-          setBuffering(true);
-          hls.startLoad();
-          if (video && video.paused) {
-            video.play().catch(() => { });
-          }
+          // HLS.js is still loading and handles gap recovery itself. Restarting
+          // on a non-fatal stall cancels useful downloads and delays recovery.
+          setBuffering(!video.paused && video.readyState < 3);
           return;
         }
         if (!data.fatal) return;
@@ -846,7 +791,7 @@ export function NativePlayer({
         console.warn("[NativePlayer] Hls fatal error:", data.type, data.details, "attempt:", fatalErrorsRef.current);
         if (fatalErrorsRef.current <= 2) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            hls.startLoad();
+            hls.startLoad(video.currentTime, true);
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             hls.recoverMediaError();
           }
@@ -939,6 +884,17 @@ export function NativePlayer({
   React.useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    delete video.dataset.firstFrameAt;
+    if (typeof video.requestVideoFrameCallback !== "function") return;
+    const callback = video.requestVideoFrameCallback(() => {
+      video.dataset.firstFrameAt = String(Date.now());
+    });
+    return () => video.cancelVideoFrameCallback(callback);
+  }, [activeSrc]);
+
+  React.useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
     const onDimensions = () => {
       if (video.videoHeight > 0) {
         setPlayingHeight(video.videoHeight);
@@ -955,16 +911,21 @@ export function NativePlayer({
         setBuffering(false);
       }
       setCurrent(video.currentTime);
-      setDuration(video.duration || 0);
+      if (Number.isFinite(video.duration) && video.duration > 0) setDuration(video.duration);
       setPaused(video.paused);
       setCueText(cuesAtTime(cuesRef.current, video.currentTime - subOffset));
-      onProgressRef.current?.(video.currentTime, video.duration || 0);
+      if (Number.isFinite(video.duration) && video.duration > 0) {
+        onProgressRef.current?.(video.currentTime, video.duration);
+      }
       if (video.videoHeight > 0) {
         setPlayingHeight(video.videoHeight);
       }
       if (video.videoWidth > 0) {
         setPlayingWidth(video.videoWidth);
       }
+    };
+    const onDuration = () => {
+      if (Number.isFinite(video.duration) && video.duration > 0) setDuration(video.duration);
     };
     const onWait = () => {
       if (!video.paused && video.readyState < 3) {
@@ -1007,6 +968,8 @@ export function NativePlayer({
       setStreamError(`Stream unavailable on ${serverNameRef.current || "this server"}. Please try another server.`);
     };
 
+    video.addEventListener("durationchange", onDuration);
+    video.addEventListener("loadedmetadata", onDuration);
     video.addEventListener("timeupdate", onTime);
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
@@ -1022,6 +985,8 @@ export function NativePlayer({
     return () => {
       video.removeEventListener("loadedmetadata", onDimensions);
       video.removeEventListener("resize", onDimensions);
+      video.removeEventListener("durationchange", onDuration);
+      video.removeEventListener("loadedmetadata", onDuration);
       video.removeEventListener("timeupdate", onTime);
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
@@ -1211,21 +1176,11 @@ export function NativePlayer({
       }
     }
 
-    if (!isBuffered && hls && selectedQualityTierRef.current === "4k") {
-      // Fast seek optimization: temporarily unlock ABR so the initial target keyframe
-      // downloads in ~1 second instead of waiting 14 seconds for a massive 4K chunk.
-      // Once the target chunk is buffered, Hls immediately transitions back to 4K UHD!
-      const fourKIdx = hls.levels.findIndex(
-        (lvl) => lvl && (lvl.height >= 1600 || (lvl.width ?? 0) >= 3200 || checkIs4KSource(lvl, activeSrc)),
-      );
-      if (fourKIdx >= 0) {
-        hls.nextLevel = -1;
-        const onFragBuffered = () => {
-          hls.off(Hls.Events.FRAG_BUFFERED, onFragBuffered);
-          hls.currentLevel = fourKIdx;
-        };
-        hls.on(Hls.Events.FRAG_BUFFERED, onFragBuffered);
-      }
+    if (!isBuffered && hls && hls.autoLevelEnabled) {
+      // A fresh position has no safety buffer. Start no higher than HD for
+      // one fragment, then resume adaptation without flushing the new data.
+      const hdIndex = hls.levels.findIndex((lvl) => lvl.height >= 900 && lvl.height <= 1200);
+      if (hdIndex >= 0) hls.nextAutoLevel = Math.min(hls.nextAutoLevel, hdIndex);
     }
 
     video.currentTime = target;
@@ -1276,7 +1231,7 @@ export function NativePlayer({
   const applyLevel = (index: number) => {
     const hls = hlsRef.current;
     if (!hls) return;
-    hls.currentLevel = index;
+    hls.loadLevel = index;
     setLevel(index);
     if (index >= 0) {
       const lvl = hls.levels[index];
@@ -1285,8 +1240,6 @@ export function NativePlayer({
         setPlayingWidth(lvl.width || 0);
       }
     }
-    setBuffering(true);
-    hls.startLoad();
     setPanel("none");
   };
 
@@ -1297,7 +1250,7 @@ export function NativePlayer({
     const video = videoRef.current;
 
     if (tier === "auto") {
-      if (hls) hls.currentLevel = -1;
+      if (hls) hls.loadLevel = -1;
       setLevel(-1);
       setPanel("none");
       return;

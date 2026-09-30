@@ -14,6 +14,7 @@ const currentUrlFile = path.join(process.cwd(), 'relay', 'CURRENT_TUNNEL_URL.txt
 let lastRegisteredUrl = '';
 
 async function registerWithWorker(tunnelUrl) {
+  let registered = true;
   for (const url of WORKER_URLS) {
     try {
       const res = await fetch(`${url}/set-target`, {
@@ -26,12 +27,16 @@ async function registerWithWorker(tunnelUrl) {
         signal: AbortSignal.timeout(5000),
       });
       const data = await res.json();
+      if (!res.ok || data.status !== 'ok' || data.target !== tunnelUrl) {
+        throw new Error(`Target registration failed: HTTP ${res.status}`);
+      }
       console.warn(`[Sync] Registered with Cloudflare Worker (${url}):`, data.status === 'ok' ? 'SUCCESS' : data);
     } catch (err) {
+      registered = false;
       console.warn(`[Sync] Could not reach Cloudflare Worker (${url}):`, err.message);
     }
   }
-  return true;
+  return registered;
 }
 
 async function sendHeartbeat() {
@@ -66,7 +71,6 @@ async function checkAndSync() {
   if (!tunnelUrl) return false;
 
   if (tunnelUrl !== lastRegisteredUrl) {
-    lastRegisteredUrl = tunnelUrl;
     fs.writeFileSync(currentUrlFile, tunnelUrl, 'utf8');
     console.warn(`[Sync] Active Cloudflare Quick Tunnel: ${tunnelUrl}`);
 
@@ -84,8 +88,11 @@ async function checkAndSync() {
     }
 
     // Register active tunnel target with Cloudflare Workers
-    await registerWithWorker(tunnelUrl);
-    return true;
+    if (await registerWithWorker(tunnelUrl)) {
+      lastRegisteredUrl = tunnelUrl;
+      return true;
+    }
+    return false;
   }
   return true;
 }

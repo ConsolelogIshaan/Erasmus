@@ -74,10 +74,18 @@ export function isRelayUrl(url: string): boolean {
  * Mirrors the original inline `relayUrl()` helper exactly, including its
  * already-relayed short-circuit.
  */
-export function buildRelayUrl(url: string, referer?: string): string {
-  if (isRelayUrl(url)) return url;
+export function buildRelayUrl(url: string, referer?: string, cloudOnly = false): string {
+  if (isRelayUrl(url)) {
+    if (!cloudOnly) return url;
+    const parsed = new URL(url, CLOUDFLARE_HLS_RELAY);
+    const upstream = parsed.searchParams.get("url");
+    if (upstream) return buildRelayUrl(upstream, referer || parsed.searchParams.get("referer") || undefined, true);
+    parsed.searchParams.set("mode", "cloud");
+    return parsed.href;
+  }
   const currentBase = resolveRelayBase();
   const query = new URLSearchParams({ url });
   if (referer) query.set("referer", referer);
+  if (cloudOnly) query.set("mode", "cloud");
   return `${currentBase}?${query.toString()}`;
 }

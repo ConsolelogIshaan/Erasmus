@@ -159,7 +159,7 @@ export async function resolveAniListId(title: string): Promise<number | null> {
       signal: AbortSignal.timeout(6000),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) throw new Error("AniList lookup unavailable");
     const json = (await res.json()) as { data?: { Media?: { id?: number } } };
     const id = json?.data?.Media?.id;
     if (typeof id === "number") {
@@ -169,6 +169,22 @@ export async function resolveAniListId(title: string): Promise<number | null> {
   } catch {
     // ignore lookup error
   }
+  // The existing Animex gateway can identify titles when AniList rejects edge IPs.
+  // Accept only an unambiguous exact title; a TMDB lookup can select the wrong season.
+  try {
+    const searchQuery = `query ($title: String!) { searchAnime(query: $title, limit: 20) { items { anilistId titles } } }`;
+    const target = `https://graphql.animex.one/graphql?${new URLSearchParams({ query: searchQuery, variables: JSON.stringify({ title }) })}`;
+    const gateway = `${WORMHOLE_BASE}/?${new URLSearchParams({ url: target, headers: JSON.stringify({ "x-api-key": WORMHOLE_KEY, Accept: "application/json" }) })}`;
+    const response = await fetch(gateway, { signal: AbortSignal.timeout(6000) });
+    if (!response.ok) return null;
+    const data = await response.json() as { data?: { searchAnime?: { items?: { anilistId?: number; titles?: Record<string, string> }[] } } };
+    const matches = (data.data?.searchAnime?.items || []).filter((item) =>
+      [item.titles?.en, item.titles?.["x-jat"]].some((candidate) => candidate?.trim().toLowerCase() === cleanTitle));
+    if (matches.length === 1 && typeof matches[0]?.anilistId === "number") {
+      anilistIdCache.set(cleanTitle, matches[0].anilistId);
+      return matches[0].anilistId;
+    }
+  } catch { /* Keep the selected server unavailable rather than guessing another title. */ }
   return null;
 }
 
@@ -386,6 +402,7 @@ export async function resolveBingrStream(input: {
   year?: string;
   imdbId?: string;
   anilistId?: number;
+  strictServer?: boolean;
 }): Promise<ResolvedBingrHit | null> {
   if (Date.now() < bingrCooldownUntil) {
     return null;
@@ -423,7 +440,8 @@ export async function resolveBingrStream(input: {
     }
   }
   // Cascade through target server and healthy fallbacks
-  const activeCandidates = candidateKeys.slice(0, 3);
+  if (input.strictServer && (targetServerId === "animesalt" || targetServerId === "ryuu")) return null;
+  const activeCandidates = input.strictServer ? candidateKeys.slice(0, 1) : candidateKeys.slice(0, 3);
 
   for (const srvKey of activeCandidates) {
     // Handle anime clusters in cascade

@@ -260,6 +260,14 @@ export const TOTAL_STREAMING_SERVERS: StreamServer[] = [
   ...ALL_STREAMING_SERVERS,
   ...CINEJOY_STREAMING_SERVERS,
   ...BINGR_EMBED_SERVERS,
+  {
+    id: "vidcore",
+    name: "VidCore",
+    flag: "🌐",
+    country: "GL",
+    badge: "Up to 4K",
+    description: "Direct adaptive playback with Cloudflare media delivery",
+  },
 ];
 
 export function isCinejoyServer(serverId: string): boolean {
@@ -375,6 +383,15 @@ export function buildStreamUrl(
   params: StreamItemParams,
 ): string {
   switch (serverId) {
+    // Direct resolver endpoint, never the provider's ad-bearing player page.
+    case "vidcore": {
+      const query = new URLSearchParams({ server: "vidcore", type: params.type, id: params.tmdbId });
+      if (params.type === "tv") {
+        query.set("season", String(params.season ?? 1));
+        query.set("episode", String(params.episode ?? 1));
+      }
+      return `/api/stream/direct?${query}`;
+    }
     // Embed fallback players
     case "filmu":
       return filmuUrl(params);

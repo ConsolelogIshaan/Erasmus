@@ -6,8 +6,8 @@
  * 1. Client plays video -> requests stream from Cloudflare Worker.
  * 2. If user's residential PC tunnel is active (via Cloudflare Quick Tunnel),
  *    Worker transparently proxies request through the tunnel to user's PC.
- *    User's PC fetches video segments from VidFast over Reliance Jio residential IP (never blocked).
- *    Result: 0 bytes on Vercel, $0 cost, unlimited 4K bandwidth.
+ *    The PC fetches upstream media using its residential connection.
+ *    Playback depends on PC availability, upload speed, and upstream access.
  * 3. If user's PC is offline:
  *    Direct edge fetch handles open CDNs (Aphelion, Bastion, Vidlink).
  *    ZERO Vercel dependency — Vercel is completely eliminated.
@@ -15,18 +15,19 @@
  */
 
 const SYNC_SECRET = "erasmus_relay_tunnel_key_9247f1";
-const HEARTBEAT_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes for rock-solid tunnel stability without KV replication jitter
 const DEFAULT_REFERER = "https://cinejoy.to/";
 
 // In-memory cache for ultra-fast (0ms) routing without KV read latency on every chunk
 let cachedTarget = null;
 let cachedPing = 0;
+let targetCheckedAt = 0;
+const TARGET_CACHE_MS = 30_000;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
   "Access-Control-Allow-Headers": "*",
-  "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges",
+  "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges, X-Relay-Cache, X-Relay-Preloaded, X-Relay-Route",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -68,9 +69,10 @@ function refererFor(requested) {
   return { referer: DEFAULT_REFERER, origin: "https://cinejoy.to" };
 }
 
-function proxied(relayBase, absolute, referer) {
+function proxied(relayBase, absolute, referer, cloudOnly = false) {
   const query = new URLSearchParams({ url: absolute });
   if (referer) query.set("referer", referer);
+  if (cloudOnly) query.set("mode", "cloud");
   return `${relayBase}?${query.toString()}`;
 }
 
@@ -142,8 +144,8 @@ function healTopDomain(urlStr) {
   );
 }
 
-function rewritePlaylist(text, baseUrl, relayBase, referer) {
-  const healedText = healTopDomain(text);
+function rewritePlaylist(text, baseUrl, relayBase, referer, cloudOnly = false) {
+  const healedText = cloudOnly ? text : healTopDomain(text);
   const enriched = enrichAudioTracks(healedText);
   return enriched
     .split("\n")
@@ -153,27 +155,26 @@ function rewritePlaylist(text, baseUrl, relayBase, referer) {
       if (trimmed.startsWith("#")) {
         return trimmed.replace(/URI="([^"]+)"/gi, (_, uri) => {
           const absolute = new URL(uri, baseUrl).href;
-          const healedAbsolute = healTopDomain(absolute);
-          return `URI="${proxied(relayBase, healedAbsolute, referer)}"`;
+          const healedAbsolute = cloudOnly ? absolute : healTopDomain(absolute);
+          return `URI="${proxied(relayBase, healedAbsolute, referer, cloudOnly)}"`;
         });
       }
       const absolute = new URL(trimmed, baseUrl).href;
-      const healedAbsolute = healTopDomain(absolute);
-      return proxied(relayBase, healedAbsolute, referer);
+      const healedAbsolute = cloudOnly ? absolute : healTopDomain(absolute);
+      return proxied(relayBase, healedAbsolute, referer, cloudOnly);
     })
     .join("\n");
 }
 
-const DEFAULT_TUNNEL_URL = "https://nurse-autumn-browser-rpg.trycloudflare.com";
-
 async function getActiveTunnel(env) {
-  if (cachedTarget) return cachedTarget;
+  if (cachedTarget && Date.now() - targetCheckedAt < TARGET_CACHE_MS) return cachedTarget;
 
   if (env && env.RELAY_CONFIG) {
     try {
       const target = await env.RELAY_CONFIG.get("TARGET_URL");
       if (target && (target.startsWith("http://") || target.startsWith("https://"))) {
         cachedTarget = target;
+        targetCheckedAt = Date.now();
         return target;
       }
     } catch (err) {
@@ -181,7 +182,7 @@ async function getActiveTunnel(env) {
     }
   }
 
-  return env?.TUNNEL_URL || DEFAULT_TUNNEL_URL;
+  return env?.TUNNEL_URL || null;
 }
 
 const worker = {
@@ -212,21 +213,22 @@ const worker = {
         target = target.replace(/\/+$/, "");
         const now = Date.now();
 
-        // Update in-memory cache
-        cachedTarget = target;
-        cachedPing = now;
-
-        // Persist to KV
+        // Persist only a changed target. Heartbeats must never consume KV writes.
         if (env && env.RELAY_CONFIG) {
           try {
-            await Promise.all([
-              env.RELAY_CONFIG.put("TARGET_URL", target),
-              env.RELAY_CONFIG.put("LAST_PING", now.toString()),
-            ]);
+            const existing = await env.RELAY_CONFIG.get("TARGET_URL");
+            if (existing !== target) await env.RELAY_CONFIG.put("TARGET_URL", target);
           } catch (kvErr) {
             console.warn("[Worker] KV put error:", kvErr);
+            return jsonResponse({ status: "error", error: "Tunnel target could not be persisted" }, 503);
           }
+        } else {
+          return jsonResponse({ status: "error", error: "Tunnel registry is not configured" }, 503);
         }
+
+        cachedTarget = target;
+        targetCheckedAt = now;
+        cachedPing = now;
 
         return jsonResponse({
           status: "ok",
@@ -254,12 +256,21 @@ const worker = {
     if (pathname === "/status" || pathname === "/health") {
       const now = Date.now();
       const target = await getActiveTunnel(env);
+      let relayHealth = null;
+      if (target) {
+        try {
+          const health = await fetch(`${target}/health`, { signal: AbortSignal.timeout(4000) });
+          const data = await health.json();
+          if (health.ok && data.service === "Erasmus High-Speed Video Relay") relayHealth = data;
+        } catch {}
+      }
 
       return jsonResponse({
         status: "ok",
         service: "Erasmus HLS Dynamic Smart Relay",
         activeTunnel: target || "none",
-        isTunnelAlive: Boolean(target),
+        isTunnelAlive: Boolean(relayHealth),
+        relay: relayHealth,
         secondsSincePing: cachedPing ? Math.round((now - cachedPing) / 1000) : 0,
         vercelFree: true,
       });
@@ -288,6 +299,7 @@ const worker = {
               headers: {
                 "Content-Type": "application/json",
                 ...CORS_HEADERS,
+            "X-Relay-Route": "cloud-edge",
               },
             });
           }
@@ -304,22 +316,26 @@ const worker = {
       return jsonResponse({ error: "missing url query parameter" }, 400);
     }
 
-    const healedRawTarget = healTopDomain(rawTarget);
+    const cloudOnly = requestUrl.searchParams.get("mode") === "cloud";
+    const healedRawTarget = cloudOnly ? rawTarget : healTopDomain(rawTarget);
     const target = isHttpsUrl(healedRawTarget);
     if (!target) {
       return jsonResponse({ error: "invalid target url" }, 400);
     }
+    if (cloudOnly && (target.hostname.endsWith(".trycloudflare.com") || target.hostname === "localhost" || target.hostname === "127.0.0.1" || target.hostname === requestUrl.hostname)) {
+      return jsonResponse({ error: "cloud-only media cannot use a PC tunnel or recursive relay" }, 400);
+    }
 
-    const activeTunnel = await getActiveTunnel(env);
+    const activeTunnel = cloudOnly ? null : await getActiveTunnel(env);
 
     const { referer, origin } = refererFor(requestUrl.searchParams.get("referer"));
     const targetHost = target.hostname.toLowerCase();
     // Referer-locked VidFast streams and residential-restricted Hakuna Matata streams route through residential tunnel when available:
-    const isVidfastStream =
+    const isVidfastStream = !cloudOnly && (
       targetHost.endsWith(".top") ||
       targetHost.includes("vidfast") ||
       targetHost.includes("hakunaymatata") ||
-      Boolean(referer && referer.includes("vidfast"));
+      Boolean(referer && referer.includes("vidfast")));
 
     // Path 1: Forward VidFast streams to local residential PC tunnel (Zero-Vercel mode)
     if (activeTunnel && isVidfastStream) {
@@ -339,19 +355,24 @@ const worker = {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-        const tunnelRes = await fetch(tunnelTargetUrl.toString(), {
+        let tunnelRes;
+        try {
+          tunnelRes = await fetch(tunnelTargetUrl.toString(), {
           method: request.method,
           headers: forwardHeaders,
           redirect: "follow",
           signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
         if (tunnelRes.ok || tunnelRes.status === 206) {
           const resHeaders = new Headers(tunnelRes.headers);
           resHeaders.set("Access-Control-Allow-Origin", "*");
           resHeaders.set("Access-Control-Allow-Headers", "*");
-          resHeaders.set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
+          resHeaders.set("Access-Control-Expose-Headers", CORS_HEADERS["Access-Control-Expose-Headers"]);
+          resHeaders.set("X-Relay-Route", "residential-tunnel");
           const ct = (resHeaders.get("content-type") || "").toLowerCase();
           if (ct.startsWith("image/") || rawTarget.includes(".jpg") || rawTarget.includes(".png") || rawTarget.includes(".ts")) {
             resHeaders.set("Content-Type", "video/mp2t");
@@ -361,9 +382,14 @@ const worker = {
             headers: resHeaders,
           });
         }
+        return jsonResponse({ error: "residential relay rejected upstream media", upstreamStatus: tunnelRes.status }, tunnelRes.status >= 400 ? tunnelRes.status : 502);
       } catch (err) {
         console.warn("[Worker] Tunnel forward attempt failed:", err);
+        return jsonResponse({ error: "residential tunnel unavailable" }, 503);
       }
+    }
+    if (isVidfastStream) {
+      return jsonResponse({ error: "residential tunnel is not configured" }, 503);
     }
 
     // Path 2: Direct edge fetch fallback for open CDNs (Zero Vercel)
@@ -414,13 +440,14 @@ const worker = {
         if (!text.includes("#EXTM3U")) {
           return jsonResponse({ error: "upstream returned invalid non-HLS playlist content" }, 502);
         }
-        const rewritten = rewritePlaylist(text, target.href, relayBase, referer);
+        const rewritten = rewritePlaylist(text, upstream.url || target.href, relayBase, referer, cloudOnly);
         return new Response(rewritten, {
           status: 200,
           headers: {
             "Content-Type": "application/vnd.apple.mpegurl; charset=utf-8",
             "Cache-Control": "no-cache",
             ...CORS_HEADERS,
+            "X-Relay-Route": "cloud-edge",
           },
         });
       }
@@ -435,6 +462,7 @@ const worker = {
             "Content-Type": "text/vtt; charset=utf-8",
             "Cache-Control": "public, max-age=300",
             ...CORS_HEADERS,
+            "X-Relay-Route": "cloud-edge",
           },
         });
       }
@@ -442,7 +470,8 @@ const worker = {
       const resHeaders = new Headers(upstream.headers);
       resHeaders.set("Access-Control-Allow-Origin", "*");
       resHeaders.set("Access-Control-Allow-Headers", "*");
-      resHeaders.set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
+      resHeaders.set("Access-Control-Expose-Headers", CORS_HEADERS["Access-Control-Expose-Headers"]);
+      resHeaders.set("X-Relay-Route", "cloud-edge");
 
       // Normalize disguised video segments:
       // Scrapers & CDNs (Bastion, Bxcnm, Tlnob) disguise MPEG-TS chunks as .jpg/.png images with Content-Type: image/jpeg.

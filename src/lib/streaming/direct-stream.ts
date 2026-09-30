@@ -1,3 +1,5 @@
+import type { VidcoreBrowser } from "./vidcore-cloud";
+import type { VidcoreRelay } from "./vidcore-direct";
 import dns from "node:dns";
 try { dns.setServers(["8.8.8.8", "1.1.1.1", "9.9.9.9"]); } catch {}
 
@@ -12,6 +14,7 @@ import {
   type CinejoyCaption,
 } from "@/lib/streaming/cinejoy-stream";
 import { resolveVidfastDirectStream } from "@/lib/streaming/vidfast-direct";
+import { resolveVidcoreDirectStream } from "@/lib/streaming/vidcore-direct";
 import {
   resolveBingrStream,
   BINGR_SERVERS,
@@ -29,6 +32,7 @@ export interface DirectServer {
   hdUrl?: string;
   fourKUrl?: string;
   isDirectCors?: boolean;
+  cloudOnly?: boolean;
 }
 
 export interface DirectStreamResult {
@@ -104,6 +108,32 @@ export async function extractDirectStream(input: {
   };
 
   try {
+    if (effectiveServerId === "vidcore") {
+      try {
+        const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+        const context = getCloudflareContext();
+        const env = context.env as unknown as { VIDCORE_BROWSER?: VidcoreBrowser; HLS_RELAY?: VidcoreRelay };
+        const browser = env.VIDCORE_BROWSER;
+        if (!browser) throw new Error("VidCore cloud browser binding unavailable");
+        // Next dev probes the public cloud-only relay; deployed Workers use the
+        // service binding to avoid same-zone public Worker fetch restrictions.
+        const hit = await resolveVidcoreDirectStream(input, browser, process.env.NODE_ENV === "development" ? undefined : env.HLS_RELAY);
+        if (!hit) return { ok: false, error: "No playable Cloudflare media source available on VidCore", servers: [] };
+        const result: DirectStreamResult = {
+          ok: true,
+          referer: "https://vidcore.io/",
+          captions: hit.captions,
+          // Already wrapped in the public Cloudflare cloud-only relay. Do not
+          // rewrap into localhost or the residential tunnel during preparation.
+          servers: [{ name: "VidCore", url: hit.url, kind: "hls", is4K: hit.is4K, ms: Date.now() - started }],
+          debug: `VidCore mirror: ${hit.mirror}; discovery: Cloudflare Browser Run; media: Cloudflare cloud-edge`,
+        };
+        extractCache.set(cacheKey, { at: Date.now(), result });
+        return result;
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : "VidCore unavailable", servers: [] };
+      }
+    }
     // 0. If a Cinejoy server is explicitly requested, try Cinejoy cluster first
     if (isCinejoy) {
       try {
@@ -145,6 +175,7 @@ export async function extractDirectStream(input: {
         const bingrHit = await resolveBingrStream({
           ...enriched,
           serverId: effectiveServerId,
+          strictServer: true,
         });
         if (bingrHit?.url) {
           const result: DirectStreamResult = {
@@ -158,6 +189,7 @@ export async function extractDirectStream(input: {
                 kind: bingrHit.kind,
                 is4K: bingrHit.is4K,
                 isDirectCors: bingrHit.isDirectCors,
+                cloudOnly: true,
                 ms: Date.now() - started,
               },
             ],
@@ -168,6 +200,7 @@ export async function extractDirectStream(input: {
       } catch (err) {
         debugLog += `bingr: ${err instanceof Error ? err.message : "failed"}; `;
       }
+      return { ok: false, error: "Selected server is unavailable through Cloudflare", debug: debugLog, servers: [] };
     }
 
     // On Cloudflare Workers (workerd), vidfast.vc blocks worker datacenter IPs with 403 Forbidden.

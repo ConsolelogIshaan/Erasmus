@@ -4,6 +4,8 @@ import * as React from "react";
 import { Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { markPlaybackClick, prepareClientStream } from "@/lib/streaming/client-resolution";
+import { readPreferredServer } from "./servers-modal";
 import { StreamingTheaterModal } from "./streaming-theater-modal";
 import {
   formatTimecode,
@@ -91,7 +93,18 @@ export function StreamButton({
     setResumeDetail(null);
   }, [theaterOpen, mediaType, tmdbId, season, episode, variant]);
 
+  const prepare = React.useCallback(() => {
+    prepareClientStream({ type: mediaType, id: tmdbId, title, server: readPreferredServer(), season: playSeason, episode: playEpisode });
+  }, [mediaType, tmdbId, title, playSeason, playEpisode]);
+
+  React.useEffect(() => {
+    if (variant !== "hero" || theaterOpen) return;
+    const timer = window.setTimeout(prepare, 700);
+    return () => window.clearTimeout(timer);
+  }, [prepare, variant, theaterOpen]);
+
   const openTheater = () => {
+    markPlaybackClick();
     setOpenToken((n) => n + 1);
     setTheaterOpen(true);
   };
@@ -115,6 +128,9 @@ export function StreamButton({
         <Button
           type="button"
           size="lg"
+          onPointerEnter={prepare}
+          onFocus={prepare}
+          onTouchStart={prepare}
           onClick={openTheater}
           className={cn(
             "relative group h-12 px-6 rounded-xl font-semibold text-sm tracking-wide transition-all duration-300",
@@ -137,6 +153,9 @@ export function StreamButton({
         <Button
           type="button"
           size="sm"
+          onPointerEnter={prepare}
+          onFocus={prepare}
+          onTouchStart={prepare}
           onClick={openTheater}
           className={cn(
             "w-full h-9 rounded-xl font-medium text-xs tracking-wide transition-all",
@@ -155,6 +174,9 @@ export function StreamButton({
           type="button"
           variant="outline"
           size="sm"
+          onPointerEnter={prepare}
+          onFocus={prepare}
+          onTouchStart={prepare}
           onClick={openTheater}
           className={cn(
             "h-8 gap-1.5 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white text-xs",
@@ -171,6 +193,9 @@ export function StreamButton({
           type="button"
           variant="ghost"
           size="sm"
+          onPointerEnter={prepare}
+          onFocus={prepare}
+          onTouchStart={prepare}
           onClick={openTheater}
           className={cn(
             "h-7 w-7 p-0 rounded-full text-white hover:bg-white/20 hover:text-white transition-colors",
