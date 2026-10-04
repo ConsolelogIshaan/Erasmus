@@ -7,6 +7,56 @@ function query(server = "lisbon", episode = "1") {
 }
 
 describe("playback preparation", () => {
+  it("does not spend VidCore browser time on speculative preparation", async () => {
+    const { prepareClientStream, resolveClientStream } = await import("./client-resolution");
+    vi.stubGlobal("document", { visibilityState: "visible" });
+    const fetcher = vi.fn(async () => Response.json({ ok: true, servers: [{ url: "https://example.test/master.m3u8" }] }));
+    vi.stubGlobal("fetch", fetcher);
+    prepareClientStream({ type: "movie", id: "411", title: "Demo", server: "vidcore" });
+    expect(fetcher).not.toHaveBeenCalled();
+    await resolveClientStream(query("vidcore"));
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves API failure reasons and displays capacity failures without claiming a missing file", async () => {
+    const { resolveClientStream, streamResolutionErrorMessage } = await import("./client-resolution");
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ ok: false, error: "VidCore cloud browser daily quota exhausted" }, { status: 502 })));
+    await expect(resolveClientStream(query("vidcore"))).rejects.toThrow("daily quota exhausted");
+    expect(streamResolutionErrorMessage(new Error("VidCore cloud browser daily quota exhausted"), "vidcore")).toContain("daily discovery allowance");
+    expect(streamResolutionErrorMessage(new Error("VidCore cloud discovery busy"), "vidcore")).toContain("Wait a moment");
+    expect(streamResolutionErrorMessage(new Error("quota exhausted"), "lisbon")).toBe("This server has no file. Pick another.");
+  });
+
+  it("keeps a prepared VidCore source beyond 45 seconds without renewing its expiry", async () => {
+    vi.useFakeTimers();
+    const { resolveClientStream } = await import("./client-resolution");
+    const expiresAt = Date.now() + 120_000;
+    const fetcher = vi.fn(async () => Response.json({ ok: true, expiresAt, servers: [{ url: "https://example.test/master.m3u8", is4K: true }] }));
+    vi.stubGlobal("fetch", fetcher);
+    await resolveClientStream(query("vidcore"));
+    vi.advanceTimersByTime(75_000);
+    await resolveClientStream(query("vidcore"));
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(40_001);
+    await resolveClientStream(query("vidcore"));
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    // An already expired API result is not retained for another two minutes.
+    await resolveClientStream(query("vidcore"));
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
+  it("requests a server-side source refresh only for VidCore Retry", async () => {
+    const { resolveClientStream } = await import("./client-resolution");
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ ok: true, servers: [{ url: "https://example.test/master.m3u8" }] }));
+    vi.stubGlobal("fetch", fetcher);
+    await resolveClientStream(query("vidcore"));
+    await resolveClientStream(query("vidcore"), true);
+    await resolveClientStream(query("aphelion"), true);
+    expect(new URL(String(fetcher.mock.calls[0][0]), "https://erasmus.test").searchParams.has("refresh")).toBe(false);
+    expect(new URL(String(fetcher.mock.calls[1][0]), "https://erasmus.test").searchParams.get("refresh")).toBe("1");
+    expect(new URL(String(fetcher.mock.calls[2][0]), "https://erasmus.test").searchParams.has("refresh")).toBe(false);
+  });
+
   it("prepares the master, HD playlist and one startup fragment", async () => {
     const { prepareClientStream } = await import("./client-resolution");
     vi.stubGlobal("document", { visibilityState: "visible" });

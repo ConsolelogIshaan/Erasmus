@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { posterUrl, backdropUrl } from "@/lib/media/image";
 import { fetchClientMediaDetails } from "@/lib/media/client-details";
 import { Badge } from "@/components/ui/badge";
+import { ImdbRatingBadge } from "@/features/media/components/imdb-rating-badge";
 import { WATCH_STATUS_LABELS, type LibraryEntry } from "@/types/library";
 import { ROUTES } from "@/constants/routes";
 import { springSoft } from "@/animations/motion";
@@ -153,8 +154,8 @@ export function LibraryPosterCard({
       : ROUTES.show(entry.external_id);
 
   const isLandscape = orientation === "landscape";
-  const backdropImg = backdropUrl(resolvedBackdrop ?? entry.backdrop_path, "w780");
-  const posterImg = posterUrl(resolvedPoster ?? entry.poster_path, "w500");
+  const backdropImg = backdropUrl(resolvedBackdrop ?? entry.backdrop_path, "w1280");
+  const posterImg = posterUrl(resolvedPoster ?? entry.poster_path, "w780");
   const src = isLandscape ? (backdropImg ?? posterImg) : posterImg;
 
   const progress = localProgress ?? Math.min(100, Math.max(0, entry.progress_percent ?? 0));
@@ -212,6 +213,7 @@ export function LibraryPosterCard({
             <div className="relative aspect-video overflow-hidden rounded-xl border border-border/40 bg-muted shadow-md transition-all duration-300 group-hover:border-border/80 group-hover:shadow-xl group-hover:shadow-black/50">
               {src ? (
                 <Image
+                  decoding="async"
                   src={src}
                   alt=""
                   fill
@@ -243,6 +245,7 @@ export function LibraryPosterCard({
 
               {/* Top-left badges (favorite / pinned) */}
               <div className="absolute left-2 top-2 flex items-center gap-1 z-10">
+                <ImdbRatingBadge mediaType={entry.media_type} id={entry.external_id} />
                 {entry.is_favorite ? (
                   <span className="inline-flex rounded-full bg-black/65 p-1 text-primary backdrop-blur-sm">
                     <Heart className="h-3 w-3 fill-current" aria-label="Favorite" />
@@ -280,6 +283,7 @@ export function LibraryPosterCard({
             <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-transparent bg-muted shadow-md transition-shadow duration-300 group-hover:shadow-xl group-hover:shadow-black/50">
               {src ? (
                 <Image
+                  decoding="async"
                   src={src}
                   alt=""
                   fill
@@ -310,6 +314,7 @@ export function LibraryPosterCard({
               ) : null}
 
               <div className="absolute left-1.5 top-1.5 flex flex-col gap-1 z-10">
+                <ImdbRatingBadge mediaType={entry.media_type} id={entry.external_id} />
                 {entry.is_favorite ? (
                   <span className="inline-flex rounded-full bg-black/65 p-1 text-primary backdrop-blur-sm">
                     <Heart className="h-3 w-3 fill-current" aria-label="Favorite" />

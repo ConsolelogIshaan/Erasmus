@@ -263,7 +263,7 @@ function ResultCard({
       ? profileUrl(item.imagePath, "w185")
       : item.kind === "company"
         ? logoUrl(item.imagePath, "w300")
-        : posterUrl(item.imagePath, "w342");
+        : posterUrl(item.imagePath, "w780");
   return (
     <Link
       href={item.href}
@@ -274,6 +274,7 @@ function ResultCard({
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-white/5">
         {image ? (
           <Image
+            decoding="async"
             src={image}
             alt=""
             fill

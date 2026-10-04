@@ -1,0 +1,250 @@
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
+  min-width: 0;
+  border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: 8px;
+  background: linear-gradient(145deg, #22252d, #16181e);
+}
+
+.wordmark {
+  width: 64%;
+  max-width: 180px;
+  height: 70px;
+  object-fit: contain;
+}
+.whiteWordmark {
+  filter: brightness(0) invert(1);
+}
+.studioPage {
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  padding: 12px 0 32px;
+}
+.brandBackdrop {
+  position: absolute;
+  z-index: -1;
+  inset: -100px -24px auto;
+  height: 650px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--studio-color) 15%, #20232c),
+    transparent
+  );
+}
+.studioPage[data-studio="paramount-plus"] .brandBackdrop {
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    #0646a8 0%,
+    #102743 48%,
+    transparent 80%
+  );
+}
+.studioPage[data-studio="disney-plus"] .brandBackdrop {
+  background: linear-gradient(180deg, #252936 0%, #202630 48%, transparent 100%);
+}
+.studioPage[data-studio="peacock"] .brandBackdrop {
+  background: radial-gradient(ellipse at 30% 0%, #2b2b2b, transparent 75%);
+}
+.brandHero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: clamp(230px, 23vw, 290px);
+  flex-direction: column;
+  gap: 16px;
+}
+.catalogScope {
+  color: #ffffffa6;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.heroWordmark {
+  width: min(420px, 68vw);
+  height: 180px;
+  object-fit: contain;
+}
+.studioPage[data-studio="hbo-max"] .heroWordmark {
+  width: min(360px, 65vw);
+}
+.studioPage[data-studio="netflix"] .heroWordmark {
+  width: min(460px, 70vw);
+}
+.serviceSwitcher {
+  margin-bottom: 28px;
+  min-width: 0;
+}
+.switcherHeading,
+.shelfHeading h2 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.switcherHeading {
+  margin-bottom: 12px;
+}
+.serviceRail {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 5px 4px 14px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+.serviceRail .card {
+  flex: 0 0 clamp(140px, 15vw, 205px);
+  aspect-ratio: 16 / 9;
+  scroll-snap-align: start;
+}
+.studioPage > section,
+.studioPage > div:not(.brandBackdrop),
+.studioPage > p {
+  position: relative;
+}
+.shelf {
+  margin: 28px 0 12px;
+  min-width: 0;
+}
+.shelfHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.railControls {
+  display: flex;
+  gap: 6px;
+}
+.railControls button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #ffffff20;
+  border-radius: 50%;
+  background: #ffffff08;
+}
+.railControls button:hover {
+  background: #ffffff18;
+}
+.railControls button:focus-visible,
+.posterRail:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 3px;
+}
+.posterRail {
+  display: flex;
+  gap: 18px;
+  overflow-x: auto;
+  padding: 14px 4px 22px;
+  margin-inline: -4px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+.posterCell {
+  flex: 0 0 clamp(145px, 15.5vw, 210px);
+  scroll-snap-align: start;
+  min-width: 0;
+}
+.continueTile {
+  flex: 0 0 clamp(145px, 15.5vw, 210px);
+  min-height: 240px;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  border: 1px solid #ffffff14;
+  border-radius: 8px;
+  background: #ffffff04;
+  font-size: 13px;
+  color: #ffffff9e;
+}
+.continueTile button,
+.continueTile a,
+.railFooter button,
+.railFooter a {
+  color: #fff;
+  font-size: 12px;
+  border: 1px solid #ffffff24;
+  border-radius: 999px;
+  padding: 8px 14px;
+}
+.continueTile button:focus-visible,
+.continueTile a:focus-visible,
+.railFooter button:focus-visible,
+.railFooter a:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 3px;
+}
+.continueTile button:disabled,
+.railFooter button:disabled {
+  opacity: 0.5;
+}
+.railFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #ffffff80;
+  font-size: 12px;
+  min-height: 36px;
+}
+.posterCell > div > div:first-child {
+  border-radius: 8px;
+}
+@media (max-width: 640px) {
+  .brandHero {
+    height: 230px;
+  }
+  .heroWordmark {
+    height: 130px;
+  }
+  .brandBackdrop {
+    inset-inline: -16px;
+    height: 540px;
+  }
+  .wordmark {
+    height: 48px;
+  }
+  .posterRail {
+    gap: 12px;
+  }
+}
+
+.card:focus-visible {
+  outline: 2px solid hsl(var(--foreground) / 0.9);
+  outline-offset: 4px;
+}
+
+.card:active {
+  background: hsl(var(--muted));
+}
+
+@media (min-width: 640px) {
+  .card {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card {
+    transition: border-color 150ms ease;
+  }
+
+  .card:hover {
+    border-color: hsl(var(--foreground) / 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

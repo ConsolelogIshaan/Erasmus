@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { posterUrl } from "@/lib/media/image";
 import { formatYear } from "@/lib/media/format";
 import { mediaHref } from "@/lib/media/routes";
+import { ImdbRatingBadge } from "@/features/media/components/imdb-rating-badge";
 import { WATCH_STATUS_LABELS, type WatchStatus } from "@/types/library";
 
 import {
@@ -73,7 +74,7 @@ export function FriendPosterCard({
   const [loaded, setLoaded] = React.useState(false);
   const [hovered, setHovered] = React.useState(false);
 
-  const src = posterUrl(item.posterPath, "w342");
+  const src = posterUrl(item.posterPath, "w780");
   const year = formatYear(item.releaseDate);
   const rating = displayRating(item);
   const episode = episodeLabel(item);
@@ -137,14 +138,12 @@ export function FriendPosterCard({
                 <div className="skeleton-shimmer absolute inset-0" aria-hidden />
               ) : null}
               <Image
+                decoding="async"
                 src={src}
                 alt=""
                 fill
                 sizes="(max-width: 640px) 33vw, 144px"
-                className={cn(
-                  "object-cover transition-opacity duration-500 ease-out",
-                  loaded ? "opacity-100" : "opacity-0",
-                )}
+                className="object-cover"
                 priority={priority}
                 onLoad={() => setLoaded(true)}
               />
@@ -164,11 +163,12 @@ export function FriendPosterCard({
           ) : null}
 
           {rating ? (
-            <div className="pointer-events-none absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+            <div className="pointer-events-none absolute bottom-7 left-1.5 inline-flex items-center gap-0.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
               <Star className="fill-primary text-primary h-2.5 w-2.5" aria-hidden />
-              {rating}
+              Friend {rating}
             </div>
           ) : null}
+          <ImdbRatingBadge mediaType={item.mediaType} id={item.externalId} className="absolute top-1.5 left-1.5" />
 
           <div className="pointer-events-none absolute top-1.5 right-1.5 flex flex-col items-end gap-1">
             {item.isFavorite ? (

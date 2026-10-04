@@ -45,7 +45,7 @@ let cached: { value: LandingShowcase; expiresAt: number } | null = null;
 let inFlight: Promise<LandingShowcase> | null = null;
 
 function toPoster(item: MediaSummary, index: number): ShowcasePoster | null {
-  const url = posterUrl(item.posterPath, "w342");
+  const url = posterUrl(item.posterPath, "w780");
   if (!url) return null;
 
   return {

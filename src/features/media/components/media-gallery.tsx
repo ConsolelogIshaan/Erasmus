@@ -139,6 +139,7 @@ export function MediaGallery({ images, className }: MediaGalleryProps) {
               <div className="relative h-[min(70vh,720px)] w-full">
                 <Image
                   src={mediaImageUrl(activeList[index]!.path, "original") ?? ""}
+                  unoptimized
                   alt=""
                   fill
                   className="object-contain"

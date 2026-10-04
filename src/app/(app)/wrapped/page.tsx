@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-
 import { ContributionHeatmap } from "@/features/intelligence/components/contribution-heatmap";
 import { StatCounter } from "@/features/intelligence/components/stat-counter";
 import { Badge } from "@/components/ui/badge";
@@ -139,7 +138,7 @@ function FavoriteCard({
       </div>
     );
   }
-  const src = posterUrl(entry.poster_path, "w185");
+  const src = posterUrl(entry.poster_path, "w780");
   const href =
     entry.media_type === "movie"
       ? ROUTES.movie(entry.external_id)
@@ -152,7 +151,7 @@ function FavoriteCard({
     >
       <span className="relative h-28 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
         {src ? (
-          <Image src={src} alt="" fill className="object-cover" sizes="80px" />
+          <Image decoding="async" src={src} alt="" fill className="object-cover" sizes="80px" />
         ) : null}
       </span>
       <span className="space-y-1">

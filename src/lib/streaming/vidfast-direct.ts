@@ -203,23 +203,40 @@ async function resolveVidfastDirectStreamSingle(input: {
       return { hit: null, debug: `no session token found in page payload (html len ${html.length})` };
     }
 
+    const encStage1 = await fetch(
+      `${ENC_API}/enc-vidfast?${new URLSearchParams({ text: sessionToken, stage: "1" })}`,
+      { signal: AbortSignal.timeout(4500) },
+    );
+    const stage1Json = (await encStage1.json()) as {
+      status?: number;
+      result?: { stage1?: string; token?: string };
+    };
+    if (!encStage1.ok || stage1Json.status !== 200 || !stage1Json.result?.stage1 || !stage1Json.result.token) {
+      return { hit: null, debug: `enc-vidfast stage 1 returned status ${stage1Json.status ?? encStage1.status}` };
+    }
+    if (new URL(stage1Json.result.stage1).origin !== new URL(pageUrl).origin) {
+      return { hit: null, debug: "Unexpected VidFast session origin" };
+    }
+    const handshake = await fetch(stage1Json.result.stage1, {
+      method: "POST",
+      headers: { "User-Agent": "Mozilla/5.0", Referer: VIDFAST_REFERER, "X-Requested-With": "XMLHttpRequest", "X-CSRF-Token": stage1Json.result.token },
+      signal: AbortSignal.timeout(4500),
+    });
+    if (!handshake.ok) return { hit: null, debug: `VidFast session handshake returned HTTP ${handshake.status}` };
+    const handshakeText = await handshake.text();
     const encRes = await fetch(
-      `${ENC_API}/enc-vidfast?text=${encodeURIComponent(sessionToken)}`,
-      {
-        signal: AbortSignal.timeout(4500),
-      },
+      `${ENC_API}/enc-vidfast?${new URLSearchParams({ text: handshakeText, stage: "2" })}`,
+      { signal: AbortSignal.timeout(4500) },
     );
     const encJson = (await encRes.json()) as {
       status?: number;
       result?: { servers?: string; stream?: string; token?: string };
     };
-    if (
-      encJson.status !== 200 ||
-      !encJson.result?.servers ||
-      !encJson.result?.stream ||
-      !encJson.result?.token
-    ) {
-      return { hit: null, debug: `enc-vidfast returned status ${encJson.status}` };
+    if (!encRes.ok || encJson.status !== 200 || !encJson.result?.servers || !encJson.result.stream || !encJson.result.token) {
+      return { hit: null, debug: `enc-vidfast stage 2 returned status ${encJson.status ?? encRes.status}` };
+    }
+    if (new URL(encJson.result.servers).origin !== new URL(pageUrl).origin || new URL(encJson.result.stream).origin !== new URL(pageUrl).origin) {
+      return { hit: null, debug: "Unexpected VidFast catalog origin" };
     }
 
     const { servers, stream, token } = encJson.result;

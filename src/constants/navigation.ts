@@ -5,6 +5,7 @@ import {
   Film,
   Heart,
   Home,
+  Clapperboard,
   Settings,
   Search,
   Target,
@@ -60,6 +61,12 @@ export const MAIN_NAV: readonly NavItem[] = [
     href: ROUTES.anime,
     icon: AnimeIcon,
     description: "Browse anime",
+  },
+  {
+    title: "Studios",
+    href: ROUTES.studios,
+    icon: Clapperboard,
+    description: "Browse by streaming service",
   },
   {
     title: "Watchlist",

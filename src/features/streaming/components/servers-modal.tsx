@@ -6,13 +6,18 @@ import { Check, GripVertical, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   TOTAL_STREAMING_SERVERS,
-  isCinejoyServer,
-  isEmbedServer,
   type StreamServer,
 } from "@/lib/streaming/stream-resolver";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "erasmus_preferred_server";
+const FEATURED_4K_SERVERS = ["lisbon", "vidcore", "aphelion"];
+
+function qualityTier(server: StreamServer): number {
+  if (/\b4k\b/i.test(server.badge)) return 0;
+  if (/\b1080p\b|\bfull hd\b/i.test(server.badge)) return 1;
+  return 2;
+}
 
 interface ServersModalProps {
   open: boolean;
@@ -40,7 +45,7 @@ export function ServersModal({
     let cancelled = false;
     const fetchStatus = async () => {
       try {
-        const res = await fetch("/api/stream/tunnel-status");
+        const res = await fetch("/api/stream/tunnel-status", { cache: "no-store" });
         if (res.ok) {
           const data = (await res.json()) as {
             relay?: { status: string; port: number };
@@ -61,9 +66,20 @@ export function ServersModal({
 
   if (!open) return null;
 
-  const cinejoyServers = servers.filter((s) => isCinejoyServer(s.id));
-  const directServers = servers.filter((s) => !isEmbedServer(s.id) && !isCinejoyServer(s.id));
-  const embedServers = servers.filter((s) => isEmbedServer(s.id));
+  // Sort a copy for display only; preserve playback priorities and equal-tier order.
+  const orderedServers = [...servers].sort((a, b) => {
+    const tierDifference = qualityTier(a) - qualityTier(b);
+    if (tierDifference !== 0) return tierDifference;
+    if (qualityTier(a) !== 0) return 0;
+    const aFeatured = FEATURED_4K_SERVERS.indexOf(a.id);
+    const bFeatured = FEATURED_4K_SERVERS.indexOf(b.id);
+    return (aFeatured === -1 ? 3 : aFeatured) - (bFeatured === -1 ? 3 : bFeatured);
+  });
+  const serverGroups = [
+    { label: "4K-capable servers", servers: orderedServers.filter((s) => qualityTier(s) === 0) },
+    { label: "1080p / Full HD servers", servers: orderedServers.filter((s) => qualityTier(s) === 1) },
+    { label: "Other servers · quality varies", servers: orderedServers.filter((s) => qualityTier(s) === 2) },
+  ];
 
   const renderServerItem = (server: StreamServer) => {
     const active = server.id === activeServerId;
@@ -118,7 +134,7 @@ export function ServersModal({
         <div className="mb-2 flex items-center justify-between pb-2 border-b border-white/10">
           <div>
             <h2 className="text-sm font-semibold tracking-wide text-white">Streaming Servers</h2>
-            <p className="text-[11px] text-white/45">Select a direct CDN or fallback embed player</p>
+            <p className="text-[11px] text-white/45">Highest quality first · availability varies by title</p>
           </div>
           <div className="flex items-center gap-1">
             <Button
@@ -158,11 +174,11 @@ export function ServersModal({
                 "h-2 w-2 rounded-full",
                 tunnelInfo?.relay?.status === "online"
                   ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"
-                  : "bg-rose-500",
+                  : tunnelInfo?.relay?.status === "offline" ? "bg-rose-500" : "bg-amber-400",
               )}
             />
             <span className="font-medium text-white/90">
-              Relay: {tunnelInfo?.relay?.status === "online" ? "Port 8443 (0ms)" : "Offline"}
+              Relay: {tunnelInfo?.relay?.status === "online" ? "Port 8443" : tunnelInfo?.relay?.status === "offline" ? "Offline" : tunnelInfo ? "Unknown" : "Checking"}
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-white/60">
@@ -183,43 +199,16 @@ export function ServersModal({
         </div>
 
         <div className="overflow-y-auto pr-1 space-y-4 max-h-[64vh]">
-          {directServers.length > 0 && (
-            <div>
+          {serverGroups.filter((group) => group.servers.length > 0).map((group) => (
+            <div key={group.label}>
               <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">
-                Direct Streams (4K & Fast Native)
+                {group.label}
               </div>
               <ul className="space-y-0.5">
-                {directServers.map(renderServerItem)}
+                {group.servers.map(renderServerItem)}
               </ul>
             </div>
-          )}
-
-          {cinejoyServers.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between px-2 pb-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-cyan-400">
-                  Cinejoy Pipeline (Direct & Zero-Buffer Beta)
-                </span>
-                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300">
-                  New
-                </span>
-              </div>
-              <ul className="space-y-0.5">
-                {cinejoyServers.map(renderServerItem)}
-              </ul>
-            </div>
-          )}
-
-          {embedServers.length > 0 && (
-            <div>
-              <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">
-                Embed Fallback Players (Filmu / Bingr Network)
-              </div>
-              <ul className="space-y-0.5">
-                {embedServers.map(renderServerItem)}
-              </ul>
-            </div>
-          )}
+          ))}
         </div>
       </div>
     </div>

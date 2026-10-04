@@ -1,14 +1,15 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
+import Image, { getImageProps } from "next/image";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Play, Info, Sparkles, Star } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, Info, Sparkles } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 import { backdropUrl, logoUrl } from "@/lib/media/image";
-import { formatVote, formatYear } from "@/lib/media/format";
+import { formatYear } from "@/lib/media/format";
+import { ImdbRatingBadge } from "@/features/media/components/imdb-rating-badge";
 import { mediaHref } from "@/lib/media/routes";
 import { markPlaybackClick, prepareClientStream } from "@/lib/streaming/client-resolution";
 import { readPreferredServer } from "@/features/streaming/components/servers-modal";
@@ -34,6 +35,15 @@ interface HeroBannerProps {
   ctaHref?: string;
 }
 
+function subscribePageVisibility(onChange: () => void) {
+  document.addEventListener("visibilitychange", onChange);
+  return () => document.removeEventListener("visibilitychange", onChange);
+}
+
+const getPageVisibility = () => document.visibilityState !== "hidden";
+const getServerVisibility = () => true;
+const HERO_LOGO_SIZES = "(max-width: 768px) 360px, 560px";
+
 /**
  * Grand cinematic full-bleed discovery hero moving panel.
  * Features synchronized ambient atmosphere blending, silky Ken Burns backdrop crossfades,
@@ -56,6 +66,26 @@ export function HeroBanner({ items, item, intervalMs = 6000, ctaHref }: HeroBann
   >({});
   const [theaterOpen, setTheaterOpen] = React.useState(false);
   const fetchedKeysRef = React.useRef<Set<string>>(new Set());
+  const heroRef = React.useRef<HTMLElement>(null);
+  const [heroVisible, setHeroVisible] = React.useState(true);
+  const [settledBackgrounds, setSettledBackgrounds] = React.useState<Record<string, boolean>>({});
+  const pageVisible = React.useSyncExternalStore(
+    subscribePageVisibility, getPageVisibility, getServerVisibility,
+  );
+  const canWork = heroVisible && pageVisible && !theaterOpen;
+  const active = slides[index] ?? slides[0];
+  const bg = active ? backdropUrl(active.backdropPath ?? active.posterPath, "original") : null;
+  const backgroundSettled = !bg || settledBackgrounds[bg] === true;
+
+  React.useEffect(() => {
+    const element = heroRef.current;
+    if (!element || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setHeroVisible(entry?.isIntersecting ?? false);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const go = React.useCallback(
     (dir: -1 | 1) => {
@@ -66,14 +96,13 @@ export function HeroBanner({ items, item, intervalMs = 6000, ctaHref }: HeroBann
 
   // Auto-advance carousel timer (pauses on hover)
   React.useEffect(() => {
-    if (slides.length <= 1 || paused || theaterOpen) return;
+    if (slides.length <= 1 || paused || !canWork) return;
+    if (!backgroundSettled) return;
     const timer = window.setInterval(() => {
       setIndex((i) => (i + 1) % slides.length);
     }, intervalMs);
     return () => window.clearInterval(timer);
-  }, [slides.length, paused, theaterOpen, intervalMs]);
-
-  const active = slides[index] ?? slides[0];
+  }, [slides.length, paused, canWork, intervalMs, bg, backgroundSettled]);
 
   // Synchronize Page-Level Ambient Background with active carousel slide
   React.useEffect(() => {
@@ -87,51 +116,49 @@ export function HeroBanner({ items, item, intervalMs = 6000, ctaHref }: HeroBann
     });
   }, [active, setAmbientTheme]);
 
-  // Preload all backdrop images and logos immediately in browser memory
+  const next = slides[(index + 1) % slides.length];
+  const nextBackdrop = next ? backdropUrl(next.backdropPath ?? next.posterPath, "original") : null;
+  const nextKey = next ? `${next.mediaType}:${next.id}` : "";
+  const nextLogo = logoUrl(detailsCache[nextKey]?.logoPath ?? next?.logoPath, "w500");
+
+  // Speculative artwork stays low priority and stops when the hero is hidden.
   React.useEffect(() => {
-    if (!slides.length || typeof window === "undefined") return;
-    slides.forEach((slide) => {
-      // 1. Preload high-res backdrops
-      const imgPath = slide.backdropPath ?? slide.posterPath;
-      if (imgPath) {
-        const bg1 = backdropUrl(imgPath, "original");
-        const bg2 = backdropUrl(imgPath, "w1280");
-        if (bg1) {
-          const img = new window.Image();
-          img.src = bg1;
-        }
-        if (bg2 && bg2 !== bg1) {
-          const img = new window.Image();
-          img.src = bg2;
-        }
-      }
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+    if (!canWork || slides.length <= 1 || connection?.saveData) return;
+    const artwork: { src: string; srcSet?: string; sizes?: string }[] = [];
+    if (nextBackdrop) artwork.push({ src: nextBackdrop });
+    if (nextLogo) {
+      const { props } = getImageProps({ src: nextLogo, alt: "", fill: true, sizes: HERO_LOGO_SIZES });
+      artwork.push({ src: props.src, srcSet: props.srcSet, sizes: props.sizes });
+    }
+    const images = artwork.map(({ src, srcSet, sizes }) => {
+      const img = new window.Image();
+      img.decoding = "async";
+      img.fetchPriority = "low";
+      if (sizes) img.sizes = sizes;
+      if (srcSet) img.srcset = srcSet;
+      img.src = src;
+      return img;
+    });
+    return () => images.forEach((img) => {
+      img.removeAttribute("src");
+      img.removeAttribute("srcset");
+    });
+  }, [canWork, slides.length, nextBackdrop, nextLogo]);
 
-      // 2. Preload logos
+  React.useEffect(() => {
+    if (!canWork) return;
+    [slides[index], slides[(index + 1) % slides.length]].forEach((slide) => {
+      if (!slide) return;
       const key = `${slide.mediaType}:${slide.id}`;
-      const activeDetails = detailsCache[key];
-      const logoPath = activeDetails?.logoPath ?? slide.logoPath;
-      if (logoPath) {
-        const url = logoUrl(logoPath, "w500");
-        if (url) {
-          const img = new window.Image();
-          img.src = url;
-        }
-      }
 
-      // 3. Details fetch if logo not yet known (strictly once per slide)
+      // Details fetch if logo not yet known (strictly once per slide)
       if (slide.logoPath || fetchedKeysRef.current.has(key)) return;
       fetchedKeysRef.current.add(key);
 
       fetchClientMediaDetails(slide.mediaType, slide.id)
         .then((data) => {
           if (!data) return;
-          if (data.logoPath) {
-            const url = logoUrl(data.logoPath, "w500");
-            if (url) {
-              const img = new window.Image();
-              img.src = url;
-            }
-          }
           setDetailsCache((prev) => ({
             ...prev,
             [key]: {
@@ -142,7 +169,7 @@ export function HeroBanner({ items, item, intervalMs = 6000, ctaHref }: HeroBann
         })
         .catch(() => {});
     });
-  }, [slides]);
+  }, [slides, index, canWork]);
 
   if (!active) return null;
 
@@ -154,9 +181,6 @@ export function HeroBanner({ items, item, intervalMs = 6000, ctaHref }: HeroBann
     !failedLogos[activeKey] && activeLogoPath ? logoUrl(activeLogoPath, "w500") : null;
 
   const href = ctaHref ?? mediaHref(active.mediaType, active.id);
-  const bg =
-    backdropUrl(active.backdropPath ?? active.posterPath, "original") ??
-    backdropUrl(active.backdropPath ?? active.posterPath, "w1280");
   const year = formatYear(active.releaseDate);
 
   const tvResume = active.mediaType === "tv" ? getTvShowResume(String(active.id)) : null;
@@ -165,6 +189,8 @@ export function HeroBanner({ items, item, intervalMs = 6000, ctaHref }: HeroBann
 
   return (
     <section
+      ref={heroRef}
+      data-carousel-running={canWork && !paused && slides.length > 1 && backgroundSettled}
       className="relative flex min-h-[min(94vh,64rem)] w-full flex-col justify-end overflow-hidden select-none"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
@@ -203,6 +229,10 @@ export function HeroBanner({ items, item, intervalMs = 6000, ctaHref }: HeroBann
             {bg ? (
               <Image
                 src={bg}
+                unoptimized
+                decoding="async"
+                onLoad={() => setSettledBackgrounds((prev) => prev[bg] ? prev : { ...prev, [bg]: true })}
+                onError={() => setSettledBackgrounds((prev) => prev[bg] ? prev : { ...prev, [bg]: true })}
                 alt=""
                 fill
                 priority={true}
@@ -290,7 +320,7 @@ export function HeroBanner({ items, item, intervalMs = 6000, ctaHref }: HeroBann
                           alt={active.title}
                           fill
                           priority={index === 0}
-                          sizes="(max-width: 768px) 360px, 560px"
+                          sizes={HERO_LOGO_SIZES}
                           className="object-contain object-bottom brightness-[1.06] drop-shadow-[0_12px_32px_rgba(0,0,0,0.9)] filter sm:object-left-bottom"
                           onError={() => {
                             setFailedLogos((prev) => ({ ...prev, [activeKey]: true }));
@@ -364,12 +394,7 @@ export function HeroBanner({ items, item, intervalMs = 6000, ctaHref }: HeroBann
                 {year ? (
                   <span className="px-1 text-xs font-medium text-white/70">{year}</span>
                 ) : null}
-                {active.voteAverage != null && active.voteAverage > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/15 px-2.5 py-0.5 text-xs font-semibold text-amber-300 backdrop-blur-md">
-                    <Star className="h-3 w-3 fill-amber-300" />
-                    {formatVote(active.voteAverage)}
-                  </span>
-                ) : null}
+                <ImdbRatingBadge mediaType={active.mediaType} id={active.id} className="text-xs" />
               </div>
             </div>
           </div>

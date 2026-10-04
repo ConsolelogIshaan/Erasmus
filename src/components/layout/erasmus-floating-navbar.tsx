@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutGroup, motion, useReducedMotion } from "framer-motion";
-import { Bookmark, Film, Heart, Home, Target, Tv, Users } from "lucide-react";
+import { Bookmark, Clapperboard, Film, Heart, Home, Target, Tv, Users } from "lucide-react";
 
 import { AnimeIcon } from "@/components/layout/anime-icon";
 import { SearchLink } from "@/components/layout/search-link";
@@ -21,6 +21,7 @@ const PRIMARY_NAV = [
   { title: "TV Shows", href: ROUTES.tv, icon: Tv },
   { title: "Movies", href: ROUTES.movies, icon: Film },
   { title: "Anime", href: ROUTES.anime, icon: AnimeIcon },
+  { title: "Studios", href: ROUTES.studios, icon: Clapperboard },
   { title: "For You", href: ROUTES.recommendations, icon: Target },
   { title: "Favorites", href: ROUTES.favorites, icon: Heart },
   { title: "Friends", href: ROUTES.friends, icon: Users },
@@ -113,10 +114,10 @@ export function ErasmusFloatingNavbar({ user }: { user: UserMenuUser }) {
           className={cn(
             styles.surface,
             "pointer-events-auto mx-auto flex h-14 w-full items-center rounded-full px-2",
-            "min-[900px]:h-[3.25rem] min-[900px]:w-fit min-[900px]:max-w-[calc(100vw-2rem)] md:px-2",
+            "min-[1024px]:h-[3.25rem] min-[1024px]:w-fit min-[1024px]:max-w-[calc(100vw-2rem)] md:px-2",
           )}
         >
-          <div className="flex min-w-0 flex-1 items-center min-[900px]:hidden">
+          <div className="flex min-w-0 flex-1 items-center min-[1024px]:hidden">
             <MobileNav />
             <Link
               href={ROUTES.discover}
@@ -153,7 +154,7 @@ export function ErasmusFloatingNavbar({ user }: { user: UserMenuUser }) {
           </div>
 
           <nav
-            className="hidden items-center gap-0.5 min-[900px]:flex lg:gap-1"
+            className="hidden items-center gap-0.5 min-[1024px]:flex lg:gap-1"
             aria-label="Main navigation"
           >
             <Link

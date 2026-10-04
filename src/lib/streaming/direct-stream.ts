@@ -39,6 +39,7 @@ export interface DirectStreamResult {
   ok: boolean;
   error?: string;
   debug?: string;
+  expiresAt?: number;
   referer?: string;
   captions?: CinejoyCaption[];
   servers: DirectServer[];
@@ -57,15 +58,19 @@ export async function extractDirectStream(input: {
   year?: string;
   imdbId?: string;
   anilistId?: number;
+  refresh?: boolean;
 }): Promise<DirectStreamResult> {
   const effectiveServerId = input.serverId ?? "lisbon";
   const cacheKey = `${effectiveServerId}:${input.type}:${input.tmdbId}:${input.season ?? 1}:${input.episode ?? 1}`;
+  const refreshVidcore = effectiveServerId === "vidcore" && input.refresh;
+  if (refreshVidcore) extractCache.delete(cacheKey);
   const cached = extractCache.get(cacheKey);
   // If the cached entry is a degraded non-4K fallback for a 4K server like Lisbon,
   // expire it in only 10 seconds so turning on the PC upgrades immediately!
   const isDegradedCached = effectiveServerId === "lisbon" && !cached?.result.servers.some((s) => s.is4K);
   const effectiveCacheMs = isDegradedCached ? 10_000 : CACHE_MS;
-  if (cached && Date.now() - cached.at < effectiveCacheMs) {
+  const sourceFresh = effectiveServerId !== "vidcore" || (cached?.result.expiresAt ?? 0) > Date.now();
+  if (cached && sourceFresh && Date.now() - cached.at < effectiveCacheMs) {
     return cached.result;
   }
 
@@ -123,6 +128,7 @@ export async function extractDirectStream(input: {
           ok: true,
           referer: "https://vidcore.io/",
           captions: hit.captions,
+          expiresAt: hit.expiresAt,
           // Already wrapped in the public Cloudflare cloud-only relay. Do not
           // rewrap into localhost or the residential tunnel during preparation.
           servers: [{ name: "VidCore", url: hit.url, kind: "hls", is4K: hit.is4K, ms: Date.now() - started }],

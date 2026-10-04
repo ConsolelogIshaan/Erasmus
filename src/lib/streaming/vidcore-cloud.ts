@@ -39,8 +39,13 @@ const discoveryScript = String.raw`
       decoded.set(text, pending);
       return pending;
     };
-    const session = await (await request('https://enc-dec.app/api/enc-vidcore?text='+encodeURIComponent(token))).json();
-    if (session.status !== 200 || !session.result) throw new Error('VidCore session decoding unavailable');
+    const first = await (await request('https://enc-dec.app/api/enc-vidcore?'+new URLSearchParams({text:token,stage:'1'}))).json();
+    if (first.status !== 200 || !first.result?.stage1 || !first.result.token) throw new Error('VidCore stage 1 session decoding unavailable');
+    if (new URL(first.result.stage1).origin !== location.origin) throw new Error('Unexpected session origin');
+    const handshakeHeaders = {'X-Requested-With':'XMLHttpRequest','X-CSRF-Token':first.result.token};
+    const handshake = await (await request(first.result.stage1, {method:'POST',headers:handshakeHeaders})).text();
+    const session = await (await request('https://enc-dec.app/api/enc-vidcore?'+new URLSearchParams({text:handshake,stage:'2'}))).json();
+    if (session.status !== 200 || !session.result?.servers || !session.result.stream || !session.result.token) throw new Error('VidCore stage 2 session decoding unavailable');
     const {servers,stream,token:csrf} = session.result;
     if (new URL(servers).origin !== location.origin || new URL(stream).origin !== location.origin) throw new Error('Unexpected catalog origin');
     const headers = {'X-Requested-With':'XMLHttpRequest','X-CSRF-Token':csrf};
@@ -60,11 +65,9 @@ const discoveryScript = String.raw`
 `;
 
 export async function discoverVidcoreCloud(browser: VidcoreBrowser, path: string): Promise<VidcoreDiscovered[]> {
-  const limits = await browser.limits();
-  // Leave a minute below the published Free daily quota for in-flight requests.
-  // Exhaustion fails explicitly; it never invokes the PC relay.
-  if ((limits.usedBrowserTimeSeconds ?? 0) >= 540) throw new Error("VidCore cloud browser daily budget exhausted");
-  if (limits.allowedBrowserAcquisitions === 0 || (limits.timeUntilNextAllowedBrowserAcquisition ?? 0) > 0) throw new Error("VidCore cloud discovery busy; please retry shortly");
+  // Quick Actions enforce the account's actual plan and capacity themselves.
+  // Session acquisition limits and an assumed Free-plan cutoff can reject
+  // requests that Cloudflare would still accept.
   const response = await browser.quickAction("content", {
     url: "https://vidcore.io" + path,
     gotoOptions: { timeout: 6000, waitUntil: "domcontentloaded" },
@@ -73,7 +76,13 @@ export async function discoverVidcoreCloud(browser: VidcoreBrowser, path: string
     addScriptTag: [{ content: discoveryScript }],
     waitForSelector: { selector: "#erasmus-vidcore-result", timeout: 18000 },
   });
-  if (response.status === 429) throw new Error("VidCore cloud discovery busy or quota exhausted; please retry later");
+  if (response.status === 429) {
+    const detail = await response.text().catch(() => "");
+    if (/browser time|for today|daily|duration.*limit/i.test(detail)) {
+      throw new Error("VidCore cloud browser daily quota exhausted; retry after the daily reset");
+    }
+    throw new Error("VidCore cloud discovery busy or quota exhausted; please retry later");
+  }
   if (!response.ok) throw new Error("VidCore cloud browser HTTP " + response.status);
   const payload = await response.json() as { result?: string };
   const encoded = payload.result?.match(/data-json="([^"<>]+)"/)?.[1];

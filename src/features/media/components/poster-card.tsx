@@ -5,12 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Bookmark, Loader2, Play, Star } from "lucide-react";
+import { Bookmark, Loader2, Play } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { posterUrl } from "@/lib/media/image";
-import { formatNumber, formatVote, formatYear } from "@/lib/media/format";
+import { formatNumber, formatYear } from "@/lib/media/format";
+import { ImdbRatingBadge } from "@/features/media/components/imdb-rating-badge";
 import { mediaHref } from "@/lib/media/routes";
 import { actionUpsertAndSetStatus } from "@/features/library/actions/library-actions";
 import { markPlaybackClick, prepareClientStream } from "@/lib/streaming/client-resolution";
@@ -29,10 +30,12 @@ interface PosterCardProps {
   quickActions?: boolean;
   /** Position in a ranked shelf. Takes the audience-score badge's corner. */
   rank?: number;
-  /** IMDb score for ranked shelves — shown instead of the TMDB star. */
+  /** Optional prefetched IMDb score. Other cards resolve it when visible. */
   imdbRating?: number | null;
   /** IMDb vote count, shown in the caption in place of the media type. */
   imdbVotes?: number | null;
+  /** Studio shelves keep posters stationary so row boundaries cannot clip hover zoom. */
+  hoverEffect?: "lift" | "none";
 }
 
 const sizeClass = {
@@ -94,6 +97,7 @@ export function PosterCard({
   rank,
   imdbRating,
   imdbVotes,
+  hoverEffect = "lift",
 }: PosterCardProps) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
@@ -108,7 +112,7 @@ export function PosterCard({
   const playEpisode = tvResume?.episode ?? 1;
 
   const href = mediaHref(item.mediaType, item.id);
-  const src = posterUrl(item.posterPath, "w500");
+  const src = posterUrl(item.posterPath, "w780");
   const year = formatYear(item.releaseDate);
   const showActions = quickActions && hovered;
 
@@ -135,7 +139,7 @@ export function PosterCard({
     }
   };
 
-  const motionTarget = reduceMotion
+  const motionTarget = reduceMotion || hoverEffect === "none"
     ? { y: 0, scale: 1, zIndex: hovered ? 8 : 0 }
     : hovered
       ? { y: -12, scale: 1.12, zIndex: 40 }
@@ -144,7 +148,8 @@ export function PosterCard({
   return (
     <motion.div
       className={cn(
-        "group relative shrink-0 will-change-transform",
+        "group relative shrink-0",
+        hovered && "will-change-transform",
         sizeClass[size],
         className,
       )}
@@ -181,14 +186,14 @@ export function PosterCard({
                 <div className="skeleton-shimmer absolute inset-0" aria-hidden />
               ) : null}
               <Image
+                decoding="async"
                 src={src}
                 alt=""
                 fill
                 sizes="(max-width: 640px) 45vw, (max-width: 1024px) 208px, 224px"
                 className={cn(
-                  "object-cover transition-[transform,opacity] duration-500 ease-out",
-                  hovered && "scale-[1.02]",
-                  loaded ? "opacity-100" : "opacity-0",
+                  "object-cover transition-transform duration-500 ease-out",
+                  hovered && hoverEffect !== "none" && "scale-[1.02]",
                 )}
                 priority={priority}
                 onLoad={() => setLoaded(true)}
@@ -212,26 +217,10 @@ export function PosterCard({
           <span className="pointer-events-none absolute top-0 left-0 z-[1] rounded-br-xl bg-black/80 px-2.5 py-1 font-mono text-xs font-semibold text-white tabular-nums backdrop-blur-sm">
             {rank}
           </span>
-        ) : item.voteAverage != null && item.voteAverage > 0 ? (
-          <div className="pointer-events-none absolute top-2 left-2 z-[1] inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
-            <Star className="fill-primary text-primary h-3 w-3" aria-hidden="true" />
-            {formatVote(item.voteAverage)}
-          </div>
         ) : null}
 
-        {/* Steps aside for the quick actions, which claim the same corner on hover */}
-        {imdbRating != null ? (
-          <span
-            className={cn(
-              "pointer-events-none absolute bottom-1.5 left-1.5 z-[1] inline-flex items-center",
-              "gap-1 rounded-full bg-[#f5c518] px-2 py-0.5 text-[10px] font-bold text-black",
-              "transition-opacity duration-200 ease-out",
-              showActions ? "opacity-0" : "opacity-100",
-            )}
-          >
-            IMDb {imdbRating.toFixed(1)}
-          </span>
-        ) : null}
+        <ImdbRatingBadge mediaType={item.mediaType} id={item.id} rating={imdbRating}
+          className={cn("absolute top-2 z-[1]", rank != null ? "right-2" : "left-2")} />
 
         <AnimatePresence>
           {lastStatus && lastStatus in STATUS_BADGE ? (

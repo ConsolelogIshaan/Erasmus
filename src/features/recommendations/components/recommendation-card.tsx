@@ -4,11 +4,12 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Sparkles, Star } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { posterUrl } from "@/lib/media/image";
-import { formatVote, formatYear } from "@/lib/media/format";
+import { formatYear } from "@/lib/media/format";
+import { ImdbRatingBadge } from "@/features/media/components/imdb-rating-badge";
 import { mediaHref } from "@/lib/media/routes";
 import type { Recommendation } from "@/types/recommendations";
 
@@ -46,7 +47,7 @@ export function RecommendationCard({
   const [hovered, setHovered] = React.useState(false);
 
   const href = mediaHref(item.media.mediaType, item.media.id);
-  const src = posterUrl(item.media.posterPath, "w342");
+  const src = posterUrl(item.media.posterPath, "w780");
   const year = formatYear(item.media.releaseDate);
   const hasDetails = item.explanation.details.length > 0;
 
@@ -94,14 +95,12 @@ export function RecommendationCard({
                 <div className="skeleton-shimmer absolute inset-0" aria-hidden />
               ) : null}
               <Image
+                decoding="async"
                 src={src}
                 alt=""
                 fill
                 sizes="(max-width: 640px) 40vw, 176px"
-                className={cn(
-                  "object-cover transition-opacity duration-500 ease-out",
-                  loaded ? "opacity-100" : "opacity-0",
-                )}
+                className="object-cover"
                 priority={priority}
                 onLoad={() => setLoaded(true)}
               />
@@ -112,12 +111,7 @@ export function RecommendationCard({
             </div>
           )}
 
-          {item.media.voteAverage != null && item.media.voteAverage > 0 ? (
-            <div className="pointer-events-none absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-black/65 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
-              <Star className="fill-primary text-primary h-3 w-3" aria-hidden />
-              {formatVote(item.media.voteAverage)}
-            </div>
-          ) : null}
+          <ImdbRatingBadge mediaType={item.media.mediaType} id={item.media.id} className="absolute top-2 left-2" />
 
           {item.tier === "wildcard" ? (
             <div className="pointer-events-none absolute top-2 right-2 inline-flex items-center gap-1 rounded-md bg-black/65 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">

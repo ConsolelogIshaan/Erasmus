@@ -6,7 +6,9 @@ import { getPlaybackProgress, shouldResume } from "./playback-progress";
 
 export interface ClientStreamResolution {
   ok?: boolean;
+  error?: string;
   referer?: string;
+  expiresAt?: number;
   captions?: { url: string; label: string; language: string; isExternal?: boolean; hearingImpaired?: boolean }[];
   servers?: { url: string; kind?: "hls" | "file"; is4K?: boolean; isDirectCors?: boolean; cloudOnly?: boolean; hdUrl?: string; fourKUrl?: string }[];
 }
@@ -97,14 +99,22 @@ export function resolveClientStream(query: URLSearchParams, refresh = false): Pr
   if (cached && cached.expires > Date.now()) return Promise.resolve(cached.data);
   const existing = pending.get(key);
   if (existing) return existing;
-  const request = fetch(`/api/stream/direct?${query}`, { signal: AbortSignal.timeout(45_000) })
+  const requestQuery = new URLSearchParams(query);
+  if (refresh && query.get("server") === "vidcore") requestQuery.set("refresh", "1");
+  const request = fetch(`/api/stream/direct?${requestQuery}`, { signal: AbortSignal.timeout(45_000) })
     .then(async (response) => {
-      if (!response.ok) throw new Error(`Stream resolution failed (${response.status})`);
-      const data = await response.json() as ClientStreamResolution;
+      const data = await response.json().catch(() => null) as ClientStreamResolution | null;
+      if (!response.ok) throw new Error(data?.error || `Stream resolution failed (${response.status})`);
+      if (!data) throw new Error("Invalid stream resolution response");
       if (data.ok && data.servers?.[0]?.url) {
         if (ready.size >= 24) ready.delete(ready.keys().next().value!);
-        const expiresIn = query.get("server") === "lisbon" && !data.servers.some((server) => server.is4K) ? 10_000 : TTL;
-        ready.set(key, { data, expires: Date.now() + expiresIn });
+        let expiresIn = query.get("server") === "lisbon" && !data.servers.some((server) => server.is4K) ? 10_000 : TTL;
+        // Keep prepared VidCore sources until their original server expiry,
+        // leaving five seconds for the player's first playlist request.
+        if (query.get("server") === "vidcore" && Number.isFinite(data.expiresAt)) {
+          expiresIn = Math.max(0, Math.min(120_000, data.expiresAt! - Date.now() - 5_000));
+        }
+        if (expiresIn > 0) ready.set(key, { data, expires: Date.now() + expiresIn });
       }
       return data;
     })
@@ -114,6 +124,9 @@ export function resolveClientStream(query: URLSearchParams, refresh = false): Pr
 }
 
 export function prepareClientStream(input: { type: "movie" | "tv"; id: string; title: string; server: string; season?: number; episode?: number }) {
+  // VidCore discovery uses a scarce account-wide browser allowance. Spend it
+  // only when the user requests playback, never on speculative card previews.
+  if (input.server === "vidcore") return;
   if (isEmbedServer(input.server) || document.visibilityState !== "visible") return;
   const query = new URLSearchParams({ type: input.type, id: input.id, title: input.title, server: input.server, season: String(input.season || 1), episode: String(input.episode || 1) });
   // Limit speculative lookups; a real Play request is never held by this limit.
@@ -121,4 +134,16 @@ export function prepareClientStream(input: { type: "movie" | "tv"; id: string; t
   const saved = getPlaybackProgress({ mediaType: input.type, tmdbId: input.id, season: input.season, episode: input.episode });
   const startAt = saved && shouldResume(saved) ? saved.seconds : 0;
   void resolveClientStream(query).then((data) => preparePlaylists(data, startAt)).catch(() => {});
+}
+
+export function streamResolutionErrorMessage(error: unknown, serverId: string): string {
+  if (serverId !== "vidcore") return "This server has no file. Pick another.";
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  if (/daily.*(?:budget|quota)|browser time.*limit|for today/i.test(message)) {
+    return "VidCore's daily discovery allowance is used up. Retry after the daily reset or choose another server.";
+  }
+  if (/busy|429/i.test(message)) {
+    return "VidCore discovery is busy. Wait a moment, then retry.";
+  }
+  return "VidCore could not load this title. Retry or choose another server.";
 }

@@ -420,7 +420,6 @@ export function NativePlayer({
   season = 1,
   episode = 1,
   episodeTitle,
-  overview,
   logoPath,
   tagline,
   onBack,
@@ -1471,12 +1470,6 @@ export function NativePlayer({
           </p>
         ) : null}
 
-        {/* Short Synopsis / Overview */}
-        {overview ? (
-          <p className="max-w-xl text-xs sm:text-sm text-white/70 line-clamp-2 sm:line-clamp-3 leading-relaxed drop-shadow mt-1">
-            {overview}
-          </p>
-        ) : null}
       </div>
 
       {/* Top Controls Area */}

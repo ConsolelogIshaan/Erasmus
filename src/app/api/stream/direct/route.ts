@@ -30,6 +30,7 @@ export async function GET(request: Request) {
     year,
     imdbId,
     anilistId,
+    refresh: serverId === "vidcore" && searchParams.get("refresh") === "1",
   });
   const status = result.ok ? 200 : 502;
   return NextResponse.json(result, { status });

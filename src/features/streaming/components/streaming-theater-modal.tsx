@@ -55,7 +55,7 @@ import {
 import { cn } from "@/lib/utils";
 import { stillUrl } from "@/lib/media/image";
 import { buildRelayUrl } from "@/lib/streaming/relay";
-import { resolveClientStream } from "@/lib/streaming/client-resolution";
+import { resolveClientStream, streamResolutionErrorMessage } from "@/lib/streaming/client-resolution";
 import { fetchClientMediaDetails } from "@/lib/media/client-details";
 
 /**
@@ -583,13 +583,13 @@ export function StreamingTheaterModal({
             }
             wallStartRef.current = Date.now();
           } else {
-            setLoadError("This server has no file. Pick another.");
+            setLoadError(streamResolutionErrorMessage(data.error, selectedServerId));
           }
         },
       )
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!cancelled) {
-          setLoadError("This server has no file. Pick another.");
+          setLoadError(streamResolutionErrorMessage(error, selectedServerId));
         }
       });
     return () => {

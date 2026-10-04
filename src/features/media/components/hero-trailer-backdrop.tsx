@@ -119,7 +119,7 @@ export function HeroTrailerBackdrop({
   className,
 }: HeroTrailerBackdropProps) {
   const trailer = React.useMemo(() => pickPreferredTrailer(videos), [videos]);
-  const still = backdropUrl(backdropPath ?? posterPath, "w1280");
+  const still = backdropUrl(backdropPath ?? posterPath, "original");
 
   const hostRef = React.useRef<HTMLDivElement>(null);
   const playerRef = React.useRef<YtPlayer | null>(null);
@@ -283,6 +283,7 @@ export function HeroTrailerBackdrop({
           >
             <Image
               src={still}
+              unoptimized
               alt=""
               fill
               priority

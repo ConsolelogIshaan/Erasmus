@@ -12,6 +12,13 @@ const POSTER = "https://image.tmdb.org/t/p/w342/xTZuh9ziUjIyHBWO9OvqNIPqVWe.jpg"
 const SUPPORTED = [45, 92, 154, 185, 300, 342, 500, 780, 1280];
 
 describe("imageLoader", () => {
+  it("preserves explicitly requested original artwork at every display width", () => {
+    const original = POSTER.replace("/w342/", "/original/");
+    for (const width of [144, 400, 1280, 3840]) {
+      expect(imageLoader({ src: original, width })).toBe(original);
+    }
+  });
+
   it("snaps a requested width up to the next supported TMDB bucket", () => {
     expect(imageLoader({ src: POSTER, width: 40 })).toContain("/t/p/w45/");
     expect(imageLoader({ src: POSTER, width: 100 })).toContain("/t/p/w154/");

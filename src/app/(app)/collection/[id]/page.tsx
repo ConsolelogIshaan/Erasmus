@@ -41,15 +41,15 @@ export default async function CollectionPage({ params }: PageProps) {
   const collection = await getCollection(id);
   if (!collection) notFound();
 
-  const bg = backdropUrl(collection.backdropPath ?? collection.posterPath, "w1280");
-  const poster = posterUrl(collection.posterPath, "w342");
+  const bg = backdropUrl(collection.backdropPath ?? collection.posterPath, "original");
+  const poster = posterUrl(collection.posterPath, "w780");
 
   return (
     <div className="space-y-10 animate-fade-up">
       <section className="relative -mx-4 overflow-hidden sm:-mx-6 lg:-mx-8">
         <div className="absolute inset-0 h-72 sm:h-80">
           {bg ? (
-            <Image src={bg} alt="" fill priority sizes="100vw" className="object-cover" />
+            <Image src={bg} unoptimized alt="" fill priority sizes="100vw" className="object-cover" />
           ) : null}
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/40" />
         </div>
@@ -57,7 +57,7 @@ export default async function CollectionPage({ params }: PageProps) {
         <div className="relative content-container flex flex-col gap-6 pb-6 pt-20 sm:flex-row sm:items-end sm:pt-28">
           {poster ? (
             <div className="relative mx-auto aspect-[2/3] w-36 shrink-0 overflow-hidden rounded-xl border-0 shadow-xl sm:mx-0 sm:w-40">
-              <Image src={poster} alt="" fill sizes="160px" className="object-cover" priority />
+              <Image decoding="async" src={poster} alt="" fill sizes="160px" className="object-cover" priority />
             </div>
           ) : null}
           <div className="space-y-2 text-center sm:text-left">

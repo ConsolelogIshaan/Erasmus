@@ -3,6 +3,7 @@ import { CLOUDFLARE_HLS_RELAY } from "./relay";
 import type { CinejoyCaption } from "./cinejoy-stream";
 
 const ORIGIN = "https://vidcore.io";
+const SOURCE_TTL_MS = 120_000;
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
 
 export interface VidcoreHit {
@@ -10,9 +11,10 @@ export interface VidcoreHit {
   mirror: string;
   is4K: boolean;
   captions: CinejoyCaption[];
+  expiresAt: number;
 }
 export interface VidcoreRelay { fetch(input: Request): Promise<Response> }
-const completed = new Map<string, { at: number; hit: VidcoreHit }>();
+const completed = new Map<string, VidcoreHit>();
 const pending = new Map<string, Promise<VidcoreHit | null>>();
 
 function edgeCache(): Cache | undefined {
@@ -41,7 +43,11 @@ async function request(url: string, init: RequestInit = {}, deadline?: AbortSign
   return response;
 }
 
-async function resolve(input: { type: "movie" | "tv"; tmdbId: string; season?: number; episode?: number }, browser: VidcoreBrowser, relay?: VidcoreRelay): Promise<VidcoreHit | null> {
+function isFresh(hit: VidcoreHit): boolean {
+  return Number.isFinite(hit?.expiresAt) && hit.expiresAt > Date.now();
+}
+
+async function resolve(input: { type: "movie" | "tv"; tmdbId: string; season?: number; episode?: number; refresh?: boolean }, browser: VidcoreBrowser, relay?: VidcoreRelay): Promise<VidcoreHit | null> {
   const deadline = AbortSignal.timeout(24_000);
   const fetchSource = (url: string, init?: RequestInit) => request(url, init, deadline, relay);
   // Share the body, not a Response: concurrent mirrors must not consume the
@@ -61,11 +67,17 @@ async function resolve(input: { type: "movie" | "tv"; tmdbId: string; season?: n
   if (!Number.isSafeInteger(season) || !Number.isSafeInteger(episode) || season < 1 || episode < 1) throw new Error("Invalid VidCore episode");
   const path = input.type === "tv" ? `/tv/${input.tmdbId}/${season}/${episode}` : `/movie/${input.tmdbId}`;
   const cache = edgeCache();
-  const cacheRequest = new Request(`https://erasmus-web.erasmustv.workers.dev/__vidcore-cache/v1${path}`);
+  const cacheRequest = new Request(`https://erasmus-web.erasmustv.workers.dev/__vidcore-cache/v2${path}`);
   if (cache) {
     try {
-      const cached = await cache.match(cacheRequest);
-      if (cached) return await cached.json() as VidcoreHit;
+      if (input.refresh) await cache.delete(cacheRequest);
+      else {
+        const cached = await cache.match(cacheRequest);
+        if (cached) {
+          const hit = await cached.json() as VidcoreHit;
+          if (isFresh(hit)) return hit;
+        }
+      }
     } catch { /* Cache availability must not block discovery. */ }
   }
   const candidates: VidcoreDiscovered[] = await discoverVidcoreCloud(browser, path);
@@ -101,7 +113,7 @@ async function resolve(input: { type: "movie" | "tv"; tmdbId: string; season?: n
   const usable = results.filter((hit): hit is NonNullable<typeof hit> => hit !== null);
   usable.sort((a, b) => b.score - a.score || Number(b.adaptive) - Number(a.adaptive));
   if (!usable.length && failures.length) throw new Error(`VidCore media unavailable (${failures.join("; ")})`);
-  const best = usable[0] || null;
+  const best = usable[0] ? { ...usable[0], expiresAt: Date.now() + SOURCE_TTL_MS } : null;
   if (cache && best) {
     try { await cache.put(cacheRequest, Response.json(best, { headers: { "Cache-Control": "public, max-age=120" } })); }
     catch { /* Playback still works when the edge cache is unavailable. */ }
@@ -109,16 +121,17 @@ async function resolve(input: { type: "movie" | "tv"; tmdbId: string; season?: n
   return best;
 }
 
-export function resolveVidcoreDirectStream(input: { type: "movie" | "tv"; tmdbId: string; season?: number; episode?: number }, browser: VidcoreBrowser, relay?: VidcoreRelay): Promise<VidcoreHit | null> {
+export function resolveVidcoreDirectStream(input: { type: "movie" | "tv"; tmdbId: string; season?: number; episode?: number; refresh?: boolean }, browser: VidcoreBrowser, relay?: VidcoreRelay): Promise<VidcoreHit | null> {
   const key = `${input.type}:${input.tmdbId}:${input.season ?? 1}:${input.episode ?? 1}`;
   const cached = completed.get(key);
-  if (cached && Date.now() - cached.at < 120_000) return Promise.resolve(cached.hit);
+  if (!input.refresh && cached && isFresh(cached)) return Promise.resolve(cached);
+  completed.delete(key);
   const existing = pending.get(key);
   if (existing) return existing;
   const promise = resolve(input, browser, relay).then(hit => {
     if (hit) {
       if (completed.size >= 24) completed.delete(completed.keys().next().value!);
-      completed.set(key, { at: Date.now(), hit });
+      completed.set(key, hit);
     }
     return hit;
   }).finally(() => pending.delete(key));

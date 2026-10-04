@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-
 import { cn } from "@/lib/utils";
 import { useLightning } from "../lightning-context";
 import type { ShowcasePoster } from "../showcase";
@@ -44,6 +43,7 @@ export function ArtTile({
     >
       {poster ? (
         <Image
+          decoding="async"
           src={poster.posterUrl}
           alt={poster.title}
           fill

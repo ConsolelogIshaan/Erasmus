@@ -1,0 +1,8 @@
+- File:Netflix 2015 logo.svg: https://commons.wikimedia.org/wiki/File:Netflix_2015_logo.svg
+- File:Amazon Prime Video logo.svg: https://commons.wikimedia.org/wiki/File:Amazon_Prime_Video_logo.svg
+- File:Apple TV Plus Logo.svg: https://commons.wikimedia.org/wiki/File:Apple_TV_Plus_Logo.svg
+- File:NBCUniversal Peacock Logo (2020–2026).svg: https://commons.wikimedia.org/wiki/File:NBCUniversal_Peacock_Logo_(2020%E2%80%932026).svg
+- File:Disney+ logo.svg: https://commons.wikimedia.org/wiki/File:Disney%2B_logo.svg
+- File:Paramount+ logo.svg: https://commons.wikimedia.org/wiki/File:Paramount%2B_logo.svg
+- File:Hulu Logo.svg: https://commons.wikimedia.org/wiki/File:Hulu_logo_(2018).svg
+- File:HBO Max Logo.svg: https://commons.wikimedia.org/wiki/File:HBO_Max_Logo.svg
